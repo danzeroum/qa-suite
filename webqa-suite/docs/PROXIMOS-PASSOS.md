@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **480 testes coletados**; num ambiente
-limpo o resultado é **477 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **488 testes coletados**; num ambiente
+limpo o resultado é **485 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -259,6 +259,15 @@ instalação nova não pode parecer defeito.
 
 **`--painel` nunca escreve no ledger**, em nenhuma combinação de flags. É leitura
 mais renderização, então é seguro no GitHub, onde nada pode tocar o arquivo.
+
+**O zero é explicado, não só exibido** (OS-33). Quando a sequência está em zero, a
+página lista os motivos DERIVADOS do ledger — nenhuma noite do ambiente oficial,
+entradas em quarentena, alvo com identidade nova, flake na última noite contada.
+São cumulativos: o ledger real hoje tem três ao mesmo tempo, e mostrar só o
+primeiro esconderia que corrigir a origem não bastaria para a contagem começar.
+Zero por "ainda não houve noite oficial" e zero por "flake ontem" são situações
+opostas — a primeira é normal, a segunda é infraestrutura quebrando — e o mesmo
+dígito representa as duas.
 
 ### 4.2 `Finding` em toda a dimensão `seguranca` — FEITO (OS-28 e OS-29)
 

@@ -431,6 +431,22 @@ def violacoes_do_contrato(caminho: Path = CONTRATO_PADRAO) -> int:
         return 0
 
 
+def _sha_do_alvo_de_hoje() -> str:
+    """Identidade do alvo fixture AGORA, para o painel saber se ela mudou.
+
+    Devolve `""` quando não dá para resolver — e aí o painel simplesmente não
+    afirma o motivo, em vez de chutar. Dizer "o alvo mudou" sem saber seria
+    inventar explicação para um zero, que é pior que não explicá-lo.
+    """
+    try:
+        sys.path.insert(0, str(ROOT))
+        from fixture_target.servir import identidade
+
+        return sha256_do_alvo(identidade())
+    except Exception:
+        return ""
+
+
 def escrever_painel(ledger: dict, destino: Path, meta: int = META_PADRAO,
                     ledger_path: str = "docs/lgpd-estabilidade.json") -> Path:
     """Renderiza o painel. NUNCA escreve no ledger — só lê e desenha."""
@@ -438,7 +454,8 @@ def escrever_painel(ledger: dict, destino: Path, meta: int = META_PADRAO,
     from webqa.estabilidade_html import montar
 
     html = montar(ledger, caminhada(ledger.get("execucoes") or []),
-                  violacoes_do_contrato(), meta=meta, ledger_path=ledger_path)
+                  violacoes_do_contrato(), meta=meta, ledger_path=ledger_path,
+                  sha_do_alvo_atual=_sha_do_alvo_de_hoje())
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_text(html, encoding="utf-8")
     return destino

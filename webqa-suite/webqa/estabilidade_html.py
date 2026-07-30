@@ -150,6 +150,76 @@ def _historia(violacoes: int) -> str:
     )
 
 
+def motivos_do_zero(execucoes: list[dict], passos: list, sha_do_alvo_atual: str = "") -> list[str]:
+    """Por que a sequência está em zero — derivado do ledger, não escrito à mão.
+
+    Exibir "0/10" sem dizer por quê ensina o leitor a desconfiar do número. Pior:
+    zero por *ainda não haver noite oficial* e zero por *flake ontem à noite* são
+    situações opostas — a primeira é normal, a segunda é infraestrutura
+    quebrando — e o mesmo dígito representa as duas.
+
+    Os motivos são cumulativos de propósito: o ledger real hoje tem três ao
+    mesmo tempo, e mostrar só o primeiro esconderia que corrigir a origem não
+    bastaria para a contagem começar.
+    """
+    if not execucoes:
+        return []                          # instalação nova tem texto próprio
+    if passos and passos[-1].streak > 0:
+        return []
+
+    motivos = []
+    fora_do_oficial = [e for e in execucoes if e.get("origem") != "vps"]
+    if len(fora_do_oficial) == len(execucoes):
+        origens = sorted({str(e.get("origem") or "local") for e in execucoes})
+        rotulos = ", ".join(f"<code>{esc(o)}</code>" for o in origens)
+        sujeito = ("a única entrada do ledger é" if len(execucoes) == 1
+                   else f"as {len(execucoes)} entradas do ledger são")
+        motivos.append(
+            f"Nenhuma noite do ambiente oficial: {sujeito} de origem {rotulos}, "
+            "que informa e não pontua." if len(execucoes) == 1 else
+            f"Nenhuma noite do ambiente oficial: {sujeito} de origem {rotulos}, "
+            "que informam e não pontuam.")
+
+    em_quarentena = [e for e in execucoes if _em_quarentena(e)]
+    if em_quarentena:
+        uma = len(em_quarentena) == 1
+        motivos.append(
+            f"{len(em_quarentena)} {'entrada' if uma else 'entradas'} em "
+            f"<strong>quarentena</strong>: {'julgada' if uma else 'julgadas'} por uma "
+            "versão do classificador com defeito conhecido. "
+            f"{'Não conta' if uma else 'Não contam'} e <strong>"
+            f"{'não zera' if uma else 'não zeram'}</strong> — a execução pode ter sido "
+            "boa, e não há como saber.")
+
+    shas_no_ledger = {str(e.get("alvo_sha256") or "") for e in execucoes}
+    if sha_do_alvo_atual and sha_do_alvo_atual not in shas_no_ledger:
+        motivos.append(
+            "O <strong>alvo mudou de identidade</strong> desde a última entrada: o "
+            f"ledger conhece <code>{esc(_sha_curto(next(iter(sorted(shas_no_ledger)))))}</code> "
+            f"e o alvo de hoje é <code>{esc(_sha_curto(sha_do_alvo_atual))}</code>. "
+            "A sequência é por alvo, então recomeça — nove noites limpas contra um "
+            "alvo mais uma contra outro não são dez noites limpas contra nada.")
+
+    if passos and not passos[-1].limpa:
+        motivos.append(
+            "A última noite contada teve <strong>flake de infraestrutura</strong>: o "
+            "equipamento falhou, e é isso — não o veredito sobre o alvo — que zera.")
+    return motivos
+
+
+def _bloco_do_zero(motivos: list[str]) -> str:
+    if not motivos:
+        return ""
+    itens = "".join(f"<li>{m}</li>" for m in motivos)
+    plural = "o motivo" if len(motivos) == 1 else f"os {len(motivos)} motivos"
+    return (f'<div class="marco"><span class="marco-k">Por que a contagem está em '
+            f'zero — {plural}</span>\n<ul>{itens}</ul>\n'
+            '<p class="intro-sec">Zero aqui não é defeito da suíte nem do alvo: é '
+            'ausência de evidência do ambiente oficial. Enquanto os motivos acima '
+            'valerem, a contagem não começa — e começar antes seria contar noite que '
+            'ninguém observou.</p></div>')
+
+
 def _nota_de_alvo(linhas: list[dict], passos: list) -> str:
     """Aviso de troca de identidade do alvo, quando houver."""
     shas = {linha["alvo_sha256"] for linha in linhas if linha["alvo_sha256"]}
@@ -195,8 +265,15 @@ def _tabela(linhas: list[dict]) -> str:
 
 
 def montar(ledger: dict, passos: list, violacoes_do_contrato: int,
-           meta: int = META_PADRAO, ledger_path: str = "docs/lgpd-estabilidade.json") -> str:
-    """HTML completo do painel. Arquivo único, sem requisição externa."""
+           meta: int = META_PADRAO, ledger_path: str = "docs/lgpd-estabilidade.json",
+           sha_do_alvo_atual: str = "") -> str:
+    """HTML completo do painel. Arquivo único, sem requisição externa.
+
+    `sha_do_alvo_atual` é a identidade do alvo de HOJE, que o painel compara com
+    a do ledger para dizer se a sequência recomeçou. Vazio quando o chamador não
+    consegue resolvê-la — e aí o motivo simplesmente não é afirmado, em vez de
+    ser chutado.
+    """
     execucoes = list(ledger.get("execucoes") or [])
     linhas = classificar_linhas(execucoes, passos)
     streak = passos[-1].streak if passos else 0
@@ -249,6 +326,7 @@ sob observação, noite após noite</p>
 {_slots(streak, meta)}
 </div>
 </div>
+{_bloco_do_zero(motivos_do_zero(execucoes, passos, sha_do_alvo_atual))}
 <div class="marco">
 <span class="marco-k">O que acontece em {meta}/{meta}</span>
 <p><strong>FASE 2 DESTRAVADA</strong> — testes ativos de consentimento (aceitar/recusar o
