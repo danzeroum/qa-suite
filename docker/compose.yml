@@ -1,0 +1,31 @@
+# Execução noturna oficial da métrica de estabilidade.
+#
+# Agendamento fica FORA do container (cron do host) — ver docs/VPS.md. Um
+# container que dorme 24h esperando a próxima noite é um processo de longa
+# duração acumulando estado; `run --rm` a cada noite é descartável e idêntico.
+name: webqa-estabilidade
+
+services:
+  estabilidade:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: webqa-estabilidade:local
+    init: true                       # PID 1 que enterra zumbis do Chromium
+    shm_size: 1gb                    # /dev/shm pequeno derruba o Chromium
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      # Declara o ambiente oficial: SÓ com isto a execução conta na sequência
+      # (scripts/estabilidade.py — valor desconhecido degrada para "local").
+      WEBQA_ORIGEM: vps
+      # Relatório em tmpfs: artefato de execução nunca persiste em volume.
+      WEBQA_REPORT_DIR: /tmp/report
+      TZ: UTC
+    volumes:
+      # Segredos montados somente-leitura, jamais copiados para a imagem.
+      # Gere ./secrets/ na VPS conforme docs/VPS.md (a pasta é ignorada no Git).
+      - ./secrets/deploy_key:/run/secrets/deploy_key:ro
+      - ./secrets/known_hosts:/run/secrets/known_hosts:ro
+    tmpfs:
+      - /tmp

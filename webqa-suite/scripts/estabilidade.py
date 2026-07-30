@@ -32,7 +32,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SUMMARY_PADRAO = ROOT / "report" / "summary.json"
+# O diretório de relatório é redirecionável por ambiente (mesma variável que
+# webqa/report.py honra ao ESCREVER). Ler de um lugar fixo enquanto a suíte
+# escreve noutro fazia o noturno da VPS classificar um summary velho — ou
+# nenhum, já que o container não tem `report/` na imagem.
+SUMMARY_PADRAO = Path(os.environ.get("WEBQA_REPORT_DIR") or ROOT / "report") / "summary.json"
 LEDGER_PADRAO = ROOT / "docs" / "lgpd-estabilidade.json"
 META_PADRAO = 10
 # schema 2: entradas ganham "origem" e "dia_utc"; sequência recalculada do

@@ -357,6 +357,22 @@ def test_remover_a_entrada_ci_historica_nao_altera_a_sequencia():
     assert sequencia_oficial(execucoes) == sequencia_oficial(sem_historico)
 
 
+def test_summary_padrao_segue_webqa_report_dir(tmp_path, monkeypatch):
+    """Regressão: a suíte ESCREVE em WEBQA_REPORT_DIR; ler de um caminho fixo
+    fazia o noturno do container classificar summary velho — ou nenhum, já que
+    a imagem não carrega `report/`."""
+    monkeypatch.setenv("WEBQA_REPORT_DIR", str(tmp_path / "relatorio"))
+    import importlib
+
+    import scripts.estabilidade as mod
+    recarregado = importlib.reload(mod)
+    try:
+        assert recarregado.SUMMARY_PADRAO == tmp_path / "relatorio" / "summary.json"
+    finally:
+        monkeypatch.delenv("WEBQA_REPORT_DIR", raising=False)
+        importlib.reload(mod)
+
+
 def test_summary_ausente_falha_com_instrucao(tmp_path, capsys):
     codigo = main([str(tmp_path / "nao-existe.json"), "--ledger", str(tmp_path / "l.json"),
                    "--alvo", ALVO])

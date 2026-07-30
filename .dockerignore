@@ -1,0 +1,25 @@
+# Contexto de build. O `.git` É copiado de propósito: o entrypoint faz
+# `git pull --ff-only` e commita o ledger a partir do repositório da imagem.
+
+# Nunca entrar em camada de imagem — defesa em profundidade contra o acidente
+# de deixar uma chave no diretório do projeto.
+docker/secrets/
+secrets/
+**/*.pem
+**/*.key
+**/id_rsa*
+**/id_ed25519*
+.env
+.env.*
+
+# Artefatos de execução: podem conter hosts e trechos de erro do alvo.
+webqa-suite/report/
+report/
+
+# Ruído
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.venv/
+**/venv/

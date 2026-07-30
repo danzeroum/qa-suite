@@ -3,6 +3,10 @@
 report/
 webqa-suite/report/
 
+# Segredos do noturno da VPS: deploy key e known_hosts vivem só no disco da
+# VPS e são montados somente-leitura no container (docs/VPS.md).
+docker/secrets/
+
 # Python
 __pycache__/
 *.py[cod]
