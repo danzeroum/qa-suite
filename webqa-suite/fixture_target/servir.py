@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import struct
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -67,6 +68,50 @@ APP_JS = (
 # esperava executável.
 MIME_TROCADO = "<!doctype html><html lang=\"pt-BR\"><body>pagina de erro</body></html>\n"
 
+# VIOLAÇÃO (seguranca, Fase B): SVG com handler inline — documento executável
+# servido como se fosse imagem.
+SVG_EXECUTAVEL = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" '
+    'onload="console.log(1)"><rect width="1" height="1"/></svg>\n'
+)
+
+# VIOLAÇÃO (seguranca, Fase B): bundle referenciando sourcemap. O check aponta o
+# caminho e NÃO baixa o .map — baixar seria sondagem (Fase C).
+BUNDLE_JS = "var x = 1;\n//# sourceMappingURL=/bundle.js.map\n"
+
+
+def _foto_com_gps() -> bytes:
+    """JPEG 1x1 válido com APP1/EXIF contendo ponteiro de IFD de GPS.
+
+    VIOLAÇÃO (seguranca, Fase B). Construído aqui, em stdlib, em vez de
+    versionar um binário: o que a violação É fica legível no diff, e não há
+    arquivo opaco no repositório. Nenhuma coordenada real — só a estrutura que
+    o detector procura.
+    """
+    ifd0_offset = 8
+    gps_offset = ifd0_offset + 2 + 12 + 4
+    ifd0 = (struct.pack("<H", 1)
+            + struct.pack("<HHII", 0x8825, 4, 1, gps_offset)   # GPSInfo → IFD de GPS
+            + struct.pack("<I", 0))
+    gps = (struct.pack("<H", 1)
+           + struct.pack("<HHI4s", 0x0001, 2, 2, b"N\x00\x00\x00")  # GPSLatitudeRef
+           + struct.pack("<I", 0))
+    corpo = b"Exif\x00\x00" + b"II*\x00" + struct.pack("<I", ifd0_offset) + ifd0 + gps
+    app1 = b"\xff\xe1" + struct.pack(">H", len(corpo) + 2) + corpo
+    return JPEG_BASE[:2] + app1 + JPEG_BASE[2:]
+
+
+# JPEG 1x1 mínimo e válido — base para a foto com EXIF.
+JPEG_BASE = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a"
+    "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAA"
+    "AQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIh"
+    "MUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpT"
+    "VFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5"
+    "usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APf6KKKAP//Z")
+
+FOTO_GPS = _foto_com_gps()
+
 HOME = f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <title>Loja Fixture — alvo deliberadamente nao conforme</title>
@@ -76,10 +121,16 @@ HOME = f"""<!doctype html>
 <script src="/app.js"></script>
 <!-- VIOLACAO (seguranca): .js servido como text/html -->
 <script src="/fallback.js"></script>
+<!-- VIOLACAO (seguranca Fase B): bundle referenciando sourcemap -->
+<script src="/bundle.js"></script>
 </head><body>
 <h1>Loja Fixture</h1>
 <!-- VIOLACAO: imagem sem atributo alt (WCAG / LBI Art. 63) -->
 <img src="/logo.png" width="1" height="1">
+<!-- VIOLACAO (seguranca Fase B): SVG com handler inline -->
+<img src="/icone.svg" alt="icone" width="1" height="1">
+<!-- VIOLACAO (seguranca Fase B): foto publicada com EXIF-GPS -->
+<img src="/foto.jpg" alt="foto" width="1" height="1">
 <!-- VIOLACAO: dado pessoal na query string -->
 <a href="/newsletter?email=joao@exemplo.com">assine a newsletter</a>
 <a href="/privacidade">Politica de Privacidade</a>
@@ -130,7 +181,8 @@ def identidade() -> str:
       e aí a sequência recomeça, porque o alvo passou a ser outro.
     """
     digest = hashlib.sha256()
-    for parte in (HOME, POLITICA, APP_JS, MIME_TROCADO, *COOKIES):
+    for parte in (HOME, POLITICA, APP_JS, MIME_TROCADO, SVG_EXECUTAVEL,
+                  BUNDLE_JS, *COOKIES):
         digest.update(parte.encode("utf-8"))
         digest.update(b"\0")
     return "fixture_target:" + digest.hexdigest()
@@ -149,6 +201,14 @@ class _Handler(BaseHTTPRequestHandler):
         elif caminho == "/fallback.js":
             # Content-Type MENTE sobre o corpo, de proposito.
             self._responder(MIME_TROCADO.encode("utf-8"), "text/html; charset=utf-8",
+                            com_cookies=False)
+        elif caminho == "/icone.svg":
+            self._responder(SVG_EXECUTAVEL.encode("utf-8"), "image/svg+xml",
+                            com_cookies=False)
+        elif caminho == "/foto.jpg":
+            self._responder(FOTO_GPS, "image/jpeg", com_cookies=False)
+        elif caminho == "/bundle.js":
+            self._responder(BUNDLE_JS.encode("utf-8"), "application/javascript",
                             com_cookies=False)
         elif caminho == "/logo.png":
             self._responder(PIXEL, "image/png", com_cookies=False)

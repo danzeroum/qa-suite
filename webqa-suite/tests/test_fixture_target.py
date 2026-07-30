@@ -67,8 +67,22 @@ def test_form_pessoal_em_get(home):
 
 
 def test_imagem_sem_alt(home):
+    """A LOGO é a única imagem sem alt — e continua sendo.
+
+    A asserção olha a tag da logo, não "nenhum alt na página": o fixture ganhou
+    imagens para a dimensão `seguranca` (SVG executável, foto com EXIF) que TÊM
+    alt de propósito, porque não são violações de acessibilidade. Exigir zero
+    `alt=` no documento inteiro amarraria a violação de acessibilidade ao
+    conteúdo de outra dimensão.
+    """
     corpo, _ = home
-    assert '<img src="/logo.png" width' in corpo and "alt=" not in corpo.split("<form")[0]
+    logo = next(linha for linha in corpo.splitlines() if 'src="/logo.png"' in linha)
+    assert logo.startswith("<img") and "alt=" not in logo
+    outras = [linha for linha in corpo.splitlines()
+              if linha.startswith("<img") and 'src="/logo.png"' not in linha]
+    assert outras and all("alt=" in linha for linha in outras), (
+        "só a logo pode estar sem alt: uma segunda imagem sem alt mudaria a "
+        "contagem que o contrato do fixture cobra")
 
 
 def test_script_de_terceiro_sem_sri(home):
