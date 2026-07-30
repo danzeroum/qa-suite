@@ -1,0 +1,19 @@
+[project]
+name = "webqa-suite"
+version = "1.0.0"
+description = "Testes genéricos de qualidade (performance, funcionalidade, UX) para qualquer aplicação web via HTTP"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# Nos checks, capturar Exception é intencional: falha de rede num sinal
+# opcional não deve derrubar a suíte — vira skip/xfail explicado.
+[tool.ruff.lint.per-file-ignores]
+"checks/**" = ["B017", "BLE001", "S110", "S112"]
+
+[tool.bandit]
+skips = ["B101"]  # assert é o mecanismo do pytest

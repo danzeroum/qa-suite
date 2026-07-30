@@ -1,0 +1,33 @@
+# Alvo e orçamentos de qualidade da WebQA Suite.
+# Sobreponha com variáveis de ambiente: WEBQA_TARGET_URL, WEBQA_TTFB_MS, etc.
+target_url: "https://example.com"
+
+http:
+  timeout_s: 15
+  user_agent: "WebQA-Suite/1.0 (+automated quality checks)"
+
+crawl:
+  max_pages: 15        # limite do crawler de links (respeite o alvo!)
+  same_host_only: true
+
+load_burst:            # rajada leve embutida (pytest -m load)
+  requests: 30
+  concurrency: 10
+
+thresholds:
+  ttfb_ms: 800
+  p50_ms: 800
+  p95_ms: 1500
+  p99_ms: 3000
+  page_weight_kb: 3000
+  html_kb: 300
+  css_files_max: 10
+  js_files_max: 20
+  blocking_scripts_max: 3
+  fcp_ms: 1800
+  lcp_ms: 2500
+  cls: 0.1
+  dcl_ms: 3000
+  max_console_errors: 0
+  a11y_critical_max: 0
+  a11y_serious_max: 0
