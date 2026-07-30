@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **443 testes coletados**; num ambiente
-limpo o resultado é **440 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **467 testes coletados**; num ambiente
+limpo o resultado é **464 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -49,6 +49,7 @@ Consulta, não leitura de entrada:
 | Doc | Quando abrir |
 |---|---|
 | [`LLM.md`](LLM.md) | contrato da camada de sumário por LLM local — leia antes de tocar em `webqa/llm.py` |
+| [`TELEMETRIA.md`](TELEMETRIA.md) | o que a telemetria coleta, sobre quê, e as duas linhas que ela não cruza |
 | [`RECOMENDACOES.md`](RECOMENDACOES.md) | rastrear uma prática de engenharia até onde ela é coberta |
 | [`dimensao-seguranca-consolidado.md`](dimensao-seguranca-consolidado.md) | histórico da consolidação da dimensão `seguranca` |
 | [`handoff/`](handoff/) | material da passagem original (brief de design, ordens de serviço abertas) |
@@ -358,6 +359,7 @@ make audita-design     # gate do pacote de design (§12)
 make estabilidade      # classifica a execução e grava o ledger
 make sumario           # anexo assistido por IA local (desligado por padrão)
 make painel            # report/estabilidade.html a partir do ledger (só lê)
+make telemetria        # agrega campanhas já executadas (não faz requisição)
 make vps-smoke         # valida a VPS antes de agendar o cron
 
 python scripts/estabilidade.py --recompute   # auditoria do ledger, sem gravar

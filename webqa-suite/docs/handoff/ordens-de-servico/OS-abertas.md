@@ -7,9 +7,9 @@
 > colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
 > três lugares e os três divergiam.
 >
-> **Próximo número livre: OS-31.**
+> **Próximo número livre: OS-32.**
 
-Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 440 testes de verificação verdes.
+Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 464 testes de verificação verdes.
 Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
 de design — `docs/qa-suite design brief/referencia/` (spec visual:
 `componentes.html` §5/§8; folha canônica: bloco `<style>` de
@@ -35,7 +35,7 @@ Trilha DESIGN/RELATÓRIO — CONCLUÍDA:
 Trilha CAMPANHA:
   OS-27 ✓ (#27, etiqueta: robots/recuo/sequencial)
      └── OS-28 (campanha multi-alvo) — EM ABERTO
-     └── OS-29 (telemetria operacional) — EM ABERTO
+     └── OS-31 ✓ (#29, telemetria operacional)
      └── [validação contra sites públicos na VPS — pendente de ambiente]
 ```
 
@@ -58,6 +58,7 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-24 v2 | #25 | `0a9e6e5` | `scripts/sumario.py` em processo separado + guardas de linguagem e omissão |
 | OS-26 | #26 | `172ba20` | Painel de estabilidade (`report/estabilidade.html`) + `caminhada()` + schema 5 |
 | OS-27 | #27 | `db7f948` | Camada de etiqueta: robots.txt, recuo 429/503, crawl sequencial, `webqa/rede.py` |
+| OS-31 | #29 | — | Telemetria operacional: 3 cortes, `anonimizar_agregado`, `--calibrar` |
 
 ### Fora da sequência do handoff — numeradas em chat, já em `main`
 
@@ -83,7 +84,7 @@ quatro casos. Não é erro de leitura:
 | **OS-23** | camada LLM (`webqa/llm.py`) | `7944fc7`, template `seguranca` — hoje canonicamente **OS-25** |
 | **OS-27** | camada de etiqueta (`db7f948`) | `c869a28`, correções de doc — hoje **OS-27-bis** |
 | **OS-28** | campanha multi-alvo (**em aberto**) | `e391e55`, Fase B `Finding` — hoje **OS-28-bis** |
-| **OS-29** | telemetria operacional (**em aberto**) | `980b094`, Fase A `Finding` — hoje **OS-29-bis** |
+| **OS-29** | — (número aposentado; a telemetria virou **OS-31**) | `980b094`, Fase A `Finding` — hoje **OS-29-bis** |
 
 Duas notas de auditoria, para que o histórico se explique sozinho:
 
