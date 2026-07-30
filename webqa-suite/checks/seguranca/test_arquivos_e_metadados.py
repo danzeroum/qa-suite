@@ -6,16 +6,28 @@ simplesmente não foi navegado, e ir buscá-lo é sondagem — Fase C, atrás do
 
 É o que separa esta bateria de um scanner: um scanner pergunta ao servidor o que
 ele não ofereceu; aqui só se lê o que ele já entregou ao visitante.
+
+Os checks que REPROVAM constroem `Finding` (docs/SEGURANCA.md §3): severidade e
+fase viajam como dado até o `summary.json`, não como texto dentro da mensagem de
+assert. Os que informam seguem `xfail` e não produzem achado — no vocabulário do
+relatório, `xfail` é alerta, e alerta com selo de severidade viraria um segundo
+semáforo dentro do estado, exatamente o que o §8 do desenho evita.
+
+A evidência NUNCA é mascarada aqui: quem mascara é o construtor do `Finding`.
+Fazê-lo antes duplicaria a borda de escrita e criaria um segundo lugar onde
+esquecer — ver `webqa/dominio.py`.
 """
 from __future__ import annotations
 
 import pytest
 
 from webqa.dominio import (
+    Finding,
     assinatura,
     ler_corpo,
     metadados_exif,
     metadados_pdf,
+    registrar_achados,
     sourcemap_referenciado,
     svg_executavel,
 )
@@ -46,14 +58,20 @@ def _corpos(network_log, sufixos=None, tipos=None):
             yield recurso, ler_corpo(recurso)
 
 
-def test_formato_real_corresponde_a_extensao(network_log):
+def test_formato_real_corresponde_a_extensao(network_log, request):
     """Magic bytes × extensão declarada — FAIL.
 
     O nome do arquivo é declaração de quem o subiu; os primeiros bytes são o que
     ele é. Divergência indica upload sem validação de tipo no servidor — a porta
     por onde entra arquivo executável disfarçado de imagem.
+
+    Severidade **média**, não alta: a divergência é sintoma de validação ausente,
+    não prova de execução. O que se sabe é que o servidor aceitou um arquivo cujo
+    conteúdo não confere com o nome; se aquilo chega a rodar depende do
+    tratamento a jusante, que a bateria não observa. Alta fica reservada ao que
+    executa por si (SVG) ou expõe dado pessoal (GPS).
     """
-    divergentes, nao_avaliados = [], []
+    achados, nao_avaliados = [], []
     for recurso, corpo in _corpos(network_log, sufixos=set(FORMATO_POR_EXTENSAO)):
         if not corpo.avaliavel:
             nao_avaliados.append(f"{recurso.url} ({corpo.motivo})")
@@ -61,52 +79,69 @@ def test_formato_real_corresponde_a_extensao(network_log):
         esperado = FORMATO_POR_EXTENSAO[_extensao(recurso.url)]
         real = assinatura(corpo.dados)
         if real and real != esperado:
-            divergentes.append(f"{recurso.url}: extensão diz {esperado}, conteúdo é {real}")
+            achados.append(Finding(
+                tipo="formato-divergente", recurso=recurso.url, severidade="media",
+                evidencia=f"extensão diz {esperado}, conteúdo é {real}", fase="B"))
 
-    if nao_avaliados and not divergentes:
+    if nao_avaliados and not achados:
         pytest.xfail("Não avaliado: " + "; ".join(nao_avaliados[:3]))
-    assert not divergentes, (
-        f"{len(divergentes)} arquivo(s) com formato divergente da extensão:\n  "
-        + "\n  ".join(divergentes[:5]))
+    registrar_achados(request.node.nodeid, achados)
+    assert not achados, (
+        f"{len(achados)} arquivo(s) com formato divergente da extensão:\n  "
+        + "\n  ".join(str(a) for a in achados[:5]))
 
 
-def test_svg_sem_conteudo_executavel(network_log):
+def test_svg_sem_conteudo_executavel(network_log, request):
     """SVG com `<script>`, `on*=` ou `href javascript:` — FAIL.
 
     SVG não é imagem inerte: é documento com DOM. Servido a partir do próprio
     domínio, executa no contexto de origem do alvo — é XSS armazenado com cara
     de avatar.
     """
-    executaveis = []
+    achados = []
     for recurso, corpo in _corpos(network_log, sufixos={".svg"},
                                   tipos={"image/svg+xml"}):
         if not corpo.avaliavel:
             continue
         motivos = svg_executavel(corpo.dados)
         if motivos:
-            executaveis.append(f"{recurso.url}: {', '.join(motivos)}")
-    assert not executaveis, (
-        f"{len(executaveis)} SVG(s) com conteúdo executável:\n  "
-        + "\n  ".join(executaveis[:5])
+            achados.append(Finding(
+                tipo="svg-executavel", recurso=recurso.url, severidade="alta",
+                evidencia=", ".join(motivos), fase="B"))
+
+    registrar_achados(request.node.nodeid, achados)
+    assert not achados, (
+        f"{len(achados)} SVG(s) com conteúdo executável:\n  "
+        + "\n  ".join(str(a) for a in achados[:5])
         + "\nSVG servido do próprio domínio executa no contexto de origem do alvo.")
 
 
-def test_imagens_sem_coordenada_de_gps(network_log):
+def test_imagens_sem_coordenada_de_gps(network_log, request):
     """EXIF-GPS numa imagem publicada — FAIL.
 
     Coordenada é dado pessoal sensível por consequência: revela onde a foto foi
     tirada, e em foto de pessoa revela onde a pessoa estava. Só a PRESENÇA é
     reportada; a suíte não extrai o valor (minimização — docs/SEGURANCA.md §6).
+
+    A minimização é anterior ao `Finding` e independe dele: `metadados_exif`
+    devolve o rótulo `"gps"`, nunca a coordenada, então não existe valor a
+    mascarar. O construtor sanitiza mesmo assim — as duas defesas são
+    independentes de propósito, e quem confia numa só acaba sem nenhuma.
     """
-    com_gps = []
+    achados = []
     for recurso, corpo in _corpos(network_log, sufixos={".jpg", ".jpeg"},
                                   tipos={"image/jpeg"}):
         if corpo.avaliavel and "gps" in metadados_exif(corpo.dados):
-            com_gps.append(recurso.url)
-    assert not com_gps, (
-        f"{len(com_gps)} imagem(ns) publicadas com coordenada GPS no EXIF: "
-        f"{com_gps[:5]}. A coordenada NÃO é reproduzida aqui de propósito — "
-        "republicá-la reencenaria a exposição. Remova o EXIF na publicação.")
+            achados.append(Finding(
+                tipo="exif-gps", recurso=recurso.url, severidade="alta",
+                evidencia="IFD de GPS presente no EXIF (valor não lido)", fase="B"))
+
+    registrar_achados(request.node.nodeid, achados)
+    assert not achados, (
+        f"{len(achados)} imagem(ns) publicadas com coordenada GPS no EXIF:\n  "
+        + "\n  ".join(str(a) for a in achados[:5])
+        + "\nA coordenada NÃO é reproduzida aqui de propósito — republicá-la "
+          "reencenaria a exposição. Remova o EXIF na publicação.")
 
 
 def test_metadados_de_autoria_removidos_na_publicacao(network_log):
