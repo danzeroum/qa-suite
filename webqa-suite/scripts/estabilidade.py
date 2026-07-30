@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -34,6 +35,9 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PADRAO = ROOT / "report" / "summary.json"
 LEDGER_PADRAO = ROOT / "docs" / "lgpd-estabilidade.json"
 META_PADRAO = 10
+# schema 2: entradas ganham "origem" e "dia_utc"; a sequência passa a ser
+# recalculada do histórico, contando só CI e no máximo um dia por vez.
+SCHEMA = 2
 
 # Assinaturas de falha do ambiente de teste — nunca de conformidade do alvo.
 #
@@ -88,10 +92,65 @@ def sha256_do_alvo(target_url: str) -> str:
 
 def carregar_ledger(caminho: Path) -> dict:
     if not caminho.exists():
-        return {"schema": 1, "execucoes": []}
+        return {"schema": SCHEMA, "execucoes": []}
     dados = json.loads(caminho.read_text(encoding="utf-8"))
     dados.setdefault("execucoes", [])
     return dados
+
+
+def origem_da_execucao() -> str:
+    """'ci' dentro do GitHub Actions, 'local' em qualquer outro lugar.
+
+    GITHUB_ACTIONS=true existe em todo runner do Actions. Não é prova
+    criptográfica de proveniência — é declaração do ambiente, e quem tem push
+    no repositório pode escrever o que quiser no ledger. O objetivo é impedir
+    que uma execução local avance a métrica por descuido, não resistir a
+    falsificação deliberada.
+    """
+    return "ci" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
+
+
+def _dia_utc_de(entrada: dict) -> str:
+    """Dia UTC da entrada; cai para o prefixo de generated_at se o campo faltar.
+
+    O fallback cobre a entrada anterior à migração, gravada por um runner do
+    Actions (TZ=UTC) — logo o prefixo É o dia UTC.
+    """
+    return str(entrada.get("dia_utc") or str(entrada.get("generated_at", ""))[:10])
+
+
+def sequencia_ci(execucoes: list[dict]) -> tuple[int, int]:
+    """(sequência sem flake, dias distintos) contando SÓ execuções de CI.
+
+    Recalculada do histórico inteiro a cada rodada, em vez de incrementada a
+    partir da última entrada: o valor gravado passa a ser derivável e auditável,
+    e uma entrada inserida fora de ordem não contamina o resto.
+
+    Três regras:
+
+    * `origem != "ci"` não conta — ausência do campo é tratada como local
+      (entradas anteriores à migração já foram marcadas explicitamente);
+    * no máximo UMA por dia UTC, e vale a PRIMEIRA do dia: um dispatch manual
+      depois do noturno não infla a sequência;
+    * a sequência é por alvo — se o `alvo_sha256` muda entre dias contados,
+      recomeça.
+    """
+    primeira_do_dia: dict[str, dict] = {}
+    for entrada in execucoes:
+        if entrada.get("origem") != "ci":
+            continue
+        primeira_do_dia.setdefault(_dia_utc_de(entrada), entrada)
+
+    streak = 0
+    alvo_anterior: str | None = None
+    for dia in sorted(primeira_do_dia):
+        entrada = primeira_do_dia[dia]
+        if alvo_anterior is not None and entrada.get("alvo_sha256") != alvo_anterior:
+            streak = 0
+        limpa = int(entrada.get("infra_flakes", 0)) == 0 and int(entrada.get("browser_total", 0)) > 0
+        streak = streak + 1 if limpa else 0
+        alvo_anterior = entrada.get("alvo_sha256")
+    return streak, len(primeira_do_dia)
 
 
 @dataclass(frozen=True)
@@ -100,44 +159,58 @@ class Registro:
 
     streak: int
     entrada: dict | None
+    dias_ci: int = 0
+    origem: str = "local"
     duplicada: bool = False
     ignorada: bool = False
     alvo_mudou: bool = False
 
 
-def registrar(ledger: dict, classificacao: Classificacao, alvo_sha256: str) -> Registro:
+def registrar(ledger: dict, classificacao: Classificacao, alvo_sha256: str,
+              origem: str | None = None, dia_utc: str | None = None) -> Registro:
     """Aplica a execução ao ledger (em memória) e devolve o que mudou."""
     execucoes = ledger["execucoes"]
+    origem = origem or origem_da_execucao()
+    streak_atual, dias_atuais = sequencia_ci(execucoes)
 
     # generated_at é a chave: rodar o script duas vezes no mesmo summary não
     # infla a sequência nem cria entrada duplicada.
     for entrada in execucoes:
         if entrada.get("generated_at") == classificacao.generated_at:
-            return Registro(streak=int(entrada.get("streak", 0)), entrada=entrada, duplicada=True)
+            return Registro(streak=streak_atual, entrada=entrada, dias_ci=dias_atuais,
+                            origem=str(entrada.get("origem", "local")), duplicada=True)
 
     # Execução sem nenhum teste de navegador não diz nada sobre a estabilidade
     # do network_log: não conta e não zera.
     if not classificacao.tem_browser:
-        anterior = execucoes[-1] if execucoes else None
-        return Registro(streak=int(anterior.get("streak", 0)) if anterior else 0,
-                        entrada=None, ignorada=True)
+        return Registro(streak=streak_atual, entrada=None, dias_ci=dias_atuais,
+                        origem=origem, ignorada=True)
 
-    anterior = execucoes[-1] if execucoes else None
-    alvo_mudou = bool(anterior and anterior.get("alvo_sha256") != alvo_sha256)
-    # Sequência é por alvo: 9 execuções limpas contra um alvo e 1 contra outro
-    # não são 10 execuções limpas contra nada.
-    base = 0 if (anterior is None or alvo_mudou) else int(anterior.get("streak", 0))
-    streak = base + 1 if classificacao.limpa else 0
+    anterior_ci = next(
+        (e for e in reversed(execucoes) if e.get("origem") == "ci"), None
+    )
+    alvo_mudou = bool(anterior_ci and anterior_ci.get("alvo_sha256") != alvo_sha256)
 
     entrada = {
         "generated_at": classificacao.generated_at,
+        # Dia vem do generated_at do summary, não do relógio de agora: o script
+        # pode rodar minutos (ou um retry) depois da suíte, e o dia que importa é
+        # o da EXECUÇÃO. Nos runners do Actions TZ=UTC — e são justamente as
+        # entradas de CI que a deduplicação por dia considera.
+        "dia_utc": dia_utc or classificacao.generated_at[:10],
+        "origem": origem,
         "alvo_sha256": alvo_sha256,
         "browser_total": classificacao.browser_total,
         "infra_flakes": len(classificacao.flakes),
-        "streak": streak,
     }
     execucoes.append(entrada)
-    return Registro(streak=streak, entrada=entrada, alvo_mudou=alvo_mudou)
+    # `streak` gravado = sequência de CI DEPOIS desta entrada. Numa entrada
+    # local ele repete o valor anterior, deixando explícito que nada mudou.
+    streak, dias = sequencia_ci(execucoes)
+    entrada["streak"] = streak
+    ledger["schema"] = SCHEMA
+    return Registro(streak=streak, entrada=entrada, dias_ci=dias, origem=origem,
+                    alvo_mudou=alvo_mudou and origem == "ci")
 
 
 def _resolver_alvo(explicito: str | None, usar_fixture: bool = False) -> str:
@@ -150,8 +223,6 @@ def _resolver_alvo(explicito: str | None, usar_fixture: bool = False) -> str:
         return identidade()
     if explicito:
         return explicito
-    import os
-
     if os.environ.get("WEBQA_TARGET_URL"):
         return os.environ["WEBQA_TARGET_URL"]
     try:  # reusa a resolução oficial (config.yaml + env) em vez de duplicá-la
@@ -190,32 +261,46 @@ def main(argv: list[str] | None = None) -> int:
     ledger = carregar_ledger(args.ledger)
     registro = registrar(ledger, classificacao, sha256_do_alvo(alvo))
 
+    def _placar() -> str:
+        plural = "dia" if registro.dias_ci == 1 else "dias"
+        return (f"streak {registro.streak}/{args.meta} (ci, {registro.dias_ci} {plural} "
+                f"{'distinto' if registro.dias_ci == 1 else 'distintos'})")
+
     if registro.ignorada:
         print("Execução sem testes de navegador — ignorada (não conta nem zera). "
-              f"Sequência segue em {registro.streak}.")
+              f"{_placar()}")
         return 0
     if registro.duplicada:
         print(f"Execução {classificacao.generated_at} já registrada — nada a fazer. "
-              f"Sequência: {registro.streak}.")
+              f"{_placar()}")
         return 0
 
     if registro.alvo_mudou:
-        print("Alvo mudou desde a última execução: sequência reiniciada (métrica é por alvo).")
+        print("Alvo mudou desde a última execução de CI: sequência reiniciada "
+              "(métrica é por alvo).")
     if classificacao.limpa:
         print(f"Execução limpa: {classificacao.browser_total} testes de navegador, 0 flakes.")
     else:
         print(f"Flake de INFRA em {len(classificacao.flakes)} de {classificacao.browser_total} "
-              f"testes de navegador — sequência zerada.")
+              "testes de navegador.")
         for teste in classificacao.flakes[:5]:
             print(f"  - {teste}")
+
+    if registro.origem == "local":
+        # Registrada para auditoria, mas fora da métrica: uma execução na
+        # máquina de alguém não é evidência de estabilidade do CI.
+        print("Origem: local — entrada informativa, NÃO avança nem zera a sequência "
+              "(só execuções de CI contam).")
+    else:
+        print("Origem: ci — conta no máximo uma vez por dia UTC "
+              f"(dia {registro.entrada['dia_utc'] if registro.entrada else '?'}).")
 
     if not args.dry_run:
         args.ledger.parent.mkdir(parents=True, exist_ok=True)
         args.ledger.write_text(json.dumps(ledger, indent=2, ensure_ascii=False) + "\n",
                                encoding="utf-8")
 
-    print(f"Sequência sem flake: {registro.streak}/{args.meta}"
-          + (" (dry-run: ledger não gravado)" if args.dry_run else ""))
+    print(_placar() + (" (dry-run: ledger não gravado)" if args.dry_run else ""))
     if registro.streak >= args.meta:
         print("FASE 2 DESTRAVADA")
     return 0

@@ -128,10 +128,35 @@ A distinção que dá sentido à métrica:
 | **FAIL determinístico** | tracker antes do consentimento, cookie de 730 dias, violação axe | **não zera** — a suíte funcionou; quem está errado é o alvo |
 | Execução sem teste de navegador | `pytest -m "lgpd and not browser"` | ignorada (não conta nem zera) |
 
-Cada entrada registra `{generated_at, alvo_sha256, browser_total, infra_flakes,
-streak}`. `generated_at` é a chave: rodar o script duas vezes no mesmo summary
-não infla a sequência. Ao atingir **10 execuções consecutivas sem flake**, o
-script imprime `FASE 2 DESTRAVADA`.
+Cada entrada registra `{generated_at, dia_utc, origem, alvo_sha256,
+browser_total, infra_flakes, streak}`. `generated_at` é a chave de
+deduplicação: rodar o script duas vezes no mesmo summary não infla a sequência.
+Ao atingir **10 dias consecutivos sem flake**, o script imprime
+`FASE 2 DESTRAVADA`.
+
+### Só o CI move a métrica
+
+`origem` é `"ci"` quando `GITHUB_ACTIONS=true`, `"local"` em qualquer outro
+lugar. A sequência é **recalculada do histórico inteiro** a cada rodada, com
+três regras:
+
+| Regra | Por quê |
+|---|---|
+| Só entradas `origem: "ci"` contam | uma execução na máquina de alguém não é evidência de estabilidade do pipeline; entradas locais ficam no ledger para auditoria, mas **não avançam nem zeram** |
+| No máximo **uma por dia UTC**, valendo a primeira | um dispatch manual depois do noturno não infla a sequência — dez execuções num dia não são dez dias estáveis |
+| Ausência do campo `origem` = `local` | a única entrada anterior à migração foi marcada explicitamente como `ci` (proveniência conhecida: autor `github-actions[bot]`); daí para frente, campo faltando é procedência desconhecida |
+
+A saída informa a fonte: `streak 3/10 (ci, 3 dias distintos)`.
+
+Recalcular em vez de incrementar a partir da última entrada tem um motivo: o
+valor gravado passa a ser **derivável e auditável** — `test_ledger_real_migrado`
+recomputa sobre o ledger versionado e cobra que dê o mesmo número.
+
+Duas honestidades: `GITHUB_ACTIONS` é declaração do ambiente, não prova
+criptográfica — quem tem push no repositório pode escrever o que quiser no
+ledger; a barreira existe contra descuido, não contra falsificação deliberada.
+E a deduplicação por `generated_at` ignora a origem: se uma execução for
+registrada localmente, aquela chave já está ocupada.
 
 ### O alvo fixture (`fixture_target/`)
 
