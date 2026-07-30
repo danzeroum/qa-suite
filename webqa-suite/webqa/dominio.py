@@ -17,6 +17,8 @@ Somente stdlib.
 """
 from __future__ import annotations
 
+import re
+import struct
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -243,6 +245,114 @@ def assinatura(dados: bytes | None) -> str:
         if dados.startswith(prefixo):
             return nome
     return ""
+
+
+# ---------- Fase B: metadados e conteúdo de arquivos ----------
+#
+# Detecta PRESENÇA, nunca extrai o valor — minimização: o metadado é do titular,
+# e a suíte não precisa do conteúdo para dizer que ele está lá. Stdlib pura;
+# `Pillow`, `piexif` e `pypdf` foram rejeitadas em docs/SEGURANCA.md §9.
+
+_EXIF_GPS = 0x8825                                  # ponteiro para a IFD de GPS
+_EXIF_AUTORIA = (0x013B, 0x8298, 0x010F, 0x0110)    # Artist, Copyright, Make, Model
+
+
+def _ifd_tags(tiff: bytes, offset: int, ordem: str) -> list[int]:
+    """Tags de uma IFD TIFF. Devolve [] a qualquer sinal de corrupção."""
+    if offset + 2 > len(tiff):
+        return []
+    (quantas,) = struct.unpack_from(ordem + "H", tiff, offset)
+    tags = []
+    for i in range(min(quantas, 512)):   # teto: arquivo corrompido não vira laço
+        entrada = offset + 2 + i * 12
+        if entrada + 12 > len(tiff):
+            break
+        tags.append(struct.unpack_from(ordem + "H", tiff, entrada)[0])
+    return tags
+
+
+def metadados_exif(dados: bytes | None) -> set[str]:
+    """`{"gps", "autoria"}` conforme o que o JPEG carrega. Sem valores.
+
+    Percorre os segmentos JPEG até o APP1 com cabeçalho Exif e lê a IFD0.
+    Qualquer inconsistência devolve conjunto vazio: arquivo quebrado não é
+    acusação, e um parser que "chuta" numa bateria de segurança é pior que
+    parser nenhum.
+    """
+    achados: set[str] = set()
+    if not dados or not dados.startswith(b"\xff\xd8"):
+        return achados
+    pos = 2
+    while pos + 4 <= len(dados):
+        if dados[pos] != 0xFF:
+            break
+        marcador = dados[pos + 1]
+        if marcador == 0xDA:      # dados comprimidos: não há EXIF depois
+            break
+        (tamanho,) = struct.unpack_from(">H", dados, pos + 2)
+        corpo = dados[pos + 4: pos + 2 + tamanho]
+        if marcador == 0xE1 and corpo.startswith(b"Exif\x00\x00"):
+            tiff = corpo[6:]
+            if len(tiff) >= 8 and tiff[:2] in (b"II", b"MM"):
+                ordem = "<" if tiff[:2] == b"II" else ">"
+                (ifd0,) = struct.unpack_from(ordem + "I", tiff, 4)
+                tags = _ifd_tags(tiff, ifd0, ordem)
+                if _EXIF_GPS in tags:
+                    achados.add("gps")
+                if any(t in tags for t in _EXIF_AUTORIA):
+                    achados.add("autoria")
+            break
+        pos += 2 + tamanho
+    return achados
+
+
+def metadados_pdf(dados: bytes | None) -> set[str]:
+    """Presença de `/Author` ou `/Creator` num PDF — sem ler o valor."""
+    if not dados or not dados.startswith(b"%PDF-"):
+        return set()
+    achados = set()
+    if b"/Author" in dados:
+        achados.add("autoria")
+    if b"/Creator" in dados or b"/Producer" in dados:
+        achados.add("ferramenta")
+    return achados
+
+
+# SVG é documento EXECUTÁVEL: `<script>` e handlers `on*=` rodam quando o SVG é
+# aberto direto ou embutido inline. Vetor clássico de XSS em upload de avatar.
+_SVG_SCRIPT = re.compile(rb"<\s*script\b", re.I)
+_SVG_HANDLER = re.compile(rb"\son[a-z]+\s*=", re.I)
+_SVG_JS_HREF = re.compile(rb"""(?:xlink:)?href\s*=\s*["']\s*javascript:""", re.I)
+
+
+def svg_executavel(dados: bytes | None) -> list[str]:
+    """Motivos pelos quais um SVG é executável. Lista vazia = inerte."""
+    if not dados:
+        return []
+    motivos = []
+    if _SVG_SCRIPT.search(dados):
+        motivos.append("<script> embutido")
+    if _SVG_HANDLER.search(dados):
+        motivos.append("handler on*= inline")
+    if _SVG_JS_HREF.search(dados):
+        motivos.append("href javascript:")
+    return motivos
+
+
+_SOURCEMAP = re.compile(rb"//[#@]\s*sourceMappingURL\s*=\s*(\S+)")
+
+
+def sourcemap_referenciado(dados: bytes | None) -> str:
+    """URL do sourcemap declarado no bundle, `""` se não houver.
+
+    Só LÊ a referência. Baixar o `.map` é requisição nova — logo Fase C, logo
+    atrás do gate. Um sourcemap costuma trazer o código-fonte inteiro, e ir
+    buscá-lo sem autorização é exatamente a linha que o desenho não cruza.
+    """
+    if not dados:
+        return ""
+    achado = _SOURCEMAP.search(dados)
+    return achado.group(1).decode("ascii", errors="replace") if achado else ""
 
 
 def parece_html(dados: bytes | None) -> bool:

@@ -1,4 +1,4 @@
-"""VERIFICAÇÃO da Fase A da dimensão `seguranca` (docs/SEGURANCA.md §5).
+"""VERIFICAÇÃO das Fases A e B da dimensão `seguranca` (docs/SEGURANCA.md §5-6).
 
 Dois níveis, e a divisão não é estética. O alvo fixture é servido por
 `http://127.0.0.1`, e três regras da Fase A **não podem ser exercidas ali sem
@@ -17,7 +17,15 @@ from __future__ import annotations
 
 import pytest
 
-from webqa.dominio import Recurso, find_secrets
+from webqa.dominio import (
+    Recurso,
+    assinatura,
+    find_secrets,
+    metadados_exif,
+    metadados_pdf,
+    sourcemap_referenciado,
+    svg_executavel,
+)
 from webqa.trackers import NetworkLog
 
 pytestmark = pytest.mark.verification
@@ -142,3 +150,100 @@ def test_asset_de_origem_nao_entra_na_regra_de_terceiro():
                   {"Content-Type": "application/javascript"})])
     assert log.de_terceiros() == []
     assert len(log.de_origem()) == 1
+
+
+# ---------- Fase B: magic bytes, SVG, metadados, sourcemap ----------
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 16
+PDF = b"%PDF-1.7\n/Author (Fulano)\n/Creator (Word)\n"
+
+
+def test_png_renomeado_para_jpg_e_detectado():
+    """Caso da OS: extensão mente, magic bytes não."""
+    assert assinatura(PNG) == "png"
+    assert assinatura(PNG) != "jpeg", "extensão .jpg não muda o que o arquivo é"
+
+
+def test_arquivo_integro_casa_com_a_extensao():
+    assert assinatura(JPEG) == "jpeg"
+    assert assinatura(PDF) == "pdf"
+
+
+def test_formato_desconhecido_nao_acusa():
+    """Texto, JS e JSON não têm assinatura — e ausência não é divergência."""
+    assert assinatura(b"function x(){}") == ""
+    assert assinatura(b"") == ""
+    assert assinatura(None) == ""
+
+
+@pytest.mark.parametrize("svg,motivo", [
+    (b'<svg onload="x()"></svg>', "handler on*= inline"),
+    (b"<svg><script>alert(1)</script></svg>", "<script> embutido"),
+    (b'<svg><a xlink:href="javascript:alert(1)"/></svg>', "href javascript:"),
+    (b'<svg><a href=" javascript:x"/></svg>', "href javascript:"),
+])
+def test_svg_executavel_detectado(svg, motivo):
+    assert motivo in svg_executavel(svg)
+
+
+def test_svg_limpo_passa():
+    assert svg_executavel(b'<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>') == []
+
+
+def test_svg_com_palavra_script_em_texto_nao_falsa_positiva():
+    """`<text>script</text>` é conteúdo, não elemento executável."""
+    assert svg_executavel(b"<svg><text>script</text></svg>") == []
+
+
+def test_metadados_pdf_detecta_presenca_sem_ler_valor():
+    achados = metadados_pdf(PDF)
+    assert achados == {"autoria", "ferramenta"}
+    assert "Fulano" not in str(achados), "só a presença é reportada"
+
+
+def test_pdf_sem_metadado_nao_acusa():
+    assert metadados_pdf(b"%PDF-1.7\n1 0 obj\n") == set()
+
+
+def test_arquivo_corrompido_nao_derruba_o_parser():
+    """Limite que importa: parser que 'chuta' numa bateria de segurança é pior
+    que parser nenhum."""
+    for lixo in (b"\xff\xd8", b"\xff\xd8\xff\xe1\x00\x02", b"\xff\xd8" + b"\xff" * 40):
+        assert metadados_exif(lixo) == set()
+    assert metadados_exif(b"nem jpeg e") == set()
+    assert metadados_exif(None) == set()
+
+
+def test_exif_gps_do_alvo_fixture_e_detectado():
+    """O JPEG do fixture é construído em stdlib — aqui se prova que ele exerce
+    mesmo a violação, e não só parece exercer."""
+    from fixture_target.servir import FOTO_GPS, JPEG_BASE
+    assert metadados_exif(FOTO_GPS) == {"gps"}
+    assert metadados_exif(JPEG_BASE) == set(), "a base limpa não pode acusar"
+
+
+@pytest.mark.parametrize("corpo,esperado", [
+    (b"var a=1;\n//# sourceMappingURL=app.js.map", "app.js.map"),
+    (b"var a=1;\n//@ sourceMappingURL=/static/b.map", "/static/b.map"),
+    (b"var a=1;", ""),
+])
+def test_sourcemap_referenciado(corpo, esperado):
+    assert sourcemap_referenciado(corpo) == esperado
+
+
+def test_fase_b_nao_faz_requisicao_nova():
+    """Prova estrutural: o módulo da Fase B não conhece cliente HTTP nenhum.
+
+    A regra "nenhum download novo" (docs/SEGURANCA.md §6) é fácil de violar sem
+    querer — basta alguém importar httpx para "só conferir se o .map existe".
+    Aqui isso reprova antes de chegar a um alvo.
+    """
+    from pathlib import Path
+    fonte = (Path(__file__).resolve().parent.parent
+             / "checks" / "seguranca" / "test_arquivos_e_metadados.py"
+             ).read_text(encoding="utf-8")
+    for proibido in ("httpx", "requests.", "urllib.request", "page.goto", "urlopen"):
+        assert proibido not in fonte, (
+            f"Fase B não pode fazer requisição nova, e o módulo menciona {proibido!r}. "
+            "Buscar recurso que o navegador não pediu é sondagem — Fase C, atrás do gate.")

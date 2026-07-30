@@ -8,6 +8,8 @@
     "checks/lgpd/test_pii_transito.py::test_pii_em_query_string",
     "checks/lgpd/test_retencao_observavel.py::test_cookies_expiracao",
     "checks/lgpd/test_terceiros.py::test_sri_scripts_externos",
+    "checks/seguranca/test_arquivos_e_metadados.py::test_imagens_sem_coordenada_de_gps",
+    "checks/seguranca/test_arquivos_e_metadados.py::test_svg_sem_conteudo_executavel",
     "checks/seguranca/test_headers_e_conteudo.py::test_tipo_declarado_corresponde_ao_conteudo",
     "checks/seguranca/test_segredos.py::test_sem_credenciais_em_js_e_json_de_origem",
     "checks/ux/test_acessibilidade.py::test_imagens_com_alt"
@@ -17,6 +19,7 @@
     "checks/ux/test_acessibilidade.py::test_sem_violacoes_serias": "idem",
     "checks/seguranca/test_headers_e_conteudo.py::test_sem_mixed_content": "o alvo fixture é servido por http://127.0.0.1 — em página http NADA é mixed content, então a violação não pode ser exercida aqui sem inventá-la. A lógica é coberta por unidade em tests/test_seguranca_checks.py",
     "checks/seguranca/test_cookies.py::test_cookies_de_sessao_sao_secure": "`Secure` não é exigível de alvo http:// — o navegador sequer aceitaria o atributo. Lógica coberta por unidade",
-    "checks/seguranca/test_headers_e_conteudo.py::test_assets_de_terceiro_declaram_nosniff": "o único terceiro do fixture é um domínio .invalid que nunca responde, logo não há resposta de terceiro para inspecionar. Lógica coberta por unidade"
+    "checks/seguranca/test_headers_e_conteudo.py::test_assets_de_terceiro_declaram_nosniff": "o único terceiro do fixture é um domínio .invalid que nunca responde, logo não há resposta de terceiro para inspecionar. Lógica coberta por unidade",
+    "checks/seguranca/test_arquivos_e_metadados.py::test_formato_real_corresponde_a_extensao": "o fixture não planta arquivo com extensão trocada: a violação exigiria servir um binário disfarçado, e o valor didático não compensa o binário opaco no repositório. Lógica coberta por unidade (magic bytes) em tests/test_seguranca_checks.py"
   }
 }
