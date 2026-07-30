@@ -4,7 +4,15 @@ httpx[http2]>=0.27
 beautifulsoup4>=4.12
 lxml>=5.0
 PyYAML>=6.0
-playwright>=1.44
+# PINADO, não `>=`: a versão do pacote determina a revisão do Chromium que ele
+# exige (1.56.0 → build 1194). Com faixa aberta, um ambiente que já traz o
+# navegador pré-instalado passa a resolver um pacote que pede OUTRA revisão, e
+# os testes de navegador viram skip explicado — inclusive os 4 de
+# tests/test_alvo_fixture.py, que são quem confere o contrato 1:1 do alvo.
+# O contrato deixaria de ser conferido sem nada ficar vermelho. É o R15
+# ("imagem base mudar sob os pés") um nível abaixo, no pacote: dependência é
+# config explícita, e subir de versão passa a ser decisão versionada.
+playwright==1.56.0
 locust>=2.24
 # qualidade da própria suíte (verificação / SAST)
 ruff>=0.4

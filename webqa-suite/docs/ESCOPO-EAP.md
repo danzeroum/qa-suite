@@ -35,14 +35,36 @@ A EAP está **alinhada 1:1 com as entregas reais do código** (pastas do reposit
 ├── 1.7 Carga .................... loadtest/ + marcador @load
 ├── 1.8 LGPD (Fase 1, passiva) ... checks/lgpd/ (5 módulos) + webqa/trackers.py, gates.py
 ├── 1.9 Verificação da suíte ..... tests/
-├── 1.10 DevOps .................. .github/workflows/ci.yml, Makefile
-└── 1.11 Documentação ............ docs/ (arquitetura C4, riscos, escopo, LGPD, recomendações)
+├── 1.10 DevOps .................. .github/workflows/{ci,estabilidade}.yml, Makefile
+├── 1.11 Documentação ............ docs/ (arquitetura C4, riscos, escopo, LGPD, recomendações)
+├── 1.12 Segurança (Fases A e B) . checks/seguranca/ (4 módulos) + webqa/dominio.py
+│                                  (value objects Finding/Recurso)
+├── 1.13 Alvo fixture ............ fixture_target/ (servir.py + esperado.json)
+├── 1.14 Ferramental ............. scripts/ (estabilidade, campanha, audita_design,
+│                                  vps_smoke) + campanha.yaml
+├── 1.15 Runtime da VPS .......... docker/ (Dockerfile, compose.yml, entrypoint.sh)
+└── 1.16 Contrato visual ......... webqa/report_html.py, report_style.py +
+                                   docs/qa-suite design brief/referencia/
 ```
 
 **1.8 — Fase 1 apenas** (bateria passiva). Canário de consentimento, detecção de
 CMP, Global Privacy Control e heurística de fingerprinting são Fase 2/3, listadas
 como backlog em `docs/LGPD.md`; entram depois que a infraestrutura de `network_log`
 estiver estável em produção.
+
+**1.12 — Fases A e B apenas** (passivas). A Fase C (sondagem ativa) está
+**desenhada e deliberadamente não implementada** em `docs/SEGURANCA.md §7`: ela
+sonda caminhos que o servidor não ofereceu, o que exige
+`WEBQA_ACTIVE_PROBES_AUTHORIZED=1` e autorização escrita do dono de um alvo.
+Note que isso **não** contradiz "pentest ofensivo" estar fora do escopo acima:
+a Fase C é sondagem autorizada e com rate-limit, não fuzzing nem injeção — e
+segue fora do escopo enquanto não houver alvo autorizado.
+
+**1.13/1.14/1.15 nasceram depois da redação original** desta EAP, junto com a
+medição de estabilidade e o runtime da VPS. Estão listados aqui porque a EAP só
+vale como mapa se acompanhar as pastas — uma EAP que declara alinhamento 1:1 e
+omite quatro entregas é pior que EAP nenhuma: ela dá confiança falsa de que o
+mapa está completo.
 
 **Modelo de gestão recomendado**: híbrido — escopo/EAP e riscos formais (acima)
 com evolução iterativa dos checks (cada novo check é um incremento pequeno,

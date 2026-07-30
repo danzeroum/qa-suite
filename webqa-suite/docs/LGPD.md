@@ -255,9 +255,13 @@ não os olhos. Um passo depois do dry-run **falha** se o ledger tiver sido tocad
 para que a garantia não dependa de boa vontade.
 
 Nos dois ambientes o passo da dimensão roda tolerando falha: contra um alvo não
-conforme a execução **reprova por definição** (7 FAILs de contrato). O código de
-saída do pytest não diz nada sobre estabilidade — quem decide é o classificador,
-lendo o `summary.json`. Falha do noturno, por si só, não zera a sequência.
+conforme a execução **reprova por definição** — 7 FAILs, que é o recorte `-m lgpd`
+do contrato, não o contrato inteiro. `esperado.json` declara escopo
+`-m "lgpd or seguranca"` e lista mais FAILs do que estes; o noturno roda só a
+dimensão de privacidade. Conferir um número contra o outro é o engano previsível
+aqui, e ele já aconteceu numa leitura de revisão. O código de saída do pytest não
+diz nada sobre estabilidade — quem decide é o classificador, lendo o
+`summary.json`. Falha do noturno, por si só, não zera a sequência.
 
 Três decisões que valem registro:
 

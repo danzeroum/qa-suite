@@ -66,9 +66,11 @@ jobs:
         run: pytest tests -m verification
 
       # continue-on-error de propósito: o alvo é NÃO CONFORME, então esta
-      # execução reprova por definição (7 FAILs de contrato). O código de saída
-      # do pytest não diz nada sobre estabilidade — quem decide é o
-      # classificador, lendo o summary.json. Falha do workflow não zera streak.
+      # execução reprova por definição — 7 FAILs, que é o recorte -m lgpd de
+      # esperado.json e não o contrato inteiro (escopo "lgpd or seguranca").
+      # O código de saída do pytest não diz nada sobre estabilidade — quem
+      # decide é o classificador, lendo o summary.json. Falha do workflow não
+      # zera streak.
       - name: Dimensão lgpd contra o fixture
         continue-on-error: true
         run: pytest -m lgpd
