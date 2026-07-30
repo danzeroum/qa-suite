@@ -48,6 +48,13 @@ jobs:
       - name: Instalar dependências
         run: pip install -r requirements.txt
 
+      # Sem Chromium, os 4 testes de tests/test_alvo_fixture.py PULAM com motivo
+      # e o quality-gate fica verde sem ter conferido o contrato 1:1 do alvo
+      # fixture — exatamente o cenário do R7 que este job existe para cobrir.
+      # O skip é honesto (não vira PASS), mas silencioso no código de saída.
+      - name: Instalar Chromium (o contrato do fixture exige navegador)
+        run: python -m playwright install --with-deps chromium
+
       - name: Lint (ruff)
         run: ruff check webqa checks tests scripts fixture_target
 

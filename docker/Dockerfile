@@ -18,10 +18,11 @@ WORKDIR /app
 # check, reaproveita.
 COPY webqa-suite/requirements.txt /app/webqa-suite/requirements.txt
 RUN pip install --no-cache-dir -r /app/webqa-suite/requirements.txt \
-    # A imagem traz os navegadores da versão 1.44, mas o requirements pede
-    # playwright>=1.44 e o pip resolve para a mais nova — cuja revisão de
-    # Chromium NÃO é a pré-instalada. Sem esta linha, toda noite falharia com
-    # "Executable doesn't exist" e viraria flake permanente.
+    # A imagem traz os navegadores da versão 1.44 e o requirements pina
+    # playwright==1.56.0 — cuja revisão de Chromium NÃO é a pré-instalada. Sem
+    # esta linha, toda noite falharia com "Executable doesn't exist" e viraria
+    # flake permanente. O pin não dispensa a linha: torna determinística a
+    # revisão que ela baixa, que antes variava com a data do build.
     && python -m playwright install chromium
 # NENHUM segredo entra em camada: a deploy key é montada em /run/secrets no
 # runtime. Ver .dockerignore e docker/compose.yml.

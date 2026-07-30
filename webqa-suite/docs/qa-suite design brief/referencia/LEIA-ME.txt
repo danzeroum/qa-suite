@@ -6,7 +6,9 @@ Entregáveis (HTML estático, arquivo único, zero requisição externa):
   summary.html                P0 — relatório com achados (execução completa contra fixture_target/)
   summary-verde.html          estado: 100% verde (0 achados, 0 alertas)
   summary-sem-navegador.html  estado: Chromium ausente (skips em massa, motivo em cada linha)
-  summary-parcial.html        estado: pytest -m lgpd offline — 7 achados, 1:1 com esperado.json
+  summary-parcial.html        estado: pytest -m lgpd offline — 7 achados, 1:1 com o
+                              RECORTE -m lgpd de esperado.json (o contrato inteiro,
+                              escopo "lgpd or seguranca", tem mais FAILs que estes)
   estabilidade.html           painel de estabilidade (P1) — ledger docs/lgpd-estabilidade.json
   componentes.html            especificação p/ dev (§11.5): tokens, contrastes, anatomia, regras
 

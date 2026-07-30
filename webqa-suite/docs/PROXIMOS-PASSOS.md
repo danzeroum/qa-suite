@@ -4,22 +4,50 @@ Documento de passagem para quem assume o projeto. Não repete o que os outros
 docs já explicam: aponta para eles, diz **onde o trabalho parou** e registra as
 decisões que um leitor do código sozinho não teria como deduzir.
 
-Base deste documento: `main` em `7944fc7` (pós OS-23), 324 testes de verificação.
+Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
+
+A verificação da própria suíte tem **324 testes coletados**; num ambiente limpo o
+resultado é **321 passed / 3 skipped**. Os 3 skips são de
+`tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
+para ter o que auditar — "324 passed" só aparece depois dela. O número de coleta e
+o número de aprovação são coisas diferentes, e confundi-los faz um ambiente
+saudável parecer defeituoso.
 
 ---
 
 ## 1. O que ler primeiro, nesta ordem
 
-| Doc | Responde |
+Esta é a **entrada única**: se um documento do projeto não está listado abaixo,
+ele não precisa ser lido antes de começar.
+
+| # | Doc | Responde |
+|---|---|---|
+| 0 | **este documento** | onde o trabalho parou e as regras que o código não explica |
+| 1 | [`README.md`](../README.md) | como rodar, níveis de teste, rastreabilidade |
+| 2 | [`ARQUITETURA.md`](ARQUITETURA.md) | camadas: `checks/` só conhece fixtures, detalhe vive em `webqa/` |
+| 3 | [`RISCOS.md`](RISCOS.md) | riscos numerados (R7, R8… citados em código e commits) |
+| 4 | [`ESCOPO-EAP.md`](ESCOPO-EAP.md) | o que está dentro e **fora** do escopo; EAP alinhada às pastas |
+| 5 | [`LGPD.md`](LGPD.md) | dimensão de privacidade, ledger, critério de saída da Fase 1 |
+| 6 | [`SEGURANCA.md`](SEGURANCA.md) | dimensão de segurança em 3 fases, DDD, veredito sobre pareceres |
+| 7 | [`CAMPANHA.md`](CAMPANHA.md) | nível sistema da própria suíte contra alvos reais |
+| 8 | [`VPS.md`](VPS.md) | ambiente oficial da métrica, cron, smoke |
+| 9 | [`design-audit.md`](design-audit.md) + `docs/qa-suite design brief/referencia/` | laudo do pacote de design e o contrato visual navegável |
+
+`RISCOS.md` e `ESCOPO-EAP.md` subiram para o começo: os riscos são citados por
+número (R7, R8…) em comentários de código e mensagens de commit, e ler esses
+números depois dos docs de dimensão obriga a voltar atrás.
+
+Consulta, não leitura de entrada:
+
+| Doc | Quando abrir |
 |---|---|
-| [`README.md`](../README.md) | como rodar, níveis de teste, rastreabilidade |
-| [`ARQUITETURA.md`](ARQUITETURA.md) | camadas: `checks/` só conhece fixtures, detalhe vive em `webqa/` |
-| [`LGPD.md`](LGPD.md) | dimensão de privacidade, ledger, critério de saída da Fase 1 |
-| [`SEGURANCA.md`](SEGURANCA.md) | dimensão de segurança em 3 fases, DDD, veredito sobre pareceres |
-| [`CAMPANHA.md`](CAMPANHA.md) | nível sistema da própria suíte contra alvos reais |
-| [`VPS.md`](VPS.md) | ambiente oficial da métrica, cron, smoke |
-| [`RISCOS.md`](RISCOS.md) | riscos numerados (R7, R8… citados em código e commits) |
-| `docs/qa-suite design brief/referencia/` | contrato visual navegável do relatório |
+| [`RECOMENDACOES.md`](RECOMENDACOES.md) | rastrear uma prática de engenharia até onde ela é coberta |
+| [`dimensao-seguranca-consolidado.md`](dimensao-seguranca-consolidado.md) | histórico da consolidação da dimensão `seguranca` |
+| [`handoff/`](handoff/) | material da passagem original (brief de design, ordens de serviço abertas) |
+
+**Antes de abrir código, rode `make verify` e `make fixture`.** Ver a suíte
+funcionando e o alvo fabricado reprovando de propósito muda a leitura dos checks:
+sem isso, as docstrings parecem abstratas.
 
 Depois disso, leia **um** check de cada dimensão. Eles seguem o mesmo formato:
 docstring dizendo *por que o teste existe e o que a falha prova*, não o que o
@@ -227,7 +255,11 @@ Global Privacy Control (`Sec-GPC: 1`) e heurísticas de fingerprinting.
    código, apague-o.
 5. **stdlib primeiro.** `Pillow`, `piexif`, `pypdf` e `python-magic` foram
    rejeitadas com fundamento registrado. Dependência nova precisa de justificativa
-   no PR.
+   no PR. E dependência que **determina o ambiente de teste** vai pinada com o
+   porquê ao lado: `playwright` fixa a revisão do Chromium, então faixa aberta
+   ali faz testes de navegador virarem skip explicado — verde no CI, contrato do
+   fixture não conferido. Pin é config explícita (12-Factor); subir de versão
+   vira decisão versionada em vez de acidente de data de build.
 6. **Quando o alvo fixture não conseguir exercer uma regra**, declare em
    `fora_do_contrato` com motivo e cubra por unidade.
 7. **Quando encontrar um defeito fora do escopo da OS**, reporte-o no PR mesmo
