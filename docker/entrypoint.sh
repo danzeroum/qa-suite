@@ -17,6 +17,10 @@ CHAVE=${WEBQA_DEPLOY_KEY:-/run/secrets/deploy_key}
 KNOWN_HOSTS=${WEBQA_KNOWN_HOSTS:-/run/secrets/known_hosts}
 RAMO=${WEBQA_RAMO:-main}
 ESPERA_MAX=${WEBQA_FIXTURE_TIMEOUT:-15}
+# WEBQA_DRY_RUN=1 roda TUDO (fixture, contrato, dimensão, classificador) e pula
+# somente commit e push. É o modo do smoke da VPS: paridade dev/prod de verdade
+# — os mesmos comandos do cron, sem a caneta.
+DRY_RUN=${WEBQA_DRY_RUN:-0}
 
 log() { printf '%s | %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 falhar() { log "ERRO: $*"; exit 1; }
@@ -92,6 +96,11 @@ log "classificando a execução"
 python scripts/estabilidade.py --alvo-fixture
 
 # ---------- 5. Escrita do ledger ----------
+
+if [ "$DRY_RUN" = "1" ]; then
+  log "WEBQA_DRY_RUN=1: commit e push PULADOS (pipeline completo já exercido)"
+  exit 0
+fi
 
 # --porcelain e não `git diff`: se o ledger ainda não existir, ele é arquivo
 # novo e `git diff` não enxerga não rastreado.
