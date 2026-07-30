@@ -10,16 +10,36 @@ import pytest
 
 pytestmark = [pytest.mark.ux, pytest.mark.browser]
 
+# Versão FIXADA + hash SHA-384 verificado antes de injetar (SRI manual):
+# CDN comprometido não roda script arbitrário no DOM da página sob teste.
 AXE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js"
+AXE_SHA384 = ("b91444cffa692592290e122db68c9b6953d29714"
+              "bb3457b5b423a41f741597e1f778cd9a2fdd1ad78d32cd829887c4c0")
+
+
+def _fetch_axe_verified(client) -> str:
+    """Baixa o axe-core e valida integridade; falha de hash é ERRO, não skip."""
+    import hashlib
+    resp = client.get(AXE_CDN)
+    resp.raise_for_status()
+    digest = hashlib.sha384(resp.content).hexdigest()
+    assert digest == AXE_SHA384, (
+        f"Integridade do axe-core FALHOU (sha384 {digest[:16]}… != esperado) — "
+        "possível comprometimento do CDN; script NÃO foi injetado."
+    )
+    return resp.text
 
 
 @pytest.fixture(scope="module")
-def axe_results(browser_page, settings):
-    browser_page.goto(settings.target_url, wait_until="load", timeout=60_000)
+def axe_results(browser_page, settings, client):
     try:
-        browser_page.add_script_tag(url=AXE_CDN)
+        axe_js = _fetch_axe_verified(client)
+    except AssertionError:
+        raise
     except Exception as exc:
-        pytest.skip(f"Não foi possível carregar axe-core do CDN ({exc}).")
+        pytest.skip(f"Não foi possível baixar o axe-core ({exc}).")
+    browser_page.goto(settings.target_url, wait_until="load", timeout=60_000)
+    browser_page.add_script_tag(content=axe_js)
     return browser_page.evaluate("async () => await axe.run()")
 
 

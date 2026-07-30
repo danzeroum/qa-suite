@@ -11,6 +11,8 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+from webqa.sanitize import sanitize_text
+
 DIMENSIONS = ("backend", "frontend", "ux", "functional", "acceptance", "load", "verification")
 _RESULTS: list[dict] = []
 _START = time.time()
@@ -26,7 +28,7 @@ def pytest_runtest_logreport(report):
             "dimension": markers[0] if markers else "other",
             "outcome": report.outcome,
             "duration_s": round(getattr(report, "duration", 0.0), 3),
-            "detail": str(report.longrepr)[:800] if report.failed else "",
+            "detail": sanitize_text(str(report.longrepr))[:800] if report.failed else "",
         }
     )
 

@@ -8,7 +8,16 @@ Uso:
 Riscos (gerenciamento de riscos): rode SOMENTE contra ambientes que você
 tem autorização para testar; carga em produção de terceiros pode ser ilegal.
 """
+import os
+import sys
+
 from locust import HttpUser, between, task
+
+if os.environ.get("WEBQA_LOAD_AUTHORIZED") != "1":
+    sys.exit(
+        "ABORTADO: teste de carga exige autorização explícita do dono do alvo.\n"
+        "Exporte WEBQA_LOAD_AUTHORIZED=1 apenas com essa autorização documentada."
+    )
 
 
 class Visitante(HttpUser):

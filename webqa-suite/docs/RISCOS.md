@@ -14,3 +14,21 @@ Matriz probabilidade (P) × impacto (I), com resposta planejada e monitoramento.
 | R8 | Vazamento de dados sensíveis em relatórios | segurança | Baixo | Alto | **Mitigar**: relatório guarda só trechos de erro (800 chars); repo ignora report/* | `.gitignore`; revisão |
 
 Revisar esta matriz a cada release da suíte ou mudança relevante no alvo.
+
+## Mitigações de privacidade aplicadas (parecer de proporcionalidade)
+
+Hierarquia adotada: **não coletar > mascarar > reter pouco > criptografar**
+(adequação e necessidade — Art. 6º, II/III; segurança — Art. 46).
+
+| Risco de privacidade | Decisão | Implementação |
+|---|---|---|
+| PII incidental persistida no relatório | **Mitigado** | `webqa/sanitize.py::sanitize_text` aplicado na borda de escrita (`report.py`); verificado em `tests/test_sanitize.py` |
+| Query strings do alvo em logs de links | **Mitigado** | `safe_url` oculta parâmetros nas mensagens (URL original segue sendo requisitada) |
+| Erros de console com payloads do alvo | **Mitigado** | truncados a 200 chars + sanitizados antes de qualquer persistência |
+| Script de CDN sem integridade (axe-core) | **Mitigado** | versão fixada 4.9.1 + verificação SHA-384 antes da injeção; hash divergente = erro, não skip |
+| Carga sem autorização do dono do alvo | **Mitigado** | guarda técnica `WEBQA_LOAD_AUTHORIZED=1` na rajada pytest e no locustfile (aborta) |
+| Relatório versionado no Git | **Mitigado** | `.gitignore` cobre `report/*`; atenção ao subir o repo — dotfiles se perdem em upload via interface web |
+| Artefato de relatório no CI | **Mitigado** | `retention-days: 7` no upload-artifact (expurgo automático, criptografia em repouso do provedor) |
+| Job de expurgo local com TTL | **Descartado (consciente)** | `summary.json` é sobrescrito a cada execução — TTL para arquivo auto-substituído é cerimônia sem risco correspondente |
+| Criptografia embutida no plugin | **Descartado (consciente)** | após mascaramento não resta PII em claro; cifrar moveria o problema para gestão de chave. Se o ambiente exigir: disco cifrado do runner ou cifrar o artefato pós-geração com chave de secret |
+| RIPD da própria ferramenta | **Descartado (consciente)** | tratamento incidental e efêmero não gera risco a titulares (Art. 38); RIPD é entregável de auditoria de um alvo controlador/operador |

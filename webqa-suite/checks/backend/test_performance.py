@@ -30,7 +30,14 @@ def test_tempo_total_razoavel(home_timing, settings):
 @pytest.mark.load
 def test_latencia_percentis_sob_rajada(settings):
     """Rajada leve e limitada (config: load_burst). Para carga real, use
-    loadtest/locustfile.py — este teste é um detector precoce de gargalo."""
+    loadtest/locustfile.py — este teste é um detector precoce de gargalo.
+
+    Guarda técnica (não só aviso): exige autorização explícita do dono do
+    alvo via WEBQA_LOAD_AUTHORIZED=1 — carga sem consentimento pode ser ilegal."""
+    import os
+    if os.environ.get("WEBQA_LOAD_AUTHORIZED") != "1":
+        pytest.skip("Carga requer opt-in explícito: exporte WEBQA_LOAD_AUTHORIZED=1 "
+                    "somente com autorização do dono do alvo.")
     latencies = asyncio.run(burst(settings, settings.target_url))
     p = percentiles(latencies)
     assert p["p50"] <= settings.threshold("p50_ms"), f"p50={p['p50']:.0f}ms alto demais"

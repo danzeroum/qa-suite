@@ -8,6 +8,8 @@ import json
 
 import pytest
 
+from webqa.sanitize import sanitize_text
+
 pytestmark = [pytest.mark.frontend, pytest.mark.browser]
 
 VITALS_JS = """
@@ -36,8 +38,9 @@ def render(browser_page, settings):
     """Navega uma única vez e coleta métricas + erros de console + peso."""
     errors, total_bytes = [], 0
 
-    browser_page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-    browser_page.on("pageerror", lambda e: errors.append(str(e)))
+    browser_page.on("console",
+                    lambda m: errors.append(sanitize_text(m.text)[:200]) if m.type == "error" else None)
+    browser_page.on("pageerror", lambda e: errors.append(sanitize_text(str(e))[:200]))
 
     def on_response(resp):
         nonlocal total_bytes
