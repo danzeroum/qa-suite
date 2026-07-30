@@ -57,7 +57,16 @@ ROOT = Path(__file__).resolve().parent.parent
 # nenhum, já que o container não tem `report/` na imagem.
 SUMMARY_PADRAO = Path(os.environ.get("WEBQA_REPORT_DIR") or ROOT / "report") / "summary.json"
 LEDGER_PADRAO = ROOT / "docs" / "lgpd-estabilidade.json"
+# Painel vai para report/, que é ignorado pelo git (R8) e honra WEBQA_REPORT_DIR
+# como o resto dos artefatos. O ledger é versionado; o painel é derivado dele e
+# se refaz a qualquer momento — versionar os dois seria versionar a mesma
+# verdade duas vezes, e elas divergiriam.
+PAINEL_PADRAO = Path(os.environ.get("WEBQA_REPORT_DIR") or ROOT / "report") / "estabilidade.html"
 META_PADRAO = 10
+# Violações declaradas no contrato do alvo fixture. INTERPOLADO na narrativa do
+# painel, nunca literal: o fixture já cresceu uma vez, e um número fixo dentro de
+# um parágrafo envelhece em silêncio.
+CONTRATO_PADRAO = ROOT / "fixture_target" / "esperado.json"
 # schema 2: entradas ganham "origem" e "dia_utc"; sequência recalculada do
 #           histórico, contando só o ambiente oficial e um dia por vez.
 # schema 3: EMENDA de arquitetura (2026-07-30) — o ambiente oficial deixa de ser
@@ -67,7 +76,13 @@ META_PADRAO = 10
 #           container oficial. Entradas "ci" anteriores viram histórico.
 # schema 4: entradas ganham "classificador" (versão do juiz). Entradas sem o
 #           campo recebem 1 na carga — migração one-shot, ver carregar_ledger.
-SCHEMA = 4
+# schema 5: entradas ganham "infra_assinaturas" — QUAIS sinais de infra
+#           dispararam, para o painel dizer o motivo em vez de só a contagem
+#           ("1 — TimeoutError" em vez de "1"). Campo descritivo e opcional:
+#           NENHUMA regra de julgamento o lê, então CLASSIFICADOR_VERSAO NÃO
+#           sobe (regra 2.3 é sobre mudar COMO se julga, e nada aqui muda).
+#           Entrada antiga sem o campo continua válida e mostra só a contagem.
+SCHEMA = 5
 
 # Só este ambiente move a métrica. Um runner hospedado troca a imagem base sob
 # os pés; um container fixado por digest não — logo é MAIS controlado, e é dele
@@ -113,6 +128,11 @@ class Classificacao:
     generated_at: str
     browser_total: int
     flakes: tuple[str, ...]
+    # QUAIS sinais dispararam, para o painel dizer o motivo. Vocabulário FECHADO,
+    # vindo da alternação de INFRA — nunca o trecho de erro do alvo. O ledger é
+    # versionado, e texto livre de execução ali violaria o R8; um rótulo do nosso
+    # próprio regex não carrega host nem dado do alvo.
+    assinaturas: tuple[str, ...] = ()
 
     @property
     def tem_browser(self) -> bool:
@@ -126,15 +146,25 @@ class Classificacao:
 def classificar(summary: dict) -> Classificacao:
     """Separa flake de infra de veredito sobre o alvo."""
     browser = [r for r in summary.get("results", []) if r.get("browser")]
-    flakes = tuple(
-        r.get("test", "?")
-        for r in browser
-        if r.get("outcome") != "passed" and INFRA.search(r.get("detail") or "")
-    )
+    flakes, assinaturas = [], []
+    for r in browser:
+        if r.get("outcome") == "passed":
+            continue
+        achado = INFRA.search(r.get("detail") or "")
+        if not achado:
+            continue
+        flakes.append(r.get("test", "?"))
+        # O TEXTO CASADO, não o trecho ao redor: `achado.group(0)` é sempre um
+        # dos rótulos da alternação de INFRA. Levar o contexto colocaria erro do
+        # alvo num arquivo versionado (R8) — o rótulo, não.
+        rotulo = achado.group(0).strip()
+        if rotulo not in assinaturas:
+            assinaturas.append(rotulo)
     return Classificacao(
         generated_at=str(summary.get("generated_at", "")),
         browser_total=len(browser),
-        flakes=flakes,
+        flakes=tuple(flakes),
+        assinaturas=tuple(sorted(assinaturas)),
     )
 
 
@@ -223,6 +253,34 @@ def sequencia_oficial(execucoes: list[dict],
     * a sequência é por alvo — se o `alvo_sha256` muda entre dias contados,
       recomeça.
     """
+    passos = caminhada(execucoes, origem_oficial)
+    streak = passos[-1].streak if passos else 0
+    return streak, len(passos)
+
+
+@dataclass(frozen=True)
+class Passo:
+    """Uma entrada que CONTA, e o que ela fez com a sequência.
+
+    Existe para que o painel HTML não precise repetir a caminhada. Duas
+    implementações da mesma regra divergem — e divergiriam justamente no número
+    que a página exibe como verdade.
+    """
+
+    entrada: dict
+    dia_utc: str
+    limpa: bool
+    streak: int          # sequência DEPOIS desta noite
+    alvo_mudou: bool     # o alvo trocou de identidade nesta noite
+
+
+def caminhada(execucoes: list[dict],
+              origem_oficial: str = ORIGEM_OFICIAL) -> list[Passo]:
+    """As noites que contam, em ordem de dia UTC, com o efeito de cada uma.
+
+    Ponto único da regra: `sequencia_oficial` devolve o último passo desta lista,
+    e o painel (`webqa/estabilidade_html.py`) rotula cada linha a partir dela.
+    """
     primeira_do_dia: dict[str, dict] = {}
     for entrada in execucoes:
         if entrada.get("origem") != origem_oficial:
@@ -234,16 +292,20 @@ def sequencia_oficial(execucoes: list[dict],
             continue
         primeira_do_dia.setdefault(_dia_utc_de(entrada), entrada)
 
+    passos: list[Passo] = []
     streak = 0
     alvo_anterior: str | None = None
     for dia in sorted(primeira_do_dia):
         entrada = primeira_do_dia[dia]
-        if alvo_anterior is not None and entrada.get("alvo_sha256") != alvo_anterior:
+        mudou = alvo_anterior is not None and entrada.get("alvo_sha256") != alvo_anterior
+        if mudou:
             streak = 0
         limpa = int(entrada.get("infra_flakes", 0)) == 0 and int(entrada.get("browser_total", 0)) > 0
         streak = streak + 1 if limpa else 0
         alvo_anterior = entrada.get("alvo_sha256")
-    return streak, len(primeira_do_dia)
+        passos.append(Passo(entrada=entrada, dia_utc=dia, limpa=limpa,
+                            streak=streak, alvo_mudou=mudou))
+    return passos
 
 
 @dataclass(frozen=True)
@@ -296,6 +358,11 @@ def registrar(ledger: dict, classificacao: Classificacao, alvo_sha256: str,
         "alvo_sha256": alvo_sha256,
         "browser_total": classificacao.browser_total,
         "infra_flakes": len(classificacao.flakes),
+        # Descritivo, para o painel dizer o MOTIVO em vez de só a contagem.
+        # Omitido quando vazio: campo presente e vazio e campo ausente diriam a
+        # mesma coisa, e o ledger é lido por humano.
+        **({"infra_assinaturas": list(classificacao.assinaturas)}
+           if classificacao.assinaturas else {}),
         # Versão do JUIZ que produziu este veredito. Sem ela, uma correção no
         # classificador não tem como distinguir dado íntegro de dado viciado —
         # e a sequência seguiria andando sobre os dois.
@@ -352,6 +419,31 @@ def _quarentena_texto(execucoes: list[dict]) -> str:
     return texto
 
 
+def violacoes_do_contrato(caminho: Path = CONTRATO_PADRAO) -> int:
+    """Quantos FAILs o alvo fixture deve produzir, lidos do contrato.
+
+    Ausência do arquivo devolve 0, e o painel omite o número em vez de chutar:
+    narrativa com número inventado é pior que narrativa sem número.
+    """
+    try:
+        return len(json.loads(caminho.read_text(encoding="utf-8"))["devem_falhar"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0
+
+
+def escrever_painel(ledger: dict, destino: Path, meta: int = META_PADRAO,
+                    ledger_path: str = "docs/lgpd-estabilidade.json") -> Path:
+    """Renderiza o painel. NUNCA escreve no ledger — só lê e desenha."""
+    sys.path.insert(0, str(ROOT))       # execução direta: python scripts/estabilidade.py
+    from webqa.estabilidade_html import montar
+
+    html = montar(ledger, caminhada(ledger.get("execucoes") or []),
+                  violacoes_do_contrato(), meta=meta, ledger_path=ledger_path)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(html, encoding="utf-8")
+    return destino
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("summary", nargs="?", type=Path, default=SUMMARY_PADRAO)
@@ -366,7 +458,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--recompute", action="store_true",
                         help="reavalia o ledger existente sem registrar execução nova "
                              "(auditoria: mostra a sequência e a quarentena atuais)")
+    parser.add_argument("--painel", nargs="?", type=Path, const=PAINEL_PADRAO, default=None,
+                        help="gera o painel HTML do ledger (default: report/estabilidade.html). "
+                             "Só LÊ o ledger — combina com --recompute para auditar sem gravar")
     args = parser.parse_args(argv)
+
+    if args.painel is not None:
+        # Gerar o painel nunca escreve no ledger, em nenhuma combinação de
+        # flags: é leitura mais renderização. Assim `--painel` é seguro no
+        # GitHub, onde nada pode tocar o arquivo (docs/VPS.md).
+        destino = escrever_painel(carregar_ledger(args.ledger), args.painel,
+                                  meta=args.meta, ledger_path=str(args.ledger))
+        print(f"painel: {destino}")
+        if not args.recompute:
+            return 0
 
     if args.recompute:
         # Auditoria pura: nenhuma classificação, nenhuma escrita. Existe porque a
