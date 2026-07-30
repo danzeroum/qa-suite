@@ -11,6 +11,7 @@ as dimensões marcadas e é agrupado na primeira declarada.
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -34,14 +35,18 @@ DIMENSION_NOTES = {
     ),
 }
 
-REPORT_DIR = Path(__file__).resolve().parent.parent / "report"
+# Redirecionável por ambiente (12-Factor): o teste de sistema do alvo fixture
+# roda um pytest interno, que sobrescreveria o relatório da execução externa.
+REPORT_DIR = Path(
+    os.environ.get("WEBQA_REPORT_DIR") or Path(__file__).resolve().parent.parent / "report"
+)
 _RESULTS: list[dict] = []
 _START = time.time()
 
 
 def report_dir() -> Path:
     """Diretório de artefatos, criado sob demanda (usado também pelos checks)."""
-    REPORT_DIR.mkdir(exist_ok=True)
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
     return REPORT_DIR
 
 
@@ -51,10 +56,13 @@ def pytest_runtest_makereport(item, call):
 
     `report.keywords` é um conjunto sem ordem confiável; a ordem de declaração é
     o que define quem "vence" o agrupamento de um teste multidimensional.
+    Também marca se o teste exige navegador — insumo do ledger de estabilidade
+    (scripts/estabilidade.py), que só olha para a dimensão browser.
     """
     outcome = yield
     result = outcome.get_result()
     result.webqa_dimensions = [m.name for m in item.iter_markers() if m.name in DIMENSIONS]
+    result.webqa_browser = any(m.name == "browser" for m in item.iter_markers())
 
 
 def pytest_runtest_logreport(report):
@@ -63,14 +71,23 @@ def pytest_runtest_logreport(report):
     dims = getattr(report, "webqa_dimensions", None)
     if not dims:  # fallback: sem o hookwrapper (ex.: report sintético)
         dims = [m for m in DIMENSIONS if m in report.keywords]
+    # `detail` também para skip: o MOTIVO do skip distingue "sem imagens na
+    # página" (resultado legítimo) de "Chromium indisponível" (falha de infra).
+    # Sem isso não há como separar flake de veredito — sempre sanitizado.
+    detalhe = (
+        sanitize_text(str(report.longrepr))[:800]
+        if (report.failed or report.skipped)
+        else ""
+    )
     _RESULTS.append(
         {
             "test": report.nodeid,
             "dimension": dims[0] if dims else "other",
             "dimensions": dims or ["other"],
+            "browser": bool(getattr(report, "webqa_browser", "browser" in report.keywords)),
             "outcome": report.outcome,
             "duration_s": round(getattr(report, "duration", 0.0), 3),
-            "detail": sanitize_text(str(report.longrepr))[:800] if report.failed else "",
+            "detail": detalhe,
         }
     )
 

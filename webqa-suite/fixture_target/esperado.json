@@ -1,0 +1,17 @@
+{
+  "descricao": "Contrato do alvo fixture: FAILs que a dimensão lgpd DEVE produzir contra fixture_target/servir.py. Conferido por tests/test_alvo_fixture.py — nem a mais (regressão que reprova alvo conforme) nem a menos (check que parou de detectar).",
+  "escopo": "pytest -m lgpd",
+  "devem_falhar": [
+    "checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento",
+    "checks/lgpd/test_consentimento.py::test_sem_cookies_nao_essenciais_pre_aceite",
+    "checks/lgpd/test_pii_transito.py::test_pii_em_query_string",
+    "checks/lgpd/test_pii_transito.py::test_forms_pii_post_https",
+    "checks/lgpd/test_retencao_observavel.py::test_cookies_expiracao",
+    "checks/lgpd/test_terceiros.py::test_sri_scripts_externos",
+    "checks/ux/test_acessibilidade.py::test_imagens_com_alt"
+  ],
+  "fora_do_contrato": {
+    "checks/ux/test_acessibilidade.py::test_sem_violacoes_criticas": "baixa o axe-core de CDN com verificação de hash — resultado depende de rede externa, não é determinístico offline",
+    "checks/ux/test_acessibilidade.py::test_sem_violacoes_serias": "idem"
+  }
+}

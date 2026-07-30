@@ -109,9 +109,95 @@ ser detectado e mascarado no mesmo commit. URLs ofensoras vão ao relatório via
 o e-mail do encarregado é detectado e **não** reproduzido. `report/` é ignorado
 pelo Git.
 
+## Critério de saída da Fase 1 (ledger de estabilidade)
+
+"Estável em produção" precisa ser um número verificável, não uma impressão.
+`scripts/estabilidade.py` lê o `report/summary.json`, classifica a execução e
+mantém o ledger versionado `docs/lgpd-estabilidade.json`:
+
+```bash
+make estabilidade                       # ou: python scripts/estabilidade.py
+python scripts/estabilidade.py --dry-run   # classifica sem gravar (uso do CI)
+```
+
+A distinção que dá sentido à métrica:
+
+| Sinal | Exemplo | Efeito na sequência |
+|---|---|---|
+| **Flake de infra** | `TimeoutError`, `TargetClosed`, `net::ERR_*`, Chromium ausente | **zera** |
+| **FAIL determinístico** | tracker antes do consentimento, cookie de 730 dias, violação axe | **não zera** — a suíte funcionou; quem está errado é o alvo |
+| Execução sem teste de navegador | `pytest -m "lgpd and not browser"` | ignorada (não conta nem zera) |
+
+Cada entrada registra `{generated_at, alvo_sha256, browser_total, infra_flakes,
+streak}`. `generated_at` é a chave: rodar o script duas vezes no mesmo summary
+não infla a sequência. Ao atingir **10 execuções consecutivas sem flake**, o
+script imprime `FASE 2 DESTRAVADA`.
+
+### O alvo fixture (`fixture_target/`)
+
+A medição roda contra um **alvo fabricado e congelado**, nunca contra um site
+alheio. Medir estabilidade contra produção mistura dois sinais: se o site muda, a
+suíte "flaka" sem que nada tenha piorado — e ainda geraria tráfego automatizado
+diário contra terceiros.
+
+```bash
+make fixture          # sobe o alvo em porta efêmera e imprime a URL
+```
+
+Violações que ele contém de propósito: GTM antes do consentimento, cookie `_ga`
+com `Max-Age` de 730 dias, `?email=` em `href`, formulário GET/HTTP com campo de
+e-mail, script de CDN sem SRI e imagem sem `alt`. Em transparência ele é
+**conforme** — o contrato precisa provar os dois lados, senão um check que
+reprova tudo passaria por "funcionando".
+
+`fixture_target/esperado.json` é o contrato: a lista exata de FAILs que a
+dimensão deve produzir. `tests/test_alvo_fixture.py` sobe o alvo, roda
+`pytest -m lgpd` em subprocesso e compara — **nem a mais** (check reprovando
+alvo conforme) **nem a menos** (check que parou de detectar e ninguém notou).
+É o risco R7 aplicado à dimensão: sem esse contrato, um check quebrado tornaria
+a medição de estabilidade uma mentira estável.
+
+Limites declarados: o "CDN sem SRI" aponta para um domínio `.invalid`
+(RFC 2606, nunca resolve) porque o check lê o **atributo** do HTML; e o único
+contato com host externo é um `fetch` abortável para o domínio do tracker — o
+teste depende do **registro da requisição**, nunca da resposta, e funciona
+offline. Os dois testes de axe-core ficam **fora do contrato**: dependem de
+baixar a biblioteca de um CDN, logo não são determinísticos.
+
+### O noturno (`.github/workflows/estabilidade.yml`)
+
+Agendado diariamente (e sob demanda). Sobe o fixture, confere o contrato, roda a
+dimensão, classifica e **commita o ledger** com `[skip ci]`. É o único ponto do
+repositório com `contents: write`, concedido no job, não no workflow.
+
+O passo da dimensão roda com `continue-on-error`: contra um alvo não conforme a
+execução **reprova por definição** (7 FAILs de contrato). O código de saída do
+pytest não diz nada sobre estabilidade — quem decide é o classificador, lendo o
+`summary.json`. Falha do workflow, por si só, não zera a sequência.
+
+Três decisões que valem registro:
+
+- **A URL do alvo nunca entra no ledger** — só o `sha256`. O digest é chave de
+  agrupamento, não segredo: o espaço de URLs é pequeno e enumerável.
+- **A identidade do fixture vem do que ele SERVE** (`--alvo-fixture`), não da
+  URL: a porta é efêmera e muda a cada noite; ancorar na URL zeraria a sequência
+  todo dia e a Fase 2 nunca destravaria. Mexer num comentário não muda a
+  identidade; mexer numa violação muda — e aí a sequência recomeça, porque o
+  alvo passou a ser outro.
+- **A sequência é por alvo**: se o `alvo_sha256` muda, ela reinicia. Nove
+  execuções limpas contra um alvo mais uma contra outro não são dez execuções
+  limpas contra nada.
+- **O CI não commita o ledger** (`contents: read`): o passo em `ci.yml` roda com
+  `--dry-run` e publica o número como artefato. Avançar a sequência é ato
+  deliberado de quem roda a validação.
+
+O `detail` de cada resultado passou a ser gravado também para **skip**: sem o
+motivo, "Sem imagens na página" (resultado legítimo) seria indistinguível de
+"Chromium indisponível" (flake). Continua sanitizado na borda de escrita.
+
 ## Backlog
 
-**Fase 2** (depois que `network_log` estiver estável em produção)
+**Fase 2** (destravada quando o ledger atingir 10 execuções consecutivas sem flake)
 
 - canário de consentimento: aceitar/recusar banner e comparar antes/depois — exige `WEBQA_ACTIVE_PROBES_AUTHORIZED=1`;
 - detecção de CMPs (OneTrust, Cookiebot, Osano) e verificação de que "recusar" recusa de fato.

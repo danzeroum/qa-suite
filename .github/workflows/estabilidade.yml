@@ -1,0 +1,103 @@
+# Medição noturna de estabilidade da dimensão browser.
+#
+# Roda a dimensão contra o ALVO FIXTURE (fixture_target/), nunca contra um site
+# alheio: alvo congelado significa que qualquer variação de resultado é da suíte
+# ou do ambiente — que é exatamente o que a métrica quer medir. Também evita
+# tráfego automatizado diário contra terceiros.
+#
+# A sequência sem flake é o critério de saída da Fase 1 (docs/LGPD.md).
+name: Estabilidade
+
+on:
+  schedule:
+    - cron: "17 3 * * *"     # 03h17 UTC — fora do pico, minuto não redondo
+  workflow_dispatch:
+
+# Padrão restritivo; só o job que commita o ledger recebe escrita.
+permissions:
+  contents: read
+
+concurrency:
+  group: estabilidade        # duas medições simultâneas corromperiam a sequência
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: webqa-suite
+
+jobs:
+  medir:
+    name: Medir estabilidade contra o alvo fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write        # ÚNICO ponto do repositório com escrita: o ledger
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: webqa-suite/requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Subir o alvo fixture
+        run: |
+          nohup python fixture_target/servir.py --url-file "$RUNNER_TEMP/alvo.url" \
+            > "$RUNNER_TEMP/alvo.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            [ -s "$RUNNER_TEMP/alvo.url" ] && break
+            sleep 1
+          done
+          test -s "$RUNNER_TEMP/alvo.url" || { cat "$RUNNER_TEMP/alvo.log"; exit 1; }
+          echo "WEBQA_TARGET_URL=$(cat "$RUNNER_TEMP/alvo.url")" >> "$GITHUB_ENV"
+
+      # Antes de MEDIR, confere que a suíte ainda detecta o que promete: um
+      # check quebrado tornaria a medição de estabilidade uma mentira estável.
+      - name: Contrato do alvo fixture (teste de sistema)
+        run: pytest tests -m verification
+
+      # continue-on-error de propósito: o alvo é NÃO CONFORME, então esta
+      # execução reprova por definição (7 FAILs de contrato). O código de saída
+      # do pytest não diz nada sobre estabilidade — quem decide é o
+      # classificador, lendo o summary.json. Falha do workflow não zera streak.
+      - name: Dimensão lgpd contra o fixture
+        continue-on-error: true
+        run: pytest -m lgpd
+
+      - name: Classificar e registrar no ledger
+        # --alvo-fixture: identidade estável entre noites (a porta é efêmera).
+        run: python scripts/estabilidade.py --alvo-fixture
+
+      - name: Commitar o ledger
+        run: |
+          # --porcelain, não `git diff`: na primeira noite o ledger é arquivo
+          # NOVO, e `git diff` não enxerga não rastreado — o primeiro commit
+          # seria silenciosamente pulado.
+          if [ -z "$(git status --porcelain -- docs/lgpd-estabilidade.json)" ]; then
+            echo "Ledger inalterado (execução duplicada ou sem testes de navegador)."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/lgpd-estabilidade.json
+          # [skip ci]: o commit do ledger não é mudança de código, não há o que
+          # verificar — e disparar o CI aqui só gastaria minutos de runner.
+          git commit -m "chore(ledger): registra execucao noturna de estabilidade [skip ci]"
+          git push
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: estabilidade-${{ github.run_number }}
+          path: |
+            webqa-suite/report/
+            webqa-suite/docs/lgpd-estabilidade.json
+          retention-days: 7
+          if-no-files-found: warn
