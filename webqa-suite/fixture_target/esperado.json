@@ -1,17 +1,22 @@
 {
-  "descricao": "Contrato do alvo fixture: FAILs que a dimensão lgpd DEVE produzir contra fixture_target/servir.py. Conferido por tests/test_alvo_fixture.py — nem a mais (regressão que reprova alvo conforme) nem a menos (check que parou de detectar).",
-  "escopo": "pytest -m lgpd",
+  "descricao": "Contrato do alvo fixture: FAILs que as dimensões lgpd e seguranca DEVEM produzir contra fixture_target/servir.py. Conferido por tests/test_alvo_fixture.py — nem a mais (regressão que reprova alvo conforme) nem a menos (check que parou de detectar).",
+  "escopo": "pytest -m \"lgpd or seguranca\"",
   "devem_falhar": [
-    "checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento",
     "checks/lgpd/test_consentimento.py::test_sem_cookies_nao_essenciais_pre_aceite",
-    "checks/lgpd/test_pii_transito.py::test_pii_em_query_string",
+    "checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento",
     "checks/lgpd/test_pii_transito.py::test_forms_pii_post_https",
+    "checks/lgpd/test_pii_transito.py::test_pii_em_query_string",
     "checks/lgpd/test_retencao_observavel.py::test_cookies_expiracao",
     "checks/lgpd/test_terceiros.py::test_sri_scripts_externos",
+    "checks/seguranca/test_headers_e_conteudo.py::test_tipo_declarado_corresponde_ao_conteudo",
+    "checks/seguranca/test_segredos.py::test_sem_credenciais_em_js_e_json_de_origem",
     "checks/ux/test_acessibilidade.py::test_imagens_com_alt"
   ],
   "fora_do_contrato": {
     "checks/ux/test_acessibilidade.py::test_sem_violacoes_criticas": "baixa o axe-core de CDN com verificação de hash — resultado depende de rede externa, não é determinístico offline",
-    "checks/ux/test_acessibilidade.py::test_sem_violacoes_serias": "idem"
+    "checks/ux/test_acessibilidade.py::test_sem_violacoes_serias": "idem",
+    "checks/seguranca/test_headers_e_conteudo.py::test_sem_mixed_content": "o alvo fixture é servido por http://127.0.0.1 — em página http NADA é mixed content, então a violação não pode ser exercida aqui sem inventá-la. A lógica é coberta por unidade em tests/test_seguranca_checks.py",
+    "checks/seguranca/test_cookies.py::test_cookies_de_sessao_sao_secure": "`Secure` não é exigível de alvo http:// — o navegador sequer aceitaria o atributo. Lógica coberta por unidade",
+    "checks/seguranca/test_headers_e_conteudo.py::test_assets_de_terceiro_declaram_nosniff": "o único terceiro do fixture é um domínio .invalid que nunca responde, logo não há resposta de terceiro para inspecionar. Lógica coberta por unidade"
   }
 }

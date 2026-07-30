@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps
+.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -7,6 +7,7 @@ ux: ; pytest -m ux
 functional: ; pytest -m functional
 acceptance: ; pytest -m acceptance
 lgpd: ; pytest -m lgpd
+seguranca: ; pytest -m seguranca
 lgpd-passivo: ; pytest -m "lgpd and not browser"   # só HTTP, sem navegador
 load: ; pytest -m load
 estabilidade: ; python scripts/estabilidade.py

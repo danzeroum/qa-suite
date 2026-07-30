@@ -205,3 +205,54 @@ def texto_do_corpo(corpo: Corpo) -> str:
     if not corpo.avaliavel:
         return ""
     return corpo.dados.decode("utf-8", errors="replace")
+
+
+def find_secrets(texto: str, recurso: str, fase: Fase = "A") -> list[Finding]:
+    """Credenciais no texto, já como `Finding` — logo, já mascaradas.
+
+    Mora aqui e não em `sanitize.py` por camada: `sanitize` é a borda de escrita
+    e não conhece o domínio; fazê-la importar `Finding` criaria ciclo, já que o
+    `Finding` depende dela para existir. O MOTOR de detecção continua sendo o do
+    `sanitize` (`encontrar_segredos`) — ponto único de verdade preservado.
+    """
+    return [Finding(tipo=f"segredo:{nome}", recurso=recurso, severidade=sev,
+                    evidencia=f"{nome} encontrado no corpo de {recurso}", fase=fase)
+            for nome, sev in encontrar_segredos(texto)]
+
+
+# Assinaturas de formato (magic bytes). Só stdlib e só o começo do arquivo — a
+# extensão e o Content-Type são DECLARAÇÕES do servidor; isto é o que o arquivo
+# de fato é. Tabela compartilhada com a Fase B (docs/SEGURANCA.md §6).
+_ASSINATURAS: tuple[tuple[str, bytes], ...] = (
+    ("pdf", b"%PDF-"),
+    ("png", b"\x89PNG\r\n\x1a\n"),
+    ("gif", b"GIF87a"),
+    ("gif", b"GIF89a"),
+    ("jpeg", b"\xff\xd8\xff"),
+    ("zip", b"PK\x03\x04"),
+    ("gzip", b"\x1f\x8b"),
+    ("webp", b"RIFF"),       # RIFF....WEBP; o prefixo já basta para separar de texto
+)
+
+
+def assinatura(dados: bytes | None) -> str:
+    """Formato pelo conteúdo, "" quando não reconhecido (texto, JS, JSON…)."""
+    if not dados:
+        return ""
+    for nome, prefixo in _ASSINATURAS:
+        if dados.startswith(prefixo):
+            return nome
+    return ""
+
+
+def parece_html(dados: bytes | None) -> bool:
+    """Começo de documento HTML — usado para pegar asset executável que virou página.
+
+    O caso real: um `.js` que o servidor devolve como a página de erro em HTML.
+    O navegador recusa executar (nosniff) ou, pior, executa algo inesperado; de
+    todo modo o app está quebrado e a declaração do servidor está mentindo.
+    """
+    if not dados:
+        return False
+    inicio = dados[:512].lstrip().lower()
+    return inicio.startswith((b"<!doctype html", b"<html", b"<head", b"<body"))
