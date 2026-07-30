@@ -362,6 +362,14 @@ footer .sha{font:400 .72rem var(--mono);overflow-wrap:anywhere}
 <div><p class="detalhe"><code>Referrer-Policy</code> ausente. Declarar <code>strict-origin-when-cross-origin</code> evita vazar URLs completas a terceiros.</p>
 <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_pii_transito.py::test_referrer_policy_declarada</code><span class="num">0,020 s</span></p></div>
 </article><figcaption>Alerta = mesma anatomia, subordinada: sem número, detail .96rem. Bloco de alertas sempre DEPOIS dos achados, nunca misturado.</figcaption></figure>
+<figure class="spec">
+<article class="achado" style="border-top:1px solid var(--linha)">
+<div class="achado-margem"><span class="achado-id">A2</span><span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span><span style="font:700 .66rem/1 var(--mono);letter-spacing:.06em;text-transform:uppercase">sev. alta</span></div>
+<div><p class="detalhe">Segredo em corpo de primeira parte: <code>AKIA****************</code> em <code>/static/app.js</code> — valor mascarado na origem (invariante do construtor de <code>Finding</code>); chave ativa dá acesso à conta — <strong class="lei">Art. 46</strong>.</p>
+<p class="achado-meta"><span class="chip-dim">seguranca</span><span class="chip-dim">fase A</span><code>checks/seguranca/test_segredos.py::test_sem_segredos_em_corpos</code><span class="num">0,42 s</span></p></div>
+</article>
+<figcaption>Extensão OS-20+ (dimensão <code>seguranca</code>): <strong>severidade é tipográfica, nunca cromática</strong> — rótulo mono caps na margem (sev. alta / média / baixa), sem cor nova: os 4 estados continuam sendo o único vocabulário de cor do sistema (um segundo semáforo dentro de failed repetiria o erro que o §5 do brief proíbe). Ordenação dentro do grupo: alta → média → baixa. A <code>fase</code> (A/B/C) entra como chip na linha meta, ao lado da dimensão. Evidência chega mascarada do código — o template apenas apresenta. "Não avaliado" (ex.: corpo truncado &gt; 512 KB) usa o vocabulário existente de xfail/skipped com o motivo por extenso — nunca PASS silencioso.</figcaption>
+</figure>
 </section>
 
 <section id="tabelas-spec" aria-labelledby="h-tabelas-spec">
@@ -413,6 +421,7 @@ footer .sha{font:400 .72rem var(--mono);overflow-wrap:anywhere}
 <li><strong>Acessibilidade:</strong> <code>lang="pt-BR"</code>, um único h1, headings sem saltos, landmarks (<code>header/main/nav/footer/section</code>), skip-link "Ir direto aos achados", ícones <code>aria-hidden</code> sempre pareados com rótulo textual, foco visível 2px <code>--acento</code>, tabelas com <code>caption</code> + <code>scope</code>.</li>
 <li><strong>Conteúdo vem do código:</strong> mensagens <code>detail</code> e a nota epistêmica não são reescritas pelo design — o template as apresenta (serif, 72ch) e apenas destaca referências legais (<code>strong.lei</code>) via regex no gerador. Números pt-BR (vírgula decimal); id de teste nunca truncado.</li>
 <li><strong>Pontos de interpolação:</strong> <code>{generated_at}</code> <code>{duration_s}</code> <code>{alvo}</code> <code>{comando}</code> · cards de <code>{by_dimension}</code> · achados/alertas/tabela de <code>{results}</code> · inventário de <code>terceiros.json</code> · nota de <code>DIMENSION_NOTES</code>.</li>
+<li><strong>Pós OS-20/21/22 (dimensão seguranca):</strong> a gramática não muda — o card entra na grade como qualquer dimensão; severidade e fase por achado conforme a §5. Contagens do fixture ("7 achados", <code>browser_total</code>) sempre interpoladas, nunca fixas em texto: o contrato <code>esperado.json</code> vai crescer com as Fases A/B, e o novo <code>alvo_sha256</code> reinicia a sequência do painel — o texto da história no painel deve receber o número do contrato, não o literal 7.</li>
 </ol>
 </div>
 </section>
