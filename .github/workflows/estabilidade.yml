@@ -1,24 +1,28 @@
-# Medição noturna de estabilidade da dimensão browser.
+# SMOKE-TEST do pipeline de estabilidade — NÃO é a medição oficial.
 #
-# Roda a dimensão contra o ALVO FIXTURE (fixture_target/), nunca contra um site
-# alheio: alvo congelado significa que qualquer variação de resultado é da suíte
-# ou do ambiente — que é exatamente o que a métrica quer medir. Também evita
-# tráfego automatizado diário contra terceiros.
+# EMENDA de arquitetura (2026-07-30): o ambiente oficial passou a ser o
+# container Docker da VPS (imagem fixada por digest), que roda o noturno e é o
+# ÚNICO escritor do ledger. Ver docs/VPS.md.
 #
-# A sequência sem flake é o critério de saída da Fase 1 (docs/LGPD.md).
-name: Estabilidade
+# Este workflow perdeu a caneta e ficou com os olhos: roda a dimensão contra o
+# alvo fixture e classifica em --dry-run, para diagnosticar o pipeline pelo
+# GitHub sem escrever nada. Dois escritores no mesmo arquivo é conflito de push
+# às 3h da manhã — por isso o `schedule` foi removido, não apenas desativado.
+#
+# Como consequência da emenda, a origem aqui NÃO é declarada: sem
+# WEBQA_ORIGEM=vps a entrada seria classificada como "local" e não contaria.
+# O --dry-run torna isso explícito — este caminho não pode mover a métrica.
+name: Estabilidade (smoke-test, sem escrita)
 
 on:
-  schedule:
-    - cron: "17 3 * * *"     # 03h17 UTC — fora do pico, minuto não redondo
   workflow_dispatch:
 
-# Padrão restritivo; só o job que commita o ledger recebe escrita.
+# Nenhum job deste workflow escreve no repositório.
 permissions:
   contents: read
 
 concurrency:
-  group: estabilidade        # duas medições simultâneas corromperiam a sequência
+  group: estabilidade
   cancel-in-progress: false
 
 defaults:
@@ -27,11 +31,9 @@ defaults:
 
 jobs:
   medir:
-    name: Medir estabilidade contra o alvo fixture
+    name: Smoke-test da medição (dry-run, não escreve o ledger)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: write        # ÚNICO ponto do repositório com escrita: o ledger
     steps:
       - uses: actions/checkout@v4
 
@@ -71,33 +73,25 @@ jobs:
         continue-on-error: true
         run: pytest -m lgpd
 
-      - name: Classificar e registrar no ledger
-        # --alvo-fixture: identidade estável entre noites (a porta é efêmera).
-        run: python scripts/estabilidade.py --alvo-fixture
+      # --dry-run é a garantia técnica de que este caminho não escreve: o
+      # arquivo do ledger não é tocado, e nenhum passo faz commit ou push.
+      # Quem registra a medição oficial é o container da VPS (docs/VPS.md).
+      - name: Classificar em dry-run (não grava o ledger)
+        run: python scripts/estabilidade.py --alvo-fixture --dry-run
 
-      - name: Commitar o ledger
+      - name: Provar que o ledger não foi alterado
         run: |
-          # --porcelain, não `git diff`: na primeira noite o ledger é arquivo
-          # NOVO, e `git diff` não enxerga não rastreado — o primeiro commit
-          # seria silenciosamente pulado.
-          if [ -z "$(git status --porcelain -- docs/lgpd-estabilidade.json)" ]; then
-            echo "Ledger inalterado (execução duplicada ou sem testes de navegador)."
-            exit 0
+          if [ -n "$(git status --porcelain -- docs/lgpd-estabilidade.json)" ]; then
+            echo "::error::o smoke-test alterou o ledger — só a VPS pode escrever"
+            git --no-pager diff -- docs/lgpd-estabilidade.json
+            exit 1
           fi
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/lgpd-estabilidade.json
-          # [skip ci]: o commit do ledger não é mudança de código, não há o que
-          # verificar — e disparar o CI aqui só gastaria minutos de runner.
-          git commit -m "chore(ledger): registra execucao noturna de estabilidade [skip ci]"
-          git push
+          echo "Ledger intacto, como esperado."
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: estabilidade-${{ github.run_number }}
-          path: |
-            webqa-suite/report/
-            webqa-suite/docs/lgpd-estabilidade.json
+          path: webqa-suite/report/
           retention-days: 7
           if-no-files-found: warn
