@@ -272,9 +272,17 @@ def test_env_da_execucao_isola_saida_e_nunca_propaga_carga(tmp_path):
     assert "WEBQA_LOAD_AUTHORIZED" not in env, "carga jamais é propagada ao pytest"
 
 
-def test_env_injeta_user_agent_so_quando_o_alvo_declara(tmp_path):
-    sem_ua = env_da_execucao(ALVO, tmp_path, {})
-    assert "WEBQA_USER_AGENT" not in sem_ua
+def test_user_agent_e_sempre_identificavel(tmp_path):
+    """O alvo declara o seu; sem declaração, entra o da suíte — nunca anônimo.
+
+    O dono de um sistema medido de fora precisa conseguir descobrir quem o mediu
+    e como pedir para parar. Cliente anônimo contra terceiro é exatamente o
+    comportamento que esta suíte critica nos alvos.
+    """
+    padrao = env_da_execucao(ALVO, tmp_path, {})["WEBQA_USER_AGENT"]
+    assert "WebQA-Suite" in padrao
+    assert "github.com/danzeroum/qa-suite" in padrao, "sem contato não é identificação"
+
     com_ua = Alvo("https://wiki.example", "real pesado", 5, "WebQA/1.0 (+contato)")
     assert env_da_execucao(com_ua, tmp_path, {})["WEBQA_USER_AGENT"] == "WebQA/1.0 (+contato)"
 
@@ -291,10 +299,17 @@ def test_markdown_tem_as_duas_secoes_de_tempo():
 
 
 def test_campanha_sem_nenhum_alvo_acessivel_nao_explode_o_render():
+    """Alvo não medido entra na tabela como 'não medido', nunca como ausência.
+
+    Omitir a coluna faria alvo que recuou e alvo que passou ficarem
+    indistinguíveis para quem lê — e alvo ausente é lido como alvo sem problema,
+    que é o pior engano possível num consolidado.
+    """
     dados = _consolidado([ResultadoAlvo(ALVO, acessivel=False, motivo="ConnectTimeout")])
     md = render_markdown(dados)
     assert dados["alvos_acessiveis"] == 0
-    assert "Nenhum alvo rendeu métrica" in md
+    assert ALVO.host in md and "não medido" in md
+    assert "ConnectTimeout" in md, "o motivo tem de aparecer, não só a ausência"
 
 
 # ---------- Erro de fixture: o teste que não aconteceu ----------

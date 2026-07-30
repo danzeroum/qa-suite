@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **418 testes coletados**; num ambiente
-limpo o resultado é **415 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **443 testes coletados**; num ambiente
+limpo o resultado é **440 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.

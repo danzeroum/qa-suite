@@ -77,7 +77,7 @@ pergunta diferente:
 | **real pesado** (`www.wikipedia.org`) | A suíte aguenta um alvo grande, com i18n e muitos assets? |
 | **falso-positivo** (`www.mozilla.org`) | Alvo maduro, com CSP e consentimento próprios. O que ele reprovar é candidato a falso-positivo da SUÍTE. É aqui que a campanha critica a própria régua. |
 
-## Robot policy do alvo
+## Robot policy do alvo {#etiqueta}
 
 `www.wikipedia.org` responde **403 a User-Agent genérico** e documenta a
 exigência de identificação com contato (<https://w.wiki/4wJS>). Por isso o alvo
@@ -87,6 +87,67 @@ Cumprir a política do alvo é o comportamento correto de uma suíte que prega
 respeito ao sistema sob teste. Mascarar o cliente como navegador para furar a
 política seria o oposto — e a suíte perderia a autoridade moral de cobrar
 conformidade de quem ela mede.
+
+### Etiqueta é invariante estrutural, não instrução
+
+A disciplina mora em `webqa/etiqueta.py` e vale para **todo alvo que não seja
+rede local**. Quem acrescenta um alvo ao `campanha.yaml` não precisa lembrar de
+nada: o runner já se comporta.
+
+| Regra | Comportamento |
+|---|---|
+| **`robots.txt` antes de tocar no alvo** | baixado com `httpx` e `timeout` do settings, lido por `RobotFileParser.parse` sobre o texto já baixado |
+| **caminho proibido** | pulado com `robots.txt proíbe /x`; os permitidos seguem |
+| **`Crawl-delay`** | respeitado entre páginas, quando declarado |
+| **`429` / `503`** | encerra aquele alvo **nesta execução**, sem reinsistir |
+| **crawl entre páginas** | sequencial, uma por vez |
+| **User-Agent** | sempre identificável e com contato, mesmo sem `user_agent` no yaml |
+| **alvo de rede local** | isento — é nosso, fabricado e controlado |
+
+Quatro decisões que custaram para descobrir e que **não** devem ser desfeitas:
+
+**`rp.read()` está proibido.** O `RobotFileParser` do stdlib busca o arquivo com
+`urllib`, **sem timeout**. Um host que aceita a conexão e nunca responde travaria
+a campanha inteira — sem log, sem fim e sem culpado aparente. Baixamos com
+`httpx` (que tem timeout) e passamos o texto a `parse`. Há teste que percorre o
+`ast` do módulo e reprova se alguém voltar ao `read()`.
+
+**`crawl_delay()` pode levantar `AttributeError`.** Acontece quando o `robots.txt`
+só traz grupos de agentes específicos e nenhum `*`: o `default_entry` fica `None`.
+Deixar propagar derrubaria a campanha por causa do robots de um único alvo, com
+um traceback que não fala de etiqueta. O fallback é `0.0`.
+
+**`robots.txt` ilegível é *disallow* temporário, não erro.** 5xx, timeout ou
+conexão recusada → o alvo é **pulado com motivo**. Não conseguir ler a política de
+alguém não é licença para ignorá-la. E não é defeito da campanha, então também
+não reprova a execução. `404` é o contrário: o host respondeu dizendo que não há
+política, e aí tudo é permitido.
+
+**A isenção do fixture é por IP resolvido** (`webqa/rede.py`), nunca por string.
+`localhost.qualquercoisa.com` resolve para IP público; casar texto de URL seria
+ilusão de controle. Host que não resolve conta como terceiro — na dúvida,
+etiqueta a mais.
+
+### O que a etiqueta NÃO serializa
+
+Carregar **uma** página dispara CSS, JS e imagens em paralelo. Isso é o que um
+visitante faz, é o que as métricas de renderização precisam medir, e está fora
+do escopo da etiqueta. O que se percorre uma de cada vez é o **crawl entre
+páginas**.
+
+Confundir os dois levaria a serializar assets — que não incomoda ninguém e
+destruiria justamente a medida de FCP/LCP que a campanha existe para produzir.
+
+### Alvo não medido nunca some do consolidado
+
+Alvo que recuou, foi bloqueado por `robots.txt` ou ficou inacessível entra na
+tabela de métricas com **"não medido"** em toda a linha, mais uma entrada na
+seção de inacessíveis com o motivo.
+
+Omitir a coluna faria alvo que pediu recuo e alvo que passou ficarem
+indistinguíveis — e **alvo ausente é lido como alvo sem problema**, que é o pior
+engano possível num consolidado. É a regra 2.1 aplicada ao nível de sistema:
+ausência nunca vira aprovação.
 
 ## Limite conhecido: navegador atrás de proxy
 
