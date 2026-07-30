@@ -25,6 +25,9 @@ class Settings:
     load_requests: int
     load_concurrency: int
     thresholds: dict[str, float] = field(default_factory=dict)
+    # Terceiros liberados pelo controlador (decisão documentada vence a
+    # heurística da suíte — ver webqa/trackers.py::is_tracker).
+    lgpd_allowed_third_parties: list[str] = field(default_factory=list)
 
     def threshold(self, name: str) -> float:
         return float(self.thresholds[name])
@@ -46,6 +49,12 @@ def load_settings(path: Path | None = None) -> Settings:
     http = raw.get("http", {})
     crawl = raw.get("crawl", {})
     burst = raw.get("load_burst", {})
+    lgpd = raw.get("lgpd", {})
+
+    # Allowlist por env aceita lista separada por vírgula (útil em CI).
+    allowed_raw = _env_override("lgpd_allowed_third_parties", lgpd.get("allowed_third_parties") or [])
+    if isinstance(allowed_raw, str):
+        allowed_raw = [p for p in allowed_raw.split(",") if p.strip()]
 
     return Settings(
         target_url=str(_env_override("target_url", raw.get("target_url", ""))).rstrip("/"),
@@ -56,4 +65,5 @@ def load_settings(path: Path | None = None) -> Settings:
         load_requests=int(burst.get("requests", 30)),
         load_concurrency=int(burst.get("concurrency", 10)),
         thresholds=thresholds,
+        lgpd_allowed_third_parties=[str(p).strip() for p in allowed_raw if str(p).strip()],
     )

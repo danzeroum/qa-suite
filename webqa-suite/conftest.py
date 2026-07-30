@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 
 from webqa.config import Settings, load_settings
 from webqa.http_utils import Timing, make_client, timed_get
+from webqa.trackers import LoggedRequest, NetworkLog
 
 
 @pytest.fixture(scope="session")
@@ -49,8 +50,8 @@ def soup(home_response) -> BeautifulSoup:
 # ---------- Navegador (Playwright) ----------
 
 @pytest.fixture(scope="session")
-def browser_page(settings):
-    """Página Chromium real para medir renderização e acessibilidade.
+def browser(settings):
+    """Instância única de Chromium por sessão (contextos é que são isolados).
     Se o Playwright/Chromium não estiver instalado, os testes 'browser'
     são pulados com instrução clara (falha explicada > falha misteriosa)."""
     try:
@@ -60,9 +61,46 @@ def browser_page(settings):
 
     with sync_playwright() as p:
         try:
-            browser = p.chromium.launch()
+            instance = p.chromium.launch()
         except Exception as exc:  # navegador ausente
             pytest.skip(f"Chromium indisponível: rode `python -m playwright install chromium` ({exc}).")
-        page = browser.new_page()
-        yield page
-        browser.close()
+        yield instance
+        instance.close()
+
+
+@pytest.fixture(scope="session")
+def browser_page(browser):
+    """Página Chromium real para medir renderização e acessibilidade."""
+    page = browser.new_page()
+    yield page
+    page.close()
+
+
+@pytest.fixture(scope="module")
+def network_log(browser, settings) -> NetworkLog:
+    """Carrega o alvo em contexto NOVO E VIRGEM e devolve o que a rede revelou.
+
+    Contrato (webqa/trackers.py::NetworkLog): `.requests` (url, resource_type de
+    TODA requisição, inclusive as de terceiros) e `.cookies` (cookies do contexto
+    após o load).
+
+    Contexto próprio, não a página da sessão: cookie ou consentimento herdado de
+    um teste anterior faria o alvo parecer conforme ("já consentiu antes") —
+    o pior falso negativo possível numa bateria de consentimento prévio.
+    """
+    context = browser.new_context(user_agent=settings.user_agent)
+    requests: list[LoggedRequest] = []
+    context.on("request", lambda r: requests.append(LoggedRequest(r.url, r.resource_type)))
+    page = context.new_page()
+    try:
+        page.goto(settings.target_url, wait_until="load", timeout=60_000)
+        # Tags de analytics costumam disparar depois do load; observar cedo demais
+        # produziria aprovação falsa.
+        page.wait_for_timeout(2_000)
+        yield NetworkLog(
+            url=settings.target_url,
+            requests=tuple(requests),
+            cookies=tuple(context.cookies()),
+        )
+    finally:
+        context.close()

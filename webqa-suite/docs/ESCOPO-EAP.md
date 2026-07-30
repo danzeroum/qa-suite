@@ -33,10 +33,16 @@ A EAP está **alinhada 1:1 com as entregas reais do código** (pastas do reposit
 ├── 1.5 Funcional ................ checks/functional/ (2 módulos)
 ├── 1.6 Aceitação (BDD) .......... checks/acceptance/
 ├── 1.7 Carga .................... loadtest/ + marcador @load
-├── 1.8 Verificação da suíte ..... tests/
-├── 1.9 DevOps ................... .github/workflows/ci.yml, Makefile
-└── 1.10 Documentação ............ docs/ (arquitetura C4, riscos, escopo, recomendações)
+├── 1.8 LGPD (Fase 1, passiva) ... checks/lgpd/ (5 módulos) + webqa/trackers.py, gates.py
+├── 1.9 Verificação da suíte ..... tests/
+├── 1.10 DevOps .................. .github/workflows/ci.yml, Makefile
+└── 1.11 Documentação ............ docs/ (arquitetura C4, riscos, escopo, LGPD, recomendações)
 ```
+
+**1.8 — Fase 1 apenas** (bateria passiva). Canário de consentimento, detecção de
+CMP, Global Privacy Control e heurística de fingerprinting são Fase 2/3, listadas
+como backlog em `docs/LGPD.md`; entram depois que a infraestrutura de `network_log`
+estiver estável em produção.
 
 **Modelo de gestão recomendado**: híbrido — escopo/EAP e riscos formais (acima)
 com evolução iterativa dos checks (cada novo check é um incremento pequeno,

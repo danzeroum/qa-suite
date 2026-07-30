@@ -1,0 +1,12 @@
+# Artefatos de execução: podem conter hosts e trechos de erro do ALVO.
+# Nunca versionar (Risco R8 / minimização — docs/RISCOS.md).
+report/
+webqa-suite/report/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/

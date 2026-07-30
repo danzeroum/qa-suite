@@ -10,6 +10,13 @@ apontando apenas a URL alvo. Cobre, em profundidade:
 - **UX**: heurísticas de Nielsen, arquitetura de informação, acessibilidade (axe-core / WCAG).
 - **Funcional**: links quebrados (crawler), formulários, fluxo de aceitação em BDD
   (Given/When/Then).
+- **LGPD**: consentimento prévio (trackers e cookies antes do aceite), PII em trânsito,
+  transparência (política, direitos do titular, encarregado), inventário de terceiros,
+  retenção observável em cookies. Detalhes e limites em [`docs/LGPD.md`](docs/LGPD.md).
+
+> A dimensão LGPD é **caixa-preta e passiva**: falha **prova** não conformidade;
+> passar **não certifica** conformidade (base legal, contratos e governança interna
+> não são observáveis por HTTP). A nota vai no próprio `report/summary.html`.
 
 ## Uso rápido
 
@@ -25,6 +32,8 @@ pytest -m backend               # só backend
 pytest -m "frontend or ux"      # frontend + UX
 pytest -m "not browser"         # sem navegador (só HTTP puro)
 pytest -m acceptance            # cenários BDD de aceitação
+pytest -m lgpd                  # bateria de privacidade (LGPD/LBI)
+pytest -m "lgpd and not browser"   # bateria de privacidade só por HTTP
 ```
 
 Ao final, um relatório consolidado é gravado em `report/summary.json` e
@@ -49,6 +58,7 @@ webqa-suite/
 │   ├── frontend/          # qualidade de HTML/CSS/JS e renderização (Playwright)
 │   ├── ux/                # heurísticas de Nielsen, arquitetura de informação, a11y
 │   ├── functional/        # links, formulários
+│   ├── lgpd/              # privacidade observável: consentimento, PII, transparência
 │   └── acceptance/        # BDD (pytest-bdd) — validação de aceitação
 ├── loadtest/              # cenário Locust
 ├── tests/                 # testes DA PRÓPRIA SUÍTE (verificação)
@@ -63,7 +73,7 @@ Seguindo a separação clássica **Verificação × Validação**:
 |---|---|---|
 | Unidade | `tests/` | **Verificação** — a suíte está construída corretamente? |
 | Integração | `checks/backend`, `checks/frontend` | O alvo integra HTTP, cache, assets corretamente? |
-| Sistema | `checks/ux`, `checks/functional` | O sistema, ponta a ponta, se comporta bem no navegador? |
+| Sistema | `checks/ux`, `checks/functional`, `checks/lgpd` | O sistema, ponta a ponta, se comporta bem no navegador? |
 | Aceitação | `checks/acceptance` (BDD Given/When/Then) | **Validação** — é o que o usuário precisa? |
 
 Cada nível foca **limites, riscos e áreas de maior complexidade**: percentis de
@@ -86,6 +96,8 @@ violações WCAG críticas primeiro.
 | Atributos de Qualidade (-ilities) | performance (`test_performance.py`), segurança (`test_security_headers.py`), disponibilidade (`test_http_basics.py`), testabilidade (a própria suíte), documentados em `docs/ARQUITETURA.md` |
 | Observabilidade (logging/tracing/monitoramento) | `checks/backend/test_observability.py` |
 | Segurança por Design (LGPD/GDPR, privilégio mínimo) | headers, cookies `Secure/HttpOnly/SameSite`, ausência de vazamento de stack trace |
+| Privacidade por Design (consentimento, minimização, transparência) | `checks/lgpd/` + `docs/LGPD.md`; gates de autorização em `webqa/gates.py` |
+| Acessibilidade como obrigação legal (LBI Art. 63) | `checks/ux/test_acessibilidade.py` com dimensão dupla `ux + lgpd` |
 | DevOps e Automação (CI/CD) | `.github/workflows/ci.yml` roda lint + verificação + suíte |
 | Leis da Arquitetura (trade-offs explícitos) | `docs/ARQUITETURA.md` — seção de decisões e preços pagos |
 | Documentação C4 | `docs/ARQUITETURA.md` (Contexto, Container, Componente) |
@@ -96,6 +108,8 @@ Tudo é dirigido por `config.yaml` (sobreponível por variáveis `WEBQA_*`):
 
 ```yaml
 target_url: "https://example.com"
+lgpd:
+  allowed_third_parties: []   # terceiros liberados por decisão documentada
 thresholds:
   ttfb_ms: 800          # limite de Time To First Byte
   p95_ms: 1500          # p95 de latência sob rajada leve

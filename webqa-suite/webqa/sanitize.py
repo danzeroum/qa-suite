@@ -44,6 +44,25 @@ def sanitize_text(text: str) -> str:
     return text
 
 
+def find_pii(text: str) -> list[str]:
+    """Tipos de PII encontrados no texto: 'email', 'cpf' e/ou 'telefone'.
+
+    Mesmas expressões usadas para MASCARAR são usadas para DETECTAR — ponto
+    único de verdade sobre "o que é dado pessoal" nesta suíte. Se um padrão
+    entra aqui, ele passa a ser mascarado e detectado no mesmo commit.
+    """
+    if not text:
+        return []
+    achados = []
+    if _EMAIL.search(text):
+        achados.append("email")
+    if _CPF.search(text):
+        achados.append("cpf")
+    if _FONE_BR.search(text):
+        achados.append("telefone")
+    return achados
+
+
 def safe_url(url: str) -> str:
     """Versão de URL segura para relatório: remove a query string inteira.
 
