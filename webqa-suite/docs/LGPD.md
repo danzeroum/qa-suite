@@ -130,10 +130,47 @@ A distinção que dá sentido à métrica:
 | Execução sem teste de navegador | `pytest -m "lgpd and not browser"` | ignorada (não conta nem zera) |
 
 Cada entrada registra `{generated_at, dia_utc, origem, alvo_sha256,
-browser_total, infra_flakes, streak}`. `generated_at` é a chave de
+browser_total, infra_flakes, streak, classificador}`. `generated_at` é a chave de
 deduplicação: rodar o script duas vezes no mesmo summary não infla a sequência.
 Ao atingir **10 dias consecutivos sem flake**, o script imprime
 `FASE 2 DESTRAVADA`.
+
+### Versão do classificador (regra obrigatória)
+
+**Todo PR que altere COMO uma execução é julgada precisa incrementar
+`CLASSIFICADOR_VERSAO`** em `scripts/estabilidade.py` — o regex de infra, o
+critério de `limpa`, o que conta como teste de navegador. A entrada carrega a
+versão do juiz que a produziu.
+
+A regra nasceu de um caso concreto. Até a **v1**, erros de setup sumiam do
+`summary.json` (o relatório só registrava a fase `call`), e uma noite em que o
+Chromium não alcançava o alvo era classificada como **LIMPA**: a métrica de
+confiança inflava exatamente quando a infraestrutura quebrava. Descoberto pela
+campanha (`docs/CAMPANHA.md`) e corrigido na **v2**, que enxerga erro de
+setup/teardown.
+
+Entradas produzidas por um juiz defeituoso não podem sustentar a sequência, e
+não há como reclassificá-las: o dado que faltava nunca foi gravado. A saída é
+**quarentena**, não expurgo:
+
+| Propriedade | Efeito |
+|---|---|
+| **não conta** | o veredito veio de um juiz que errava — não avança a sequência |
+| **não zera** | a execução pode ter sido perfeitamente boa; não há como saber, e condenar sem prova é tão errado quanto absolver |
+| **não apaga** | o histórico continua auditável no arquivo |
+
+`DEFEITOS_CONHECIDOS` é uma lista **fechada de culpados**, não uma whitelist:
+versão futura desconhecida **conta normalmente**. Travar a sequência para sempre
+porque um refactor esqueceu de registrar o campo seria um fail-safe que falha
+para o lado errado.
+
+Entrada sem o campo é anterior à criação dele, logo **v1** — assumir a versão
+corrente daria fé de integridade justamente ao dado que não a tem. A migração é
+one-shot, aplicada na carga do ledger.
+
+```bash
+python scripts/estabilidade.py --recompute   # auditoria: sequência e quarentena, sem gravar
+```
 
 ### Só o ambiente oficial move a métrica
 

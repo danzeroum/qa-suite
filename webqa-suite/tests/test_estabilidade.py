@@ -10,15 +10,21 @@ from pathlib import Path
 import pytest
 
 from scripts.estabilidade import (
+    CLASSIFICADOR_VERSAO,
+    DEFEITOS_CONHECIDOS,
     ORIGEM_OFICIAL,
+    SCHEMA,
     _dia_utc_de,
     carregar_ledger,
     classificar,
+    em_quarentena,
     main,
     origem_da_execucao,
+    quarentena,
     registrar,
     sequencia_oficial,
     sha256_do_alvo,
+    versao_de,
 )
 
 pytestmark = pytest.mark.verification
@@ -192,7 +198,15 @@ def test_dry_run_nao_grava(tmp_path, capsys, monkeypatch):
 
 # ---------- Origem: só CI move a métrica ----------
 
-def _entrada(dia, *, origem=ORIGEM_OFICIAL, flakes=0, alvo=SHA, quando=None, browser=9):
+def _entrada(dia, *, origem=ORIGEM_OFICIAL, flakes=0, alvo=SHA, quando=None, browser=9,
+             versao=CLASSIFICADOR_VERSAO):
+    """Entrada de ledger COMO ELA EXISTE depois da migração.
+
+    `classificador` explícito porque estas fábricas montam o histórico em
+    memória, sem passar por carregar_ledger (que é quem migra). Entrada sem o
+    campo é, por definição, v1 — e v1 está em quarentena, o que mascararia os
+    testes de origem e de dia com um motivo que não é o deles.
+    """
     return {
         "generated_at": quando or f"{dia} 03:17:00",
         "dia_utc": dia,
@@ -200,6 +214,7 @@ def _entrada(dia, *, origem=ORIGEM_OFICIAL, flakes=0, alvo=SHA, quando=None, bro
         "alvo_sha256": alvo,
         "browser_total": browser,
         "infra_flakes": flakes,
+        "classificador": versao,
     }
 
 
@@ -283,10 +298,27 @@ def test_troca_de_alvo_entre_dias_oficiais_reinicia():
 
 
 def test_dia_utc_ausente_cai_para_o_prefixo_de_generated_at():
-    """A entrada pré-migração não tem dia_utc; veio de runner em UTC."""
+    """A entrada pré-migração não tem dia_utc; veio de runner em UTC.
+
+    `classificador` explícito para isolar o que este teste mede: sem ele a
+    entrada cairia na quarentena da v1 e o resultado falaria de versão, não do
+    fallback de dia. A interação das duas regras é coberta em
+    test_entrada_sem_versao_cai_na_quarentena_mesmo_sem_dia_utc.
+    """
+    antiga = {"generated_at": "2026-07-30 02:38:18", "origem": ORIGEM_OFICIAL,
+              "alvo_sha256": SHA, "browser_total": 9, "infra_flakes": 0,
+              "classificador": CLASSIFICADOR_VERSAO}
+    assert sequencia_oficial([antiga, _entrada("2026-07-31")]) == (2, 2)
+
+
+def test_entrada_sem_versao_cai_na_quarentena_mesmo_sem_dia_utc():
+    """As duas regras juntas: a entrada legada é pré-campo, logo v1, logo fora.
+
+    É exatamente o formato da única entrada do ledger real.
+    """
     antiga = {"generated_at": "2026-07-30 02:38:18", "origem": ORIGEM_OFICIAL,
               "alvo_sha256": SHA, "browser_total": 9, "infra_flakes": 0}
-    assert sequencia_oficial([antiga, _entrada("2026-07-31")]) == (2, 2)
+    assert sequencia_oficial([antiga, _entrada("2026-07-31")]) == (1, 1)
 
 
 def test_github_actions_nao_declara_mais_origem(monkeypatch):
@@ -416,3 +448,111 @@ def test_sequencia_zera_quando_o_navegador_esta_inalcancavel():
     ])
     registro = _aplicar(ledger, morto)
     assert registro.streak == 0, "duas noites boas não sobrevivem a um navegador morto"
+
+
+# ---------- OS-18: versão do classificador e quarentena ----------
+
+def test_entrada_nova_carimba_a_versao_do_classificador():
+    ledger = {"schema": SCHEMA, "execucoes": []}
+    registro = _aplicar(ledger, _limpo("2026-08-01 04:00:00"))
+    assert registro.entrada["classificador"] == CLASSIFICADOR_VERSAO
+
+
+def test_migracao_one_shot_marca_entrada_sem_campo_como_v1(tmp_path):
+    """Ausência do campo é anterior à sua criação — logo v1, nunca a versão atual.
+
+    Assumir a corrente daria fé de integridade a exatamente o dado que não a tem.
+    """
+    caminho = tmp_path / "ledger.json"
+    caminho.write_text(json.dumps({"schema": 2, "execucoes": [
+        {"generated_at": "2026-07-30 02:38:18", "origem": "ci", "alvo_sha256": SHA,
+         "browser_total": 9, "infra_flakes": 0, "streak": 1}]}), encoding="utf-8")
+    ledger = carregar_ledger(caminho)
+    assert ledger["execucoes"][0]["classificador"] == 1
+    assert versao_de(ledger["execucoes"][0]) == 1
+    assert em_quarentena(ledger["execucoes"][0])
+
+
+def test_v1_limpa_nao_conta_e_nao_zera():
+    """Quarentena: nem avança (veredito não confiável) nem derruba (pode ter sido boa)."""
+    execucoes = [_entrada("2026-08-01", versao=1),
+                 _entrada("2026-08-02", versao=1)]
+    assert sequencia_oficial(execucoes) == (0, 0), "v1 não conta"
+
+    execucoes = [_entrada("2026-08-01", versao=1),
+                 _entrada("2026-08-02", versao=2),
+                 _entrada("2026-08-03", versao=1)]
+    streak, dias = sequencia_oficial(execucoes)
+    assert (streak, dias) == (1, 1), "só a v2 conta, e a v1 posterior não a zera"
+
+
+def test_v1_com_flake_tambem_fica_em_quarentena_e_nao_zera_a_v2():
+    """v1 SUJA também é ignorada: o juiz que a condenou é o mesmo que errava."""
+    execucoes = [_entrada("2026-08-01", versao=2),
+                 _entrada("2026-08-02", versao=1, flakes=3),
+                 _entrada("2026-08-03", versao=2)]
+    assert sequencia_oficial(execucoes) == (2, 2)
+
+
+def test_v1_no_mesmo_dia_de_v2_nao_rouba_a_vaga_do_dia():
+    """Regressão do desenho: filtrar a quarentena ANTES do agrupamento por dia."""
+    execucoes = [_entrada("2026-08-01", versao=1),
+                 {**_entrada("2026-08-01", versao=2),
+                  "generated_at": "2026-08-01 05:00:00"}]
+    assert sequencia_oficial(execucoes) == (1, 1)
+
+
+def test_versao_futura_desconhecida_conta_normalmente():
+    """Defeito é lista FECHADA de culpados, não whitelist.
+
+    Travar a sequência para sempre porque um refactor esqueceu de registrar a
+    versão seria um fail-safe que falha para o lado errado.
+    """
+    assert 3 not in DEFEITOS_CONHECIDOS
+    execucoes = [_entrada("2026-08-01", versao=3),
+                 _entrada("2026-08-02", versao=99)]
+    assert sequencia_oficial(execucoes) == (2, 2)
+
+
+def test_nove_v1_limpas_mais_correcao_recomecam_sem_apagar_historico():
+    """Simulação da OS: 9 noites boas julgadas pelo juiz defeituoso + a correção."""
+    execucoes = [_entrada(f"2026-08-{dia:02d}", versao=1) for dia in range(1, 10)]
+    assert sequencia_oficial(execucoes) == (0, 0), "nove v1 não valem nada para a meta"
+
+    execucoes.append(_entrada("2026-08-10", versao=2))
+    streak, _dias = sequencia_oficial(execucoes)
+    assert streak == 1, "a contagem RECOMEÇA em 1, não continua de 9"
+    assert len(execucoes) == 10, "e nada foi apagado — histórico auditável"
+
+
+def test_quarentena_reporta_contagem_por_versao():
+    execucoes = [_entrada("2026-08-01", versao=1),
+                 _entrada("2026-08-02", versao=1),
+                 _entrada("2026-08-03", versao=2)]
+    assert quarentena(execucoes) == {1: 2}
+
+
+def test_saida_explica_a_quarentena_e_o_recomeco(tmp_path, capsys):
+    """Sem o motivo à vista, '0/10' depois de nove noites parece bug do script."""
+    caminho = tmp_path / "ledger.json"
+    caminho.write_text(json.dumps({"schema": 4, "execucoes": [
+        _entrada("2026-08-01", versao=1)]}), encoding="utf-8")
+    assert main(["--ledger", str(caminho), "--recompute"]) == 0
+    saida = capsys.readouterr().out
+    assert "streak 0/10" in saida
+    assert "quarentena: v1 (1 entrada)" in saida
+    assert DEFEITOS_CONHECIDOS[1] in saida
+    assert "RECOMEÇA do zero, sem apagar o histórico" in saida
+
+
+def test_recompute_do_ledger_real_nao_grava_nada(tmp_path, capsys):
+    """Auditoria é leitura: recompute não pode alterar o ledger."""
+    caminho = tmp_path / "ledger.json"
+    original = json.dumps({"schema": 2, "execucoes": [
+        {"generated_at": "2026-07-30 02:38:18", "origem": "ci", "alvo_sha256": SHA,
+         "browser_total": 9, "infra_flakes": 0, "streak": 1}]})
+    caminho.write_text(original, encoding="utf-8")
+    assert main(["--ledger", str(caminho), "--recompute"]) == 0
+    assert caminho.read_text(encoding="utf-8") == original, "recompute não escreve"
+    saida = capsys.readouterr().out
+    assert "streak 0/10" in saida and "quarentena: v1" in saida
