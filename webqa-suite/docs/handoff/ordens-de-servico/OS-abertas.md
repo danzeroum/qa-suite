@@ -7,9 +7,9 @@
 > colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
 > três lugares e os três divergiam.
 >
-> **Próximo número livre: OS-35.**
+> **Próximo número livre: OS-36.**
 
-Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 506 testes de verificação verdes.
+Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 521 testes de verificação verdes.
 Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
 de design — `docs/qa-suite design brief/referencia/` (spec visual:
 `componentes.html` §5/§8; folha canônica: bloco `<style>` de
@@ -33,6 +33,7 @@ Trilha DESIGN/RELATÓRIO — CONCLUÍDA:
   OS-25 ✓ (#18, template seguranca) → OS-26 ✓ (#26, painel de estabilidade)
      └── OS-33 ✓ (#31, o zero do painel explicado)
      └── OS-34 ✓ (#32, derivadores provados ligados ao template)
+     └── OS-35 ✓ (#33, --painel provado somente-leitura sobre o ledger)
 
 Trilha CAMPANHA:
   OS-27 ✓ (#27, etiqueta: robots/recuo/sequencial)
@@ -65,6 +66,7 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-32 | #30 | — | Armadilhas recorrentes como teste: prefixo de coleta, folga em float, anonimato recursivo |
 | OS-33 | #31 | — | Painel explica POR QUE a sequência está em zero (origem, quarentena, alvo novo) |
 | OS-34 | #32 | — | Cada derivador dos dois geradores provado LIGADO ao template (sentinela) |
+| OS-35 | #33 | — | `--painel` somente-leitura: capacidade reduzida + fronteira no fonte + prova por tentativa |
 
 ### Fora da sequência do handoff — numeradas em chat, já em `main`
 

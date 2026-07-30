@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **509 testes coletados**; num ambiente
-limpo o resultado é **506 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **524 testes coletados**; num ambiente
+limpo o resultado é **521 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -199,6 +199,46 @@ indistinguíveis no HTML.** `_bloco_do_zero` devolve `""` quando a sequência es
 viva, e `_achados` devolve seção vazia num laudo verde — os dois casos produzem
 a mesma ausência de texto que uma interpolação apagada produziria. A sentinela é
 o que separa os dois, e há teste para cada um.
+
+#### A classe: "a garantia existe, a ligação não"
+
+Três instâncias, e a assinatura é sempre a mesma — **um teste afirma algo sobre
+uma peça sem atravessar o caminho que a usa de verdade:**
+
+| Instância | A garantia | A ligação que faltava |
+|---|---|---|
+| **D6** | `quality-gate` verde a cada push | sem Chromium, os 4 testes do contrato **pulavam**; o job aprovava sem exercer o R7 que existe para cobrir |
+| **#31 / OS-33** | `motivos_do_zero` testado e correto | o bloco **não estava interpolado**; a página saía sem os três motivos |
+| **#35 / OS-35** | "`--painel` não escreve no ledger" | conferido por **md5 depois da execução** — nada dizia da próxima linha que alguém acrescentasse |
+
+**Heurística de detecção**, para achar a quarta antes que ela morda:
+
+> Pergunte de cada garantia: *o teste percorre o caminho real, ou só a peça?*
+> Se ele monta a peça à mão, chama a função direto ou confere o resultado
+> depois, a ligação está fora da cobertura. Suspeite especialmente quando o
+> teste **confirma um estado** ("o arquivo não mudou", "o job ficou verde") em
+> vez de **exercer um caminho**.
+
+O remédio tem uma ordem de preferência, do mais forte ao mais fraco:
+
+1. **impossibilidade estrutural** — o `Finding` sanitiza no construtor, e não há
+   outro jeito de existir um. Só serve quando há ponto único de estrangulamento;
+2. **fronteira no fonte** — teste que lê o código do caminho e reprova o que não
+   pode aparecer (a Fase B sem `httpx`, o painel sem escrita);
+3. **prova por tentativa** — armadilha que explode no ato, em vez de conferir
+   depois;
+4. **conferência de estado** — o mais fraco. Vale como complemento, nunca sozinho.
+
+Em `--painel` as três últimas foram usadas juntas, porque a primeira não cabia:
+**Python não tem ponto único de estrangulamento para escrita em arquivo**. Dizer
+isso em vez de prometer "impossível" é parte da regra — garantia superestimada é
+irmã da métrica que infla.
+
+Detalhe do ambiente que mudou o desenho do teste e vale para quem escrever o
+próximo: **este container roda como root, e `chmod 0444` não impede escrita
+nenhuma.** Um teste que só conferisse permissão daria garantia falsa — a própria
+classe de defeito, dentro do PR que a fecha. A armadilha de escrita é
+independente de permissão por isso.
 
 Uma nota sobre a primeira: o pytest coleta por `test*`, **não** por `test_*`.
 `testes_lentos` e `testar_alvo` entram na coleta, e em código português esse
