@@ -1,9 +1,19 @@
-# Ordens de Serviço — Dimensão `seguranca` + Camada LLM + Design do Relatório
+# Ordens de Serviço — registro e numeração
 
-Estado em 2026-07-30 · base: `main` @ `b22af7d` · 314 testes de verificação verdes.
-Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, e — para as OS de design —
-`docs/qa-suite design brief/referencia/` (spec visual: `componentes.html` §5/§8;
-folha canônica: bloco `<style>` de `referencia/summary.html`, copiar byte a byte).
+> ## Esta tabela é a FONTE ÚNICA DE VERDADE da numeração de OS.
+>
+> Antes de abrir uma OS, confira o número **aqui** — nunca contra a memória do
+> chat, contra `PROXIMOS-PASSOS §4` nem contra o título de um PR. O número já
+> colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
+> três lugares e os três divergiam.
+>
+> **Próximo número livre: OS-31.**
+
+Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 440 testes de verificação verdes.
+Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
+de design — `docs/qa-suite design brief/referencia/` (spec visual:
+`componentes.html` §5/§8; folha canônica: bloco `<style>` de
+`referencia/summary.html`, copiar byte a byte).
 
 ---
 
@@ -11,19 +21,28 @@ folha canônica: bloco `<style>` de `referencia/summary.html`, copiar byte a byt
 
 ```
 Trilha SEGURANÇA (checks) — CONCLUÍDA:
-  OS-20 v2 ✓ (#15, 5dd0245) → OS-21 ✓ (#16, 80d8269) → OS-22 ✓ (#17, b22af7d)
+  OS-20 v2 ✓ (#15) → OS-21 ✓ (#16) → OS-22 ✓ (#17)
+     └── Finding em toda a dimensão ✓ (#21, #22)
      └── [Fase C — apenas desenhada em docs/SEGURANCA.md §7, TRAVADA]
 
-Trilha LLM (independente):
-  OS-23 v2 (webqa/llm.py) → OS-24 v2 (scripts/sumario.py)
+Trilha LLM — CONCLUÍDA no que independe de runtime local:
+  OS-23 v2 ✓ (#24, webqa/llm.py) → OS-24 v2 ✓ (#25, scripts/sumario.py)
+     └── [validação com Ollama real — pendente de ambiente]
 
-Trilha DESIGN/RELATÓRIO (nova; depende só da base atual):
-  OS-25 (template seguranca no summary.html) → OS-26 (painel de estabilidade)
+Trilha DESIGN/RELATÓRIO — CONCLUÍDA:
+  OS-25 ✓ (#18, template seguranca) → OS-26 ✓ (#26, painel de estabilidade)
+
+Trilha CAMPANHA:
+  OS-27 ✓ (#27, etiqueta: robots/recuo/sequencial)
+     └── OS-28 (campanha multi-alvo) — EM ABERTO
+     └── OS-29 (telemetria operacional) — EM ABERTO
+     └── [validação contra sites públicos na VPS — pendente de ambiente]
 ```
 
 ⚠️ Numeração: OS-23/OS-24 são **LLM** (como neste pacote desde a origem). As OS
 de design que circularam em chat com esses números foram renumeradas para
-**OS-25/OS-26** — valem os blocos abaixo.
+**OS-25/OS-26** — valem os blocos abaixo. Quatro outras foram numeradas em chat
+sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas".
 
 ---
 
@@ -34,6 +53,48 @@ de design que circularam em chat com esses números foram renumeradas para
 | OS-20 v2 | #15 | `5dd0245` | `Finding`/`Recurso` + `network_log` enriquecida + `docs/SEGURANCA.md` |
 | OS-21 | #16 | `80d8269` | Fase A: headers/mixed/MIME/segredos/cookies |
 | OS-22 | #17 | `b22af7d` | Fase B: magic bytes/metadados/SVG/sourcemap/SRI · fixture com 11 FAILs · novo `alvo_sha256` |
+| OS-25 | #18 | `7944fc7` | Template `seguranca` no `summary.html` (severidade tipográfica + fase) |
+| OS-23 v2 | #24 | `c175eed` | `webqa/llm.py`: `ResumidorLLM` + gate + veto de endpoint por IP resolvido |
+| OS-24 v2 | #25 | `0a9e6e5` | `scripts/sumario.py` em processo separado + guardas de linguagem e omissão |
+| OS-26 | #26 | `172ba20` | Painel de estabilidade (`report/estabilidade.html`) + `caminhada()` + schema 5 |
+| OS-27 | #27 | `db7f948` | Camada de etiqueta: robots.txt, recuo 429/503, crawl sequencial, `webqa/rede.py` |
+
+### Fora da sequência do handoff — numeradas em chat, já em `main`
+
+Estas quatro nasceram da leitura de compreensão e foram numeradas sem consultar
+este registro. **Os números colidem** com a sequência acima; ficam registradas
+com o número que está no histórico do git, porque commit mergeado é fato, e com
+o apelido canônico ao lado.
+
+| No histórico | Canônico | PR | Commit | Entrega |
+|---|---|---|---|---|
+| "OS-27" | **OS-27-bis** | #20 | `c869a28` | Correções D2–D6: pin do Playwright, EAP, entrada única, contagens |
+| "OS-28" | **OS-28-bis** | #21 | `e391e55` | Fase B emite `Finding` (severidade/fase como dado) |
+| "OS-29" | **OS-29-bis** | #22 | `980b094` | Fase A emite `Finding` — fecha o §4.2 |
+| "OS-30" | **OS-30-bis** | #23 | `bdff377` | Regra de merge para pilha de PRs encadeados (§5.1) |
+
+### Colisões conhecidas — o que fazer ao encontrar
+
+Quem procurar um número no histórico vai achar **duas coisas diferentes** em
+quatro casos. Não é erro de leitura:
+
+| Número | Significa (canônico) | Também aparece em `main` como |
+|---|---|---|
+| **OS-23** | camada LLM (`webqa/llm.py`) | `7944fc7`, template `seguranca` — hoje canonicamente **OS-25** |
+| **OS-27** | camada de etiqueta (`db7f948`) | `c869a28`, correções de doc — hoje **OS-27-bis** |
+| **OS-28** | campanha multi-alvo (**em aberto**) | `e391e55`, Fase B `Finding` — hoje **OS-28-bis** |
+| **OS-29** | telemetria operacional (**em aberto**) | `980b094`, Fase A `Finding` — hoje **OS-29-bis** |
+
+Duas notas de auditoria, para que o histórico se explique sozinho:
+
+* o PR **#27** foi aberto com o título "OS-25" por engano e corrigido para
+  "OS-27" antes do merge; o commit de origem (`db7f948`) ainda diz OS-25;
+* o commit `7944fc7` diz "OS-23" porque foi o número que circulou em chat; o
+  registro já o renumerava para **OS-25**, e é esse que vale.
+
+**A regra que fecha isto:** número novo sai da linha "Próximo número livre" do
+topo deste arquivo, e essa linha é incrementada no MESMO PR que consome o
+número. Enquanto o número viver em três lugares, ele vai divergir de novo.
 
 ---
 
