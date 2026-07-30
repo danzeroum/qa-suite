@@ -92,15 +92,28 @@ class LoggedRequest:
 
 @dataclass(frozen=True)
 class NetworkLog:
-    """Contrato da fixture `network_log` — consumido por checks/lgpd/.
+    """Contrato da fixture `network_log` — consumido por checks/lgpd/ e seguranca/.
 
     Imutável de propósito: dois testes que compartilham o log de um módulo não
     podem interferir um no outro (isolamento sem custo de nova navegação).
+
+    `recursos` é acréscimo da dimensão `seguranca` (docs/SEGURANCA.md §4): as
+    RESPOSTAS observadas, com status, cabeçalhos e tipo. Campo com default para
+    que todo consumidor anterior — e todo teste que fabrica um log — siga
+    funcionando sem alteração.
     """
 
     url: str
     requests: tuple[LoggedRequest, ...]
     cookies: tuple[dict, ...]
+    recursos: tuple = ()
+
+    def de_origem(self) -> list:
+        """Recursos servidos pelo próprio alvo (`www` e sem-`www` são o mesmo)."""
+        return [r for r in self.recursos if getattr(r, "from_origin", False)]
+
+    def de_terceiros(self) -> list:
+        return [r for r in self.recursos if not getattr(r, "from_origin", False)]
 
     def hosts(self) -> list[str]:
         """Hosts http(s) únicos contactados, em ordem de primeiro contato."""

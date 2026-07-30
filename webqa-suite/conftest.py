@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 
 from webqa import metricas
 from webqa.config import Settings, load_settings
+from webqa.dominio import Recurso
 from webqa.http_utils import Timing, make_client, timed_get
 from webqa.trackers import LoggedRequest, NetworkLog
 
@@ -99,7 +100,19 @@ def network_log(browser, settings) -> NetworkLog:
     """
     context = browser.new_context(user_agent=settings.user_agent)
     requests: list[LoggedRequest] = []
+    recursos: list[Recurso] = []
     context.on("request", lambda r: requests.append(LoggedRequest(r.url, r.resource_type)))
+
+    def registrar_resposta(resposta) -> None:
+        # Só METADADOS aqui. O corpo fica com o Playwright e é lido sob demanda
+        # por `dominio.ler_corpo`, em memória e com teto — puxar bytes dentro do
+        # handler faria a página inteira residir na RAM sem ninguém ter pedido.
+        try:
+            recursos.append(Recurso.de_resposta(resposta, settings.target_url))
+        except Exception:
+            pass    # instrumentação não pode derrubar a observação do alvo
+
+    context.on("response", registrar_resposta)
     page = context.new_page()
     try:
         page.goto(settings.target_url, wait_until="load", timeout=60_000)
@@ -110,6 +123,9 @@ def network_log(browser, settings) -> NetworkLog:
             url=settings.target_url,
             requests=tuple(requests),
             cookies=tuple(context.cookies()),
+            recursos=tuple(recursos),
         )
     finally:
+        # O contexto morre AQUI, depois do teste: é o que permite a leitura de
+        # corpo sob demanda durante a asserção.
         context.close()
