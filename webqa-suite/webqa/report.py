@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from webqa.metricas import coletadas
 from webqa.report_html import montar
 from webqa.sanitize import safe_url, sanitize_text
 
@@ -96,7 +97,19 @@ def pytest_runtest_makereport(item, call):
 
 
 def pytest_runtest_logreport(report):
-    if report.when != "call" and not (report.when == "setup" and report.skipped):
+    # ERRO de setup/teardown também entra. Antes, só `call` e skip de setup eram
+    # registrados — e uma fixture que estourava levava o teste inteiro a
+    # DESAPARECER do relatório. Não era perda cosmética: numa execução em que o
+    # Chromium não alcançava o alvo, 13 desfechos sumiam, o ledger de
+    # estabilidade não achava assinatura de infra nenhuma para classificar e
+    # dava a noite como LIMPA — inflando exatamente a métrica que existe para
+    # provar que a infraestrutura de navegador funciona.
+    interessa = (
+        report.when == "call"
+        or (report.when == "setup" and (report.skipped or report.failed))
+        or (report.when == "teardown" and report.failed)
+    )
+    if not interessa:
         return
     dims = getattr(report, "webqa_dimensions", None)
     if not dims:  # fallback: sem o hookwrapper (ex.: report sintético)
@@ -113,7 +126,14 @@ def pytest_runtest_logreport(report):
     # `estado` é a leitura visual: xfail é estado próprio, não um skip qualquer —
     # sem isso o relatório contaria alerta como pulado e perderia a distinção que
     # a dimensão lgpd inteira usa (obrigação × sinal de maturidade).
-    estado = "xfail" if hasattr(report, "wasxfail") else report.outcome
+    # `error` é a terceira distinção: falha FORA do corpo do teste não é veredito
+    # sobre o alvo, é o teste não tendo acontecido.
+    if report.failed and report.when != "call":
+        estado = "error"
+    elif hasattr(report, "wasxfail"):
+        estado = "xfail"
+    else:
+        estado = report.outcome
     _RESULTS.append(
         {
             "test": report.nodeid,
@@ -122,6 +142,11 @@ def pytest_runtest_logreport(report):
             "browser": bool(getattr(report, "webqa_browser", "browser" in report.keywords)),
             "outcome": report.outcome,
             "estado": estado,
+            # A fase distingue "falhou medindo" de "nem chegou a medir". Um teste
+            # pode render duas entradas (call passou, teardown estourou); quem
+            # conta desfecho por teste colapsa pelo pior — ver
+            # scripts/campanha.py::estados_por_teste.
+            "fase": report.when,
             "duration_s": round(getattr(report, "duration", 0.0), 3),
             "detail": detalhe,
         }
@@ -143,6 +168,11 @@ def pytest_sessionfinish(session, exitstatus):
         "comando": _comando(session),
         "by_dimension": by_dim,
         "dimension_notes": DIMENSION_NOTES,
+        # Medidas do ALVO (webqa/metricas.py), não vereditos: TTFB, total, FCP,
+        # LCP, CLS. Ficam só no JSON — o summary.html segue o contrato visual
+        # congelado na OS-15, e acrescentar seção ali é iteração de DESIGN, não
+        # de instrumentação. Métrica ausente é chave ausente, nunca zero.
+        "metricas": coletadas(),
         "results": _RESULTS,
     }
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")

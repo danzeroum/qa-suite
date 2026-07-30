@@ -378,3 +378,41 @@ def test_summary_ausente_falha_com_instrucao(tmp_path, capsys):
                    "--alvo", ALVO])
     assert codigo == 2
     assert "rode a suíte antes" in capsys.readouterr().err
+
+
+# ---------- Regressão: navegador morto não é noite limpa ----------
+
+def test_erro_de_setup_do_navegador_nao_conta_como_noite_limpa():
+    """Regressão encontrada pela campanha (nível sistema).
+
+    Numa execução em que o Chromium não alcançava o alvo, os testes estouravam no
+    SETUP das fixtures. Como webqa/report.py registrava apenas a fase `call`,
+    esses desfechos desapareciam do summary: sobravam dois skips, nenhuma
+    assinatura de infra para casar, e a noite entrava no ledger como LIMPA —
+    inflando justamente a métrica que existe para provar que a infraestrutura de
+    navegador funciona. Com a fase registrada, `net::` aparece e zera a sequência.
+    """
+    summary = _summary("2026-07-30 04:00:00", [
+        _result("checks/frontend/test_rendering.py::test_fcp", outcome="failed",
+                detail="playwright._impl._errors.Error: Page.goto: "
+                       "net::ERR_CONNECTION_RESET at https://alvo.example/"),
+        _result("checks/lgpd/test_consentimento.py::test_x", outcome="failed",
+                detail="playwright._impl._errors.Error: Page.goto: "
+                       "net::ERR_CONNECTION_RESET at https://alvo.example/"),
+    ])
+    classificacao = classificar(summary)
+    assert classificacao.browser_total == 2
+    assert len(classificacao.flakes) == 2, "net:: é assinatura de infra, não veredito"
+    assert classificacao.limpa is False, "navegador inalcançável jamais é noite limpa"
+
+
+def test_sequencia_zera_quando_o_navegador_esta_inalcancavel():
+    ledger = {"schema": 1, "execucoes": []}
+    _aplicar(ledger, _limpo("2026-07-28 04:00:00"))
+    _aplicar(ledger, _limpo("2026-07-29 04:00:00"))
+    morto = _summary("2026-07-30 04:00:00", [
+        _result("checks/frontend/test_rendering.py::test_fcp", outcome="failed",
+                detail="Page.goto: net::ERR_CONNECTION_RESET"),
+    ])
+    registro = _aplicar(ledger, morto)
+    assert registro.streak == 0, "duas noites boas não sobrevivem a um navegador morto"

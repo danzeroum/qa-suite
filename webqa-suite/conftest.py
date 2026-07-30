@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 from bs4 import BeautifulSoup
 
+from webqa import metricas
 from webqa.config import Settings, load_settings
 from webqa.http_utils import Timing, make_client, timed_get
 from webqa.trackers import LoggedRequest, NetworkLog
@@ -39,7 +40,15 @@ def home_response(client, settings):
 
 @pytest.fixture(scope="session")
 def home_timing(client, settings) -> Timing:
-    return timed_get(client, settings.target_url)
+    """Latência da home, medida UMA vez e registrada para o consolidado.
+
+    O registro fica na fixture, não nos testes: assim a medida existe mesmo que
+    o teste de orçamento passe — e ninguém precisa lembrar de registrar ao
+    escrever o próximo teste que consome esta fixture."""
+    medida = timed_get(client, settings.target_url)
+    metricas.registrar("ttfb_ms", medida.ttfb_ms)
+    metricas.registrar("total_ms", medida.total_ms)
+    return medida
 
 
 @pytest.fixture(scope="session")
