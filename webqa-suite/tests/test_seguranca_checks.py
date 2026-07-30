@@ -22,6 +22,8 @@ import pytest
 # pedindo a fixture `network_log` de verdade — subindo navegador contra o alvo
 # configurado no meio da bateria de verificação, que é offline por definição.
 from checks.seguranca import test_arquivos_e_metadados as fase_b
+from checks.seguranca import test_cookies as fase_a_cookies
+from checks.seguranca import test_headers_e_conteudo as fase_a_headers
 from webqa.dominio import (
     Recurso,
     achados_de,
@@ -367,6 +369,141 @@ def test_xfail_da_fase_b_nao_produz_finding():
         corpo = fonte.split(f"def {nome}(")[1].split("\ndef ")[0]
         assert "Finding(" not in corpo, f"{nome} é xfail: não pode construir Finding"
         assert "registrar_achados" not in corpo, f"{nome} é xfail: não pode registrar achado"
+
+
+# ---------- Fase A: os achados também chegam como DADO (OS-29) ----------
+#
+# Mixed content, `Secure` e cabeçalho de terceiro NÃO são exercíveis pelo alvo
+# fixture (servido por http://127.0.0.1) e estão em `fora_do_contrato`. Logo,
+# esta é a única cobertura da emissão deles — a mesma razão que já valia para os
+# detectores, agora valendo para o que os checks fazem com o que detectaram.
+
+VALOR_DE_SESSAO = "s%3AsegredoDeSessao.9xKq" + "Z" * 20
+
+
+def test_mixed_content_emite_finding_alta():
+    log = _log("https://alvo.example/", [
+        _Resposta("http://cdn.terceiro.example/a.js"),
+        _Resposta("https://alvo.example/ok.js"),
+    ])
+    achados = _achados_do_check(fase_a_headers.test_sem_mixed_content, log, "mixed::x")
+    assert len(achados) == 1
+    achado = achados[0]
+    assert (achado.severidade, achado.fase, achado.tipo) == ("alta", "A", "mixed-content")
+    assert achado.recurso == "http://cdn.terceiro.example/a.js"
+
+
+def test_mixed_content_protocol_relative_nao_emite_finding():
+    """A borda antiga não regride: `//host/x.js` numa página https é BAIXADO
+    como https, então não há achado nenhum a emitir.
+
+    Este é o falso positivo mais provável da regra — o HTML fonte diz `//host`,
+    e uma verificação por "começa com http" acusaria. O que se observa é a
+    requisição RESOLVIDA. Antes da OS-29 isso era garantido pela lista de
+    strings; agora precisa continuar valendo para a lista de Findings.
+    """
+    log = _log("https://alvo.example/", [_Resposta("https://cdn.terceiro.example/x.js")])
+    limpar_achados()
+    fase_a_headers.test_sem_mixed_content(log, _RequestFalso("mixed::limpo"))
+    assert achados_de("mixed::limpo") == []
+
+
+def test_tipo_declarado_divergente_emite_finding_alta():
+    """`.js` que volta como página HTML — o caso do fallback de erro em SPA."""
+    log = _log("https://alvo.example/", [
+        _Resposta("https://alvo.example/app.js",
+                  headers={"content-type": "text/html"},
+                  corpo=b"<!doctype html><html><body>erro</body></html>"),
+    ])
+    achados = _achados_do_check(
+        fase_a_headers.test_tipo_declarado_corresponde_ao_conteudo, log, "mime::x")
+    assert len(achados) == 1
+    achado = achados[0]
+    assert (achado.severidade, achado.fase) == ("alta", "A")
+    assert achado.tipo == "tipo-declarado-divergente"
+    assert achado.evidencia == "corpo é HTML, servido como text/html"
+    # O par (declarado, observado) basta como prova — nenhum trecho do corpo do
+    # alvo é republicado no laudo.
+    assert "<body>" not in achado.evidencia
+
+
+@pytest.mark.parametrize("cookie,nodeid,check,tipo", [
+    ({"name": "sid", "value": VALOR_DE_SESSAO, "sameSite": "None", "secure": False},
+     "ck::none", "test_samesite_none_sempre_com_secure", "cookie-samesite-none-sem-secure"),
+    ({"name": "sid", "value": VALOR_DE_SESSAO, "httpOnly": False, "secure": True},
+     "ck::http", "test_cookies_de_sessao_sao_httponly", "cookie-sessao-sem-httponly"),
+    ({"name": "sid", "value": VALOR_DE_SESSAO, "httpOnly": True, "secure": False},
+     "ck::sec", "test_cookies_de_sessao_sao_secure", "cookie-sessao-sem-secure"),
+])
+def test_cookie_emite_finding_media_identificado_por_nome(cookie, nodeid, check, tipo):
+    """Média, identificado pelo NOME, e o valor não aparece em campo nenhum.
+
+    Cookie de sessão É a credencial: um laudo que o reproduz entrega a conta
+    junto com o diagnóstico. Aqui o cookie de teste carrega um valor que parece
+    sessão de verdade justamente para que a ausência dele seja verificável, e
+    não apenas presumida da leitura do código.
+    """
+    log = _log("https://alvo.example/", cookies=[cookie])
+    achados = _achados_do_check(getattr(fase_a_cookies, check), log, nodeid)
+    assert len(achados) == 1
+    achado = achados[0]
+    assert (achado.severidade, achado.fase, achado.tipo) == ("media", "A", tipo)
+    assert achado.recurso == "cookie:sid"
+    for campo in (achado.recurso, achado.evidencia, str(achado)):
+        assert VALOR_DE_SESSAO not in campo, "o valor do cookie vazou para o achado"
+
+
+def test_cookie_conforme_nao_emite_finding():
+    log = _log("https://alvo.example/", cookies=[
+        {"name": "sid", "value": VALOR_DE_SESSAO, "sameSite": "Lax",
+         "secure": True, "httpOnly": True},
+    ])
+    limpar_achados()
+    for nome in ("test_samesite_none_sempre_com_secure",
+                 "test_cookies_de_sessao_sao_httponly",
+                 "test_cookies_de_sessao_sao_secure"):
+        getattr(fase_a_cookies, nome)(log, _RequestFalso(f"ok::{nome}"))
+        assert achados_de(f"ok::{nome}") == []
+
+
+def test_xfail_da_fase_a_nao_produz_finding():
+    """Mesma regra da Fase B: alerta não ganha selo de severidade (§8)."""
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parent.parent / "checks" / "seguranca"
+    alvos = {
+        "test_headers_e_conteudo.py": ["test_assets_de_terceiro_declaram_nosniff"],
+        "test_cookies.py": ["test_cookies_declaram_samesite"],
+    }
+    for arquivo, nomes in alvos.items():
+        fonte = (raiz / arquivo).read_text(encoding="utf-8")
+        for nome in nomes:
+            corpo = fonte.split(f"def {nome}(")[1].split("\ndef ")[0]
+            assert "Finding(" not in corpo, f"{nome} é xfail: não pode construir Finding"
+            assert "_achado(" not in corpo, f"{nome} é xfail: não pode construir Finding"
+            assert "registrar_achados" not in corpo, f"{nome} é xfail: não registra achado"
+
+
+def test_toda_reprovacao_da_dimensao_passa_pelo_value_object():
+    """Fecha a linguagem ubíqua: nenhum `assert` da dimensão reprova com lista
+    de strings montada à mão.
+
+    Depois da OS-29, "achado de seguranca" e `Finding` são sinônimos — e o único
+    caminho até o laudo é o value object, que sanitiza no construtor. Um check
+    novo que voltasse a montar evidência em f-string reintroduziria a borda que
+    a regra 2.6 eliminou, e reprovaria aqui antes de chegar a um alvo.
+    """
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parent.parent / "checks" / "seguranca"
+    for arquivo in sorted(raiz.glob("test_*.py")):
+        fonte = arquivo.read_text(encoding="utf-8")
+        assert "registrar_achados" in fonte, (
+            f"{arquivo.name} não registra achado nenhum — se ele reprova, o "
+            "relatório recebe o FAIL sem severidade nem fase.")
+        for linha in fonte.splitlines():
+            if linha.strip().startswith("assert not "):
+                assert "achados" in linha, (
+                    f"{arquivo.name}: `{linha.strip()}` reprova sobre algo que não é "
+                    "a lista de Findings — evidência voltou a ser string solta.")
 
 
 def test_fase_b_nao_faz_requisicao_nova():
