@@ -17,10 +17,17 @@ from __future__ import annotations
 
 import pytest
 
+# Importado como MÓDULO, nunca `from ... import test_*`: um nome `test_` no
+# namespace deste arquivo seria coletado como teste daqui, e aí o check rodaria
+# pedindo a fixture `network_log` de verdade — subindo navegador contra o alvo
+# configurado no meio da bateria de verificação, que é offline por definição.
+from checks.seguranca import test_arquivos_e_metadados as fase_b
 from webqa.dominio import (
     Recurso,
+    achados_de,
     assinatura,
     find_secrets,
+    limpar_achados,
     metadados_exif,
     metadados_pdf,
     sourcemap_referenciado,
@@ -230,6 +237,136 @@ def test_exif_gps_do_alvo_fixture_e_detectado():
 ])
 def test_sourcemap_referenciado(corpo, esperado):
     assert sourcemap_referenciado(corpo) == esperado
+
+
+# ---------- Fase B: os achados chegam ao relatório como DADO ----------
+#
+# Os checks acima verificam os DETECTORES; estes verificam o que os checks fazem
+# com o que detectaram. É a diferença que a OS-28 fechou: antes o achado era a
+# string da mensagem de assert, e severidade/fase não existiam como dado — o
+# relatório renderizava pelo caminho de retrocompatibilidade, sem selo.
+#
+# `test_formato_real_corresponde_a_extensao` está em `fora_do_contrato` (o
+# fixture não planta binário disfarçado), então esta é a ÚNICA cobertura da
+# emissão dele. Sem ela, a regra mais fácil de errar ficaria sem rede.
+
+
+class _NoFalso:
+    def __init__(self, nodeid):
+        self.nodeid = nodeid
+
+
+class _RequestFalso:
+    """Só o que os checks usam: `request.node.nodeid`."""
+
+    def __init__(self, nodeid):
+        self.node = _NoFalso(nodeid)
+
+
+def _achados_do_check(check, log, nodeid):
+    """Roda o check e devolve os Findings que ele registrou.
+
+    O check REPROVA por construção (é o que se está testando), então o
+    AssertionError é esperado e engolido — o que importa é o que ficou
+    registrado, não a mensagem.
+    """
+    limpar_achados()
+    try:
+        check(log, _RequestFalso(nodeid))
+    except AssertionError:
+        pass
+    return achados_de(nodeid)
+
+
+def test_svg_executavel_emite_finding_alta():
+    log = _log("http://alvo.test", [
+        _Resposta("http://alvo.test/logo.svg", headers={"content-type": "image/svg+xml"},
+                  corpo=b'<svg onload="x()"></svg>'),
+    ])
+    achados = _achados_do_check(fase_b.test_svg_sem_conteudo_executavel, log, "svg::x")
+    assert len(achados) == 1
+    achado = achados[0]
+    assert (achado.severidade, achado.fase, achado.tipo) == ("alta", "B", "svg-executavel")
+    assert "handler on*= inline" in achado.evidencia
+
+
+def test_exif_gps_emite_finding_alta_sem_reproduzir_a_coordenada():
+    """A coordenada não pode existir no achado — nem mascarada, nem em claro.
+
+    `metadados_exif` devolve o rótulo 'gps', nunca o valor, então não há o que
+    mascarar. Este teste fixa isso: se alguém um dia passar o EXIF bruto como
+    evidência "para dar mais contexto", o achado passaria a carregar a
+    localização — e a suíte reencenaria a exposição que veio apontar.
+    """
+    from fixture_target.servir import FOTO_GPS
+
+    log = _log("http://alvo.test", [
+        _Resposta("http://alvo.test/foto.jpg", headers={"content-type": "image/jpeg"},
+                  corpo=FOTO_GPS),
+    ])
+    achados = _achados_do_check(fase_b.test_imagens_sem_coordenada_de_gps, log, "gps::x")
+    assert len(achados) == 1
+    achado = achados[0]
+    assert (achado.severidade, achado.fase, achado.tipo) == ("alta", "B", "exif-gps")
+    assert not achado.contem_segredo_em_claro
+    # Nenhum byte do EXIF viaja no achado: a evidência é uma AFIRMAÇÃO sobre o
+    # arquivo, não um trecho dele.
+    assert FOTO_GPS.decode("latin-1")[:64] not in achado.evidencia
+
+
+def test_formato_divergente_emite_finding_media():
+    """Severidade média, e a distinção importa: validação ausente é sintoma,
+    não prova de execução. Alta fica com o que executa (SVG) ou expõe dado
+    pessoal (GPS) — senão 'alta' deixa de significar alguma coisa."""
+    log = _log("http://alvo.test", [
+        _Resposta("http://alvo.test/foto.jpg", headers={"content-type": "image/jpeg"},
+                  corpo=PNG),
+    ])
+    achados = _achados_do_check(fase_b.test_formato_real_corresponde_a_extensao, log, "fmt::x")
+    assert len(achados) == 1
+    achado = achados[0]
+    assert (achado.severidade, achado.fase, achado.tipo) == ("media", "B", "formato-divergente")
+    assert "conteúdo é png" in achado.evidencia
+
+
+def test_alvo_conforme_nao_registra_achado_nenhum():
+    """O outro lado do contrato: sem violação, nenhum Finding é registrado.
+
+    Um check que registra achado quando não há transformaria o relatório num
+    gerador de ruído — e a seção de achados é justamente o que se lê primeiro.
+    """
+    log = _log("http://alvo.test", [
+        _Resposta("http://alvo.test/ok.svg", headers={"content-type": "image/svg+xml"},
+                  corpo=b'<svg><rect/></svg>'),
+        _Resposta("http://alvo.test/ok.jpg", headers={"content-type": "image/jpeg"},
+                  corpo=JPEG),
+    ])
+    limpar_achados()
+    fase_b.test_svg_sem_conteudo_executavel(log, _RequestFalso("limpo::svg"))
+    fase_b.test_imagens_sem_coordenada_de_gps(log, _RequestFalso("limpo::gps"))
+    fase_b.test_formato_real_corresponde_a_extensao(log, _RequestFalso("limpo::fmt"))
+    assert achados_de("limpo::svg") == []
+    assert achados_de("limpo::gps") == []
+    assert achados_de("limpo::fmt") == []
+
+
+def test_xfail_da_fase_b_nao_produz_finding():
+    """Sourcemap, SRI e autoria informam — e alerta não ganha selo de severidade.
+
+    Registrar Finding num caminho de xfail poria severidade numa linha que o
+    relatório conta como ALERTA, criando um segundo semáforo dentro do estado.
+    O §8 do desenho evita exatamente isso; aqui a decisão vira teste.
+    """
+    from pathlib import Path
+    fonte = (Path(__file__).resolve().parent.parent
+             / "checks" / "seguranca" / "test_arquivos_e_metadados.py"
+             ).read_text(encoding="utf-8")
+    for nome in ("test_metadados_de_autoria_removidos_na_publicacao",
+                 "test_sourcemaps_nao_referenciados_em_producao",
+                 "test_assets_de_terceiro_declaram_sri"):
+        corpo = fonte.split(f"def {nome}(")[1].split("\ndef ")[0]
+        assert "Finding(" not in corpo, f"{nome} é xfail: não pode construir Finding"
+        assert "registrar_achados" not in corpo, f"{nome} é xfail: não pode registrar achado"
 
 
 def test_fase_b_nao_faz_requisicao_nova():

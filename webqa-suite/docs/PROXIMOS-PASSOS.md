@@ -6,12 +6,19 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem **324 testes coletados**; num ambiente limpo o
-resultado é **321 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **329 testes coletados**; num ambiente
+limpo o resultado é **326 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
-para ter o que auditar — "324 passed" só aparece depois dela. O número de coleta e
-o número de aprovação são coisas diferentes, e confundi-los faz um ambiente
-saudável parecer defeituoso.
+para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
+dela. Confundir os dois faz ambiente saudável parecer defeituoso.
+
+Os valores acima envelhecem a cada OS que acrescenta teste. Quem for citá-los
+recalcula em vez de copiar:
+
+```bash
+pytest -m verification tests --collect-only -q | tail -1   # coletados
+make verify                                                # passed / skipped
+```
 
 ---
 
@@ -210,16 +217,20 @@ literal.
 Reuse a montagem do gerador do relatório (folha, header, footer) — um único
 ponto de verdade visual.
 
-### 4.2 Fase B emitindo `Finding` (curta, e é dívida conhecida)
+### 4.2 Fase B emitindo `Finding` — ~~dívida conhecida~~ FEITO (OS-28)
 
-Hoje **só** o check de segredos constrói `Finding`. Os da Fase B (GPS no EXIF,
-SVG executável) fazem `assert` direto, então chegam ao relatório **sem
-severidade** — renderizam pelo caminho de retrocompatibilidade, mas os dois
-merecem severidade alta.
+Os checks da Fase B constroem `Finding` e registram com
+`dominio.registrar_achados(request.node.nodeid, achados)`: GPS no EXIF e SVG
+executável saem com severidade **alta**, divergência de formato com **média**
+(sintoma de validação ausente, não prova de execução). Os que informam
+(sourcemap, SRI, autoria) seguem `xfail` e **não** produzem achado — alerta com
+selo de severidade seria um segundo semáforo dentro do estado, o que a regra 2.5
+evita. Há teste fixando isso.
 
-É mudança nos *checks*, não no template: chamar `find_secrets`-equivalente ou
-construir `Finding` diretamente e registrar com
-`dominio.registrar_achados(request.node.nodeid, achados)`.
+**Resta um.** `checks/seguranca/test_headers_e_conteudo.py::test_tipo_declarado_corresponde_ao_conteudo`
+é Fase A e ainda reprova sem severidade — é o último FAIL da dimensão que
+renderiza pelo caminho de retrocompatibilidade. Ficou fora da OS-28, cujo escopo
+era a Fase B.
 
 ### 4.3 `seguranca` Fase C — sondagem ativa
 
