@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **369 testes coletados**; num ambiente
-limpo o resultado é **366 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **390 testes coletados**; num ambiente
+limpo o resultado é **387 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -235,25 +235,37 @@ O caminho de retrocompatibilidade do template **permanece** — agora só para
 summary histórico, e há teste que o exercita com dado sintético. Removê-lo faria
 todo relatório antigo mudar de forma.
 
-### 4.2b Sumário por LLM local — `webqa/llm.py` pronto (OS-23 v2)
+### 4.2b Sumário por LLM local — FEITO (OS-23 v2 e OS-24 v2)
 
-Contrato em [`LLM.md`](LLM.md). A abstração, o gate `WEBQA_LLM_ENABLED` e o veto
-de endpoint existem; **falta a etapa que os usa**.
+Contrato em [`LLM.md`](LLM.md). A trilha está fechada: abstração, gate
+`WEBQA_LLM_ENABLED`, veto de endpoint (`webqa/llm.py`) e a etapa que os usa
+(`scripts/sumario.py`, `make sumario`).
 
-Duas coisas que é fácil errar aqui e que já estão resolvidas no módulo — não as
-desfaça ao escrever o consumidor:
+```bash
+WEBQA_LLM_ENABLED=1 make sumario   # depois do pytest; sem gate ou sem runtime, não gera nada
+```
 
-- **o veto é por IP resolvido**, nunca por string. `localhost.qualquercoisa.com`
-  resolve para IP público e passaria por qualquer verificação textual;
-- **`passed` não entra no prompt**, e `detail` **não** é re-sanitizado — ele já
-  nasce sanitizado no `report.py`, e duplicar a borda cria a ilusão de duas
-  defesas onde há uma só.
+Quatro invariantes que é fácil desfazer sem perceber — todas com teste:
 
-**Próximo: OS-24 v2** — `scripts/sumario.py`, em **processo separado** do pytest.
-Nunca dentro de `pytest_sessionfinish`: um `try/except` amplo no hook que escreve
-o laudo reencena o pior defeito deste projeto (erro de setup engolido virando
-"noite limpa" com navegador morto). Separação de processo é a lição, não
-preferência de estilo.
+- **o veto é por IP resolvido**, nunca por string (`LLM.md §2.1`, que também
+  registra por que o IMDS é recusado apesar de link-local e por que `0.0.0.0` é
+  checado antes de `is_private`);
+- **`passed` não entra no prompt**, e `detail` **não** é re-sanitizado — já nasce
+  sanitizado no `report.py`, e duplicar a borda cria a ilusão de duas defesas
+  onde há uma só;
+- **processo separado**, nunca `pytest_sessionfinish`. Um `try/except` amplo no
+  hook que escreve o laudo reencena o pior defeito deste projeto (erro de setup
+  engolido virando "noite limpa" com navegador morto). Fora do hook, capturar é
+  seguro — a lição é a separação de processo, não a proibição de capturar;
+- **duas guardas sobre a saída**, e a segunda é a menos óbvia: além da linguagem
+  de certificação, um detector de **omissão** marca o sumário que deixou uma
+  dimensão com `failed` fora do texto. O risco de um modelo não é só afirmar
+  demais — é calar, e ausência não deixa marca sozinha.
+
+O que **não** foi feito: validação com runtime local de verdade. Tudo aqui é
+verificação com modelo fake, sem rede. Rodar `make sumario` contra o alvo
+fixture com um Ollama de pé continua pendente — é o análogo, nesta trilha, do
+§3.2: exercitado com dublê, não confirmado no ambiente real.
 
 ### 4.3 `seguranca` Fase C — sondagem ativa
 
@@ -334,6 +346,7 @@ make fixture           # sobe o alvo fabricado em porta efêmera
 make campanha          # nível sistema: alvos reais × N, consolidado
 make audita-design     # gate do pacote de design (§12)
 make estabilidade      # classifica a execução e grava o ledger
+make sumario           # anexo assistido por IA local (desligado por padrão)
 make vps-smoke         # valida a VPS antes de agendar o cron
 
 python scripts/estabilidade.py --recompute   # auditoria do ledger, sem gravar

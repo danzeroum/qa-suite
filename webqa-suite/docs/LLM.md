@@ -26,6 +26,31 @@ autoridade à suíte:
    **Nuvem está FORA de escopo** — nem como opt-in. Endpoint que não seja
    loopback/rede local -> aborta com erro claro ("envio para nuvem fora de escopo").
    Isso é invariante estrutural, não default gentil.
+
+   ### 2.1 O veto de endpoint, e as três decisões que ele carrega
+
+   **O veto é por IP RESOLVIDO, nunca por string.** Casar `localhost` ou `127.`
+   no texto da URL é ilusão de controle: `localhost.atacante.example` resolve
+   para IP público e passaria por qualquer verificação textual. `validar_endpoint`
+   resolve com `getaddrinfo` e julga o endereço. Exige que **todos** os IPs
+   resolvidos sejam locais — host que devolve um privado e um público é
+   recusado, porque quem escolhe qual usar é o sistema operacional, e garantia
+   que depende de sorte não é garantia.
+
+   Três decisões saíram da implementação (OS-23 v2) e ficam registradas aqui
+   como **regra**, não como comentário no código — cada uma erra em silêncio:
+
+   | Decisão | Motivo |
+   |---|---|
+   | **IMDS recusado apesar de link-local** — `169.254.169.254` e `fd00:ec2::254` | É o serviço de metadados do provedor (AWS, GCP, Azure, DigitalOcean), não esta máquina. Cai na faixa link-local e passaria pela regra "loopback/privado/link-local", cumprindo a letra da fronteira enquanto viola o propósito dela. Num veto de egresso, o IMDS é o endereço errado para deixar passar. |
+   | **`0.0.0.0` é checado ANTES de `is_private`** | Em `ipaddress`, `0.0.0.0` está em `0.0.0.0/8` e responde **`True`** a `is_private`. Na ordem inversa ele passaria como "rede local". Endereço não especificado não é destino — é curinga de escuta. |
+   | **Guarda de linguagem por formas flexionadas, nunca radicais** | O radical `segur` casaria com "segurança", palavra presente em praticamente toda linha de um sumário desta suíte. A guarda dispararia sempre, viraria ruído e seria ignorada — que é como guarda morre. Os padrões casam `aprovad[oa]s?`, `conforme`, `segur[oa]s?`, `certificad[oa]s?`, com `\b` nas duas pontas. |
+
+   Armadilha ao escrever teste para este veto: as faixas de **documentação** da
+   RFC 5737 (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`) respondem
+   `True` a `is_private` em `ipaddress`, porque não são roteáveis. Um teste de
+   recusa que use `203.0.113.10` passa pelo veto e **parece defeito no código**.
+   Use IP público de verdade.
 2. **Só achado sanitizado entra no prompt.** Nunca corpo bruto de resposta, nunca
    conteúdo de arquivo do alvo. O `detail` do `summary.json` já nasce sanitizado
    (invariante do `report.py`) — **não se re-sanitiza** (isso duplicaria o ponto
