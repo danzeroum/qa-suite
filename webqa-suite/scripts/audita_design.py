@@ -44,9 +44,11 @@ REFERENCIA_PADRAO = RAIZ / "docs" / "qa-suite design brief" / "referencia"
 LAUDO_PADRAO = RAIZ / "docs" / "design-audit.md"
 LIMITE_KB = 300
 
-# Entregáveis de relatório: cobram a nota epistêmica e os quatro estados.
-RELATORIOS = ("summary.html", "summary-verde.html", "summary-sem-navegador.html",
-              "summary-parcial.html")
+# Entregáveis de RELATÓRIO cobram a nota epistêmica e os quatro estados. A
+# identificação é por ESTRUTURA, não por nome de arquivo: casar por nome fazia
+# um arquivo renomeado rebaixar dois critérios para N.A. em silêncio — o gate
+# passaria a aprovar por omissão.
+MARCAS_DE_RELATORIO = ('id="achados"', 'class="resumo"', 'class="dims"')
 # Trecho literal de webqa/report.py::DIMENSION_NOTES — o design apresenta a nota,
 # não a reescreve.
 NOTA_EPISTEMICA = "não certifica conformidade"
@@ -178,8 +180,13 @@ def criterio_tema_escuro(doc: Documento) -> Resultado:
     return Resultado(PASS, "prefers-color-scheme" + (" + gancho data-tema" if gancho else ""))
 
 
+def e_relatorio(doc: Documento) -> bool:
+    """Relatório de execução? Decide pela estrutura entregue, não pelo nome."""
+    return sum(marca in doc.texto for marca in MARCAS_DE_RELATORIO) >= 2
+
+
 def criterio_nota_epistemica(doc: Documento) -> Resultado:
-    if doc.nome not in RELATORIOS:
+    if not e_relatorio(doc):
         return Resultado(NA, "critério é dos relatórios de execução")
     if NOTA_EPISTEMICA.lower() in doc.texto.lower():
         return Resultado(PASS, f'contém "{NOTA_EPISTEMICA}" (linha {doc.linha_de("certifica")})')
@@ -188,7 +195,7 @@ def criterio_nota_epistemica(doc: Documento) -> Resultado:
 
 def criterio_estados_sem_cor(doc: Documento) -> Resultado:
     """Cada estado presente precisa de marcador não cromático (forma + rótulo)."""
-    if doc.nome not in RELATORIOS:
+    if not e_relatorio(doc):
         return Resultado(NA, "critério é dos relatórios de execução")
     presentes = [e for e in ESTADOS if f'"{e}"' in doc.texto or f" {e}" in doc.texto]
     sem_marcador = []
