@@ -254,3 +254,156 @@ def test_ordem_das_secoes_segue_o_paragrafo_6():
                                         'id="terceiros"', 'id="tabela"', "<footer>")]
     assert posicoes == sorted(posicoes), "ordem do §6 violada"
     assert html.index("nota-epistemica") < html.index('id="achados"')
+
+
+# ---------- OS-20: estado `error`, faixa de métricas, julgamento incompleto ----------
+
+def _e(test, *, dimension="frontend", fase="setup", detail="Page.goto: net::ERR_CONNECTION_RESET"):
+    """Erro de infraestrutura como webqa/report.py o grava: outcome failed, estado error."""
+    return {"test": test, "dimension": dimension, "dimensions": [dimension], "browser": True,
+            "outcome": "failed", "estado": "error", "fase": fase,
+            "duration_s": 13.2, "detail": detail}
+
+
+def test_error_nao_e_lido_como_failed_pelo_outcome():
+    """O pytest reporta erro de setup com outcome=failed.
+
+    Cair no `outcome` faria toda fixture quebrada virar não conformidade DO ALVO —
+    um navegador que não subiu acusaria o site.
+    """
+    assert estado_de({"outcome": "failed", "estado": "error"}) == "error"
+
+
+def test_error_jamais_soma_em_achados():
+    html = montar(_summary([_r("t::ok", "passed"), _e("checks/frontend/t.py::test_fcp")]))
+    assert "Achados (0)" in html, "erro de infra não é achado"
+    assert "Erros de execução (1)" in html
+
+
+def test_xfail_jamais_soma_em_falhas_mesmo_com_erros():
+    results = [_r("t::x", "xfail", detail="Referrer-Policy ausente"),
+               _e("checks/frontend/t.py::test_fcp")]
+    html = montar(_summary(results))
+    assert "Achados (0)" in html
+    assert "Alertas (1)" in html and "Erros de execução (1)" in html
+
+
+def test_zero_achados_com_erros_nao_da_banner_verde():
+    """Caso da OS: 0 failed + errors>0 → 'julgamento incompleto', não elogio."""
+    html = montar(_summary([_r("t::ok", "passed"), _e("checks/frontend/t.py::test_fcp")]))
+    assert "Julgamento incompleto" in html
+    assert "Nenhuma não conformidade observada nesta execução." not in html, (
+        "a frase de sucesso não pode aparecer sem ressalva quando a infra quebrou")
+    assert "entre os testes que conseguiram rodar" in html
+
+
+def test_zero_achados_sem_erros_mantem_o_banner_verde():
+    html = montar(_summary([_r("t::ok", "passed")]))
+    assert "Nenhuma não conformidade observada" in html
+    assert "Julgamento incompleto" not in html
+
+
+def test_secao_de_erros_e_neutra_sem_cor_de_estado():
+    """A folha canônica não define `.error`; inventar cor seria divergir."""
+    html = montar(_summary([_e("checks/frontend/t.py::test_fcp")]))
+    corpo = html.split("</style>", 1)[1]
+    secao = corpo.split('id="erros"', 1)[1].split("</section>", 1)[0]
+    assert 'class="chip-neutro"' in secao and "fora-escopo" in secao
+    for classe in ("estado failed", "estado xfail", "estado passed", "estado skipped"):
+        assert classe not in secao, f"seção de infra não pode usar {classe}"
+    assert 'class="error"' not in corpo and "cor-error" not in corpo
+
+
+def test_secao_de_erros_some_quando_nao_ha_erros():
+    html = montar(_summary([_r("t::ok", "passed")]))
+    assert 'id="erros"' not in html
+
+
+def test_ordem_do_paragrafo_6_com_a_secao_de_erros():
+    results = [_r("t::a", "failed", detail="x"), _r("t::b", "xfail", detail="y"),
+               _e("checks/frontend/t.py::test_fcp")]
+    html = montar(_summary(results), terceiros={"third_parties": []})
+    posicoes = [html.index(m) for m in ('id="panorama"', 'id="achados"', 'id="alertas"',
+                                        'id="erros"', 'id="terceiros"', 'id="tabela"')]
+    assert posicoes == sorted(posicoes), "erros fica entre alertas e terceiros"
+
+
+def test_numeracao_das_secoes_acompanha_a_presenca_da_de_erros():
+    """Índice e cabeçalhos saem da MESMA lista — não podem discordar."""
+    sem = montar(_summary([_r("t::ok", "passed")]))
+    com = montar(_summary([_r("t::ok", "passed"), _e("checks/frontend/t.py::test_fcp")]))
+    assert '<span class="n">4</span>Inventário' in sem
+    assert '<span class="n">5</span>Inventário' in com
+    assert '<span class="n">4</span>Erros de execução' in com
+
+
+def test_error_na_tabela_sai_sem_selo_colorido():
+    html = montar(_summary([_e("checks/frontend/t.py::test_fcp")]))
+    linha = html.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
+    assert '<span class="chip-neutro">erro de infra</span>' in linha
+    assert 'class="estado-min error"' not in linha
+
+
+def test_dimensao_so_com_erros_nao_sai_como_sem_achados():
+    html = montar(_summary([_e("checks/frontend/t.py::test_fcp")]))
+    assert "não avaliada" in html
+    assert "1 erro de infra" in html
+
+
+# ---------- Faixa de métricas ----------
+
+def test_faixa_de_metricas_mostra_so_o_que_foi_medido():
+    html = montar(_summary([_r("t::ok", "passed")],
+                           metricas={"ttfb_ms": 108.4, "total_ms": 109.2, "cls": 0.021}))
+    faixa = html.split('id="metricas"', 1)[1].split("</dl>", 1)[0]
+    assert "TTFB" in faixa and "108 ms" in faixa
+    assert "CLS" in faixa and "0,021" in faixa
+    assert "FCP" not in faixa and "LCP" not in faixa, "métrica ausente não aparece"
+
+
+def test_metricas_ausentes_omitem_a_faixa_inteira_sem_zeros_falsos():
+    """Caso da OS: ausente ≠ zero. Zero num relatório de performance é elogio."""
+    html = montar(_summary([_r("t::ok", "passed")]))
+    assert 'id="metricas"' not in html
+    assert "TTFB" not in html and "FCP" not in html
+
+
+def test_metrica_nula_nao_vira_zero():
+    html = montar(_summary([_r("t::ok", "passed")],
+                           metricas={"ttfb_ms": 90.0, "fcp_ms": None}))
+    faixa = html.split('id="metricas"', 1)[1].split("</dl>", 1)[0]
+    assert "TTFB" in faixa and "FCP" not in faixa
+
+
+def test_metrica_ilegivel_nao_derruba_o_relatorio():
+    html = montar(_summary([_r("t::ok", "passed")],
+                           metricas={"ttfb_ms": "n/a", "total_ms": 50.0}))
+    faixa = html.split('id="metricas"', 1)[1].split("</dl>", 1)[0]
+    assert "Download total" in faixa and "TTFB" not in faixa
+
+
+# ---------- Regressão do placeholder literal ----------
+
+@pytest.mark.parametrize("results", [
+    [],
+    [_r("t::ok", "passed")],
+    [_r("t::a", "failed", detail="x")],
+    [_r("t::x", "xfail", detail="y")],
+    [_r("t::ok", "passed"), _e("checks/frontend/t.py::test_fcp")],
+])
+def test_nenhum_placeholder_literal_chega_ao_html(results):
+    """Regressão: blocos sem prefixo `f` emitiam `{ACHADOS_VAZIO}` no relatório
+    VERDE — o caso em que essa é a única frase da seção."""
+    html = montar(_summary(results))
+    corpo = html.split("</style>", 1)[1]
+    assert not re.findall(r"\{[A-Z_]{4,}\}", corpo), "placeholder de f-string vazou para o HTML"
+
+
+def test_achados_vazio_com_erros_nao_usa_a_caixa_verde():
+    """Cor não pode contradizer texto: `.vazio` é verde no contrato."""
+    com = montar(_summary([_r("t::ok", "passed"), _e("checks/frontend/t.py::test_fcp")]))
+    secao = com.split('id="achados"', 1)[1].split("</section>", 1)[0]
+    assert "fora-escopo" in secao and "intro-sec vazio" not in secao
+    sem = montar(_summary([_r("t::ok", "passed")]))
+    secao_verde = sem.split('id="achados"', 1)[1].split("</section>", 1)[0]
+    assert "intro-sec vazio" in secao_verde, "sem erros, a caixa verde é correta"
