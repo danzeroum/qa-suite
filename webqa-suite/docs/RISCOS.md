@@ -16,6 +16,9 @@ Matriz probabilidade (P) × impacto (I), com resposta planejada e monitoramento.
 | R10 | Relatório LGPD ser lido como certificado de conformidade | negócio | Alto | Alto | **Mitigar**: nota epistêmica no código (`DIMENSION_NOTES`), impressa no `summary.html` e no `summary.json`, não só na documentação | revisão de PR do relatório |
 | R11 | Sondagem ativa (submeter formulário, clicar em banner) contra terceiro | legal | Baixo | Alto | **Evitar**: Fase 1 é 100% passiva; gate próprio `WEBQA_ACTIVE_PROBES_AUTHORIZED=1`, separado do gate de carga | `webqa/gates.py` + `tests/test_gates.py` |
 | R12 | `network_log` herdar consentimento de teste anterior (falso negativo) | técnico | M | Alto | **Mitigar**: contexto Playwright novo e virgem por módulo, fechado ao final | contrato documentado na fixture |
+| R13 | Deploy key do noturno vazar (escrita no repositório) | segurança | Baixo | Alto | **Mitigar**: deploy key exclusiva do repo (não PAT de pessoa), só no disco da VPS, montada `ro`, ausente de camada de imagem (`.dockerignore` + conferência com `docker history`) | `docs/VPS.md`; revisão de PR do Dockerfile |
+| R14 | Dois escritores no ledger (GitHub + VPS) colidindo | técnico | M | Médio | **Evitar**: schedule removido do GitHub; único escritor é a VPS. Colisão com humano tratada com `pull --rebase` + 1 retry | log do noturno; `estabilidade.yml` reprova se tocar o ledger |
+| R15 | Imagem base mudar sob os pés e falsear a sequência | técnico | M | Alto | **Mitigar**: imagem fixada por digest, não por tag; `playwright install chromium` no build casa a revisão do navegador com a do pacote | `docker/Dockerfile` |
 
 Revisar esta matriz a cada release da suíte ou mudança relevante no alvo.
 
