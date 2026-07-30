@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **467 testes coletados**; num ambiente
-limpo o resultado é **464 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **480 testes coletados**; num ambiente
+limpo o resultado é **477 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -145,6 +145,37 @@ fixture a exercita dá confiança falsa justamente na regra mais fácil de errar
 
 Artefato de execução carrega host e trecho de erro do alvo (Risco R8). Vale para
 `report/`, `report/campanha/` e `docker/report-campanha/`.
+
+### 2.10 Prosa × código: quando discordam, desconfie do código
+
+O docstring dizia "função auxiliar" e o pytest coletou como teste. O comentário
+dizia "folga de 20%" e a saída imprimiu **19%**. O doc dizia "remove
+identificação de alvo" e o campo `origens` levava o host no caminho do arquivo.
+
+Três vezes o mesmo padrão, e nas três **a prosa estava certa**. Não é coincidência:
+a prosa é escrita com a intenção à vista, o código é escrito com a implementação
+à vista — e é a implementação que erra em silêncio, porque ninguém relê uma
+f-string no meio de uma lista.
+
+Consequência prática, em duas regras:
+
+1. **Quando o texto e o comportamento divergirem, comece corrigindo o código.**
+   Ajustar a prosa para casar com o bug é a saída rápida e apaga a única
+   evidência de que havia bug.
+2. **Escrever a documentação é um detector.** As três armadilhas acima
+   apareceram enquanto alguém redigia — não enquanto depurava. Foi assim também
+   com o `.gitignore` inexistente, com o `IGNORECASE` que transformava toda
+   falha em falso flake, e com as quatro colisões de numeração de OS, que só
+   ficaram visíveis quando a tabela do registro foi escrita. Documentar não é
+   cerimônia aqui; é o momento em que a intenção e o código são confrontados.
+
+As três estão fixadas em `tests/test_convencoes.py` e `tests/test_telemetria.py`
+— reintroduzir qualquer uma reprova a suíte. Antes da OS-32 elas viviam só em
+comentário, e comentário não reprova ninguém.
+
+Uma nota sobre a primeira: o pytest coleta por `test*`, **não** por `test_*`.
+`testes_lentos` e `testar_alvo` entram na coleta, e em código português esse
+prefixo aparece sem querer. A guarda checa o prefixo que o pytest usa de fato.
 
 ---
 

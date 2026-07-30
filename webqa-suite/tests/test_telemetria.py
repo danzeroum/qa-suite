@@ -312,3 +312,111 @@ def test_telemetria_so_le_chaves_agregadas():
         assert proibido not in fonte, (
             f"telemetria não pode alcançar {proibido!r}: ela agrega o que já foi "
             "gravado, e ampliar o que ela lê amplia o que ela pode vazar.")
+
+
+# ---------- OS-32: as armadilhas que reincidiram, agora como teste ----------
+
+@pytest.mark.parametrize("fator,esperado", [
+    (1.20, "20%"),      # o caso real: int() dava 19%
+    (1.05, "5%"),
+    (1.333, "33%"),     # arredonda, não trunca
+    (1.336, "34%"),
+    (1.0, "0%"),
+    (2.0, "100%"),
+])
+def test_rotulo_de_folga_arredonda_e_nao_trunca(fator, esperado):
+    """`int((1.20 - 1) * 100)` devolve 19: o produto é 19.999999999999996 em
+    binário e `int` trunca. A saída anunciava 19% enquanto aplicava 20%."""
+    from scripts.telemetria import rotulo_de_folga
+
+    assert rotulo_de_folga(fator) == esperado
+
+
+def test_a_folga_anunciada_e_a_folga_aplicada():
+    """O que o texto promete tem de ser o que a conta faz.
+
+    Não basta o rótulo estar certo isolado: ele precisa descrever o
+    `FOLGA_CALIBRACAO` que a sugestão realmente usa. Se alguém mudar a constante
+    e esquecer do texto, é aqui que reprova.
+    """
+    from scripts.telemetria import FOLGA_CALIBRACAO, rotulo_de_folga
+
+    percentual = int(rotulo_de_folga().rstrip("%"))
+    assert abs((1 + percentual / 100) - FOLGA_CALIBRACAO) < 0.005
+
+    linhas = "\n".join(sugerir_thresholds({"metricas": {"sha": {"ttfb_ms": {"p75": 100.0}}}}))
+    assert f"folga de {rotulo_de_folga()}" in linhas
+    # 100 × 1.20 = 120: a conta aplicada bate com o rótulo anunciado.
+    assert "120" in linhas
+
+
+def _valores_em_profundidade(no, caminho="raiz"):
+    """Todo valor escalar da estrutura, com o caminho até ele.
+
+    Recursivo de propósito: uma lista de campos conhecidos aprova por omissão o
+    campo que alguém acrescentar amanhã, e foi assim que `origens` quase passou.
+    """
+    if isinstance(no, dict):
+        for chave, valor in no.items():
+            yield from _valores_em_profundidade(valor, f"{caminho}.{chave}")
+            yield f"{caminho} (chave)", str(chave)
+    elif isinstance(no, (list, tuple)):
+        for i, valor in enumerate(no):
+            yield from _valores_em_profundidade(valor, f"{caminho}[{i}]")
+    else:
+        yield caminho, str(no)
+
+
+# Identificadores que jamais podem aparecer num agregado anônimo: os hosts do
+# yaml de alvos, o esquema de URL e o prefixo de caminho que carrega o host no
+# diretório (`report/campanha/www.mozilla.org/run1/`).
+IDENTIFICADORES_PROIBIDOS = ("mozilla", "example.com", "wikipedia", "https://",
+                             "http://", "campanha/", "run1", ".org", ".com")
+
+
+def test_anonimato_verificado_por_varredura_recursiva(tmp_path):
+    """Nenhum valor, em nenhuma profundidade, pode conter identificador de alvo.
+
+    A verificação é por VARREDURA, não por lista de campos: campo novo não
+    escapa por omissão. Foi exatamente o modo de falha do `origens`, que não era
+    "o campo do host" e mesmo assim levava o host no caminho do arquivo.
+    """
+    _escrever(tmp_path, "www.mozilla.org", 1, _summary(ALVO_B, [_res("a.py::t")]))
+    _escrever(tmp_path, "example.com", 1, _summary(ALVO_A, [_res("a.py::t")]))
+
+    anonimo = anonimizar_agregado(agregar(carregar_summaries(tmp_path)))
+
+    vazamentos = [
+        f"{caminho} = {valor!r} contém {proibido!r}"
+        for caminho, valor in _valores_em_profundidade(anonimo)
+        for proibido in IDENTIFICADORES_PROIBIDOS
+        if proibido in valor.lower()
+    ]
+    assert not vazamentos, "identificador de alvo no agregado anônimo:\n  " + \
+        "\n  ".join(vazamentos)
+
+
+def test_campo_novo_com_host_em_qualquer_profundidade_e_pego(tmp_path):
+    """A guarda precisa reprovar o campo que ainda não existe.
+
+    Sem isto a varredura seria decorativa: ela só provaria que os campos de hoje
+    estão limpos, que é justamente a garantia que não sobrevive ao próximo PR.
+    """
+    _escrever(tmp_path, "www.mozilla.org", 1, _summary(ALVO_B, [_res("a.py::t")]))
+    anonimo = anonimizar_agregado(agregar(carregar_summaries(tmp_path)))
+
+    # Campo aninhado três níveis abaixo, como um acréscimo futuro descuidado.
+    anonimo["diagnostico"] = {"ultima_execucao": [{"origem": "report/campanha/www.mozilla.org/run1"}]}
+
+    vazamentos = [caminho for caminho, valor in _valores_em_profundidade(anonimo)
+                  if any(p in valor.lower() for p in IDENTIFICADORES_PROIBIDOS)]
+    assert vazamentos, "a varredura recursiva não enxergou o campo novo"
+    assert any("diagnostico" in v for v in vazamentos)
+
+
+def test_varredura_tambem_olha_as_CHAVES_nao_so_os_valores():
+    """Host como NOME de campo (`{"www.mozilla.org": {...}}`) vazaria igual."""
+    disfarcado = {"por_alvo": {"www.mozilla.org": {"execucoes": 3}}}
+    achados = [c for c, v in _valores_em_profundidade(disfarcado)
+               if any(p in v.lower() for p in IDENTIFICADORES_PROIBIDOS)]
+    assert achados, "chave com host precisa ser pega como valor seria"
