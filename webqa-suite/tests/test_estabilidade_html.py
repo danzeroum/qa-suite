@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from scripts.estabilidade import caminhada, sequencia_oficial, violacoes_do_contrato
-from webqa.estabilidade_html import classificar_linhas, montar
+from webqa.estabilidade_html import classificar_linhas, montar, motivos_do_zero
 from webqa.report_style import ESTILO_CANONICO
 
 pytestmark = pytest.mark.verification
@@ -340,3 +340,103 @@ def test_mesmas_secoes_e_nenhuma_classe_nova_frente_a_referencia():
 
     novas = sorted(classes(html) - classes(ref))
     assert novas == [], f"o painel inventou classe que a referência não usa: {novas}"
+
+
+# ---------- OS-33: o zero explicado, não apenas exibido ----------
+
+SHA_HOJE = "c" * 64
+
+
+def test_zero_do_ledger_real_mostra_os_tres_motivos():
+    """Exibir 0/10 sem dizer por quê ensina o leitor a desconfiar do número.
+
+    Hoje o ledger tem três motivos ao mesmo tempo, e mostrar só o primeiro
+    esconderia que corrigir a origem não bastaria para a contagem começar.
+    """
+    ledger = json.loads(
+        (RAIZ / "docs" / "lgpd-estabilidade.json").read_text(encoding="utf-8"))
+    execucoes = ledger["execucoes"]
+    motivos = motivos_do_zero(execucoes, caminhada(execucoes), SHA_HOJE)
+
+    assert len(motivos) == 3, f"esperava 3 motivos, vieram {len(motivos)}: {motivos}"
+    juntos = " ".join(motivos).lower()
+    assert "ambiente oficial" in juntos and "<code>ci</code>" in " ".join(motivos)
+    assert "quarentena" in juntos
+    assert "mudou de identidade" in juntos
+
+
+def test_motivos_sao_cumulativos_e_nao_excludentes():
+    """Corrigir um não faz os outros sumirem — e a página tem de dizer isso."""
+    so_origem = [_noite("2026-08-01", origem="local", sha=SHA_HOJE)]
+    assert len(motivos_do_zero(so_origem, caminhada(so_origem), SHA_HOJE)) == 1
+
+    origem_e_quarentena = [_noite("2026-08-01", origem="local", sha=SHA_HOJE,
+                                  classificador=1)]
+    assert len(motivos_do_zero(origem_e_quarentena,
+                               caminhada(origem_e_quarentena), SHA_HOJE)) == 2
+
+
+def test_sequencia_viva_nao_ganha_bloco_de_motivo():
+    """O bloco existe para explicar zero. Com a contagem andando, ele some."""
+    execucoes = [_noite("2026-08-01", sha=SHA_HOJE), _noite("2026-08-02", sha=SHA_HOJE)]
+    assert motivos_do_zero(execucoes, caminhada(execucoes), SHA_HOJE) == []
+
+    html = montar({"schema": 5, "execucoes": execucoes}, caminhada(execucoes), 11,
+                  sha_do_alvo_atual=SHA_HOJE)
+    assert "Por que a contagem está em zero" not in html
+
+
+def test_flake_na_ultima_noite_e_dito_como_motivo():
+    """Zero por 'ainda não houve noite oficial' e zero por 'flake ontem' são
+    situações opostas — a primeira é normal, a segunda é infra quebrando."""
+    execucoes = [_noite("2026-08-01", sha=SHA_HOJE),
+                 _noite("2026-08-02", sha=SHA_HOJE, flakes=1)]
+    motivos = " ".join(motivos_do_zero(execucoes, caminhada(execucoes), SHA_HOJE))
+    assert "flake de infraestrutura" in motivos
+
+
+def test_alvo_novo_nao_e_afirmado_sem_saber_qual_e_o_alvo_de_hoje():
+    """Sem a identidade atual, o motivo não é afirmado — inventar explicação
+    para um zero é pior que não explicá-lo."""
+    execucoes = [_noite("2026-08-01", origem="local", sha=SHA_A)]
+    motivos = " ".join(motivos_do_zero(execucoes, caminhada(execucoes), ""))
+    assert "mudou de identidade" not in motivos
+
+
+def test_ledger_vazio_nao_lista_motivos_porque_ja_tem_texto_proprio():
+    assert motivos_do_zero([], [], SHA_HOJE) == []
+    html = montar({"schema": 5, "execucoes": []}, [], 11, sha_do_alvo_atual=SHA_HOJE)
+    assert "Por que a contagem está em zero" not in html
+    assert "instalação nova, não um defeito" in html
+
+
+def test_bloco_do_zero_compoe_com_a_folha_e_nao_inventa_classe():
+    ledger = json.loads(
+        (RAIZ / "docs" / "lgpd-estabilidade.json").read_text(encoding="utf-8"))
+    html = montar(ledger, caminhada(ledger["execucoes"]), 11, sha_do_alvo_atual=SHA_HOJE)
+
+    corpo = re.sub(r"<style>.*?</style>", "", html, flags=re.S)
+    usadas = {c for m in re.finditer(r'class="([^"]+)"', corpo) for c in m.group(1).split()}
+    ausentes = sorted(c for c in usadas if f".{c}" not in ESTILO_CANONICO)
+    assert ausentes == [], f"classes sem regra na folha canônica: {ausentes}"
+    assert html.count("<h1") == 1
+
+
+def test_o_bloco_do_zero_chega_ao_HTML_e_nao_so_a_funcao():
+    """A derivação certa não serve de nada se ela não for renderizada.
+
+    Este teste existe porque a primeira versão da suíte da OS-33 passava com o
+    bloco DESCONECTADO do `montar`: os testes chamavam `motivos_do_zero()`
+    direto e nenhum conferia a página. É §2.10 de novo — a intenção estava certa
+    e a ligação faltava, em silêncio.
+    """
+    ledger = json.loads(
+        (RAIZ / "docs" / "lgpd-estabilidade.json").read_text(encoding="utf-8"))
+    html = montar(ledger, caminhada(ledger["execucoes"]), 11, sha_do_alvo_atual=SHA_HOJE)
+
+    assert "Por que a contagem está em zero" in html, "o bloco não foi renderizado"
+    for esperado in ("ambiente oficial", "quarentena", "mudou de identidade"):
+        assert esperado in html, f"motivo {esperado!r} derivado mas ausente da página"
+    # O bloco fica ANTES do marco da Fase 2: explicar o zero vem antes de
+    # prometer o prêmio de 10/10.
+    assert html.index("Por que a contagem") < html.index("FASE 2 DESTRAVADA")
