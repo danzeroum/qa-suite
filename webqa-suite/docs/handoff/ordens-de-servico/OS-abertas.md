@@ -1,116 +1,39 @@
-# Ordens de Serviço em aberto — Dimensão `seguranca` + Camada LLM
+# Ordens de Serviço — Dimensão `seguranca` + Camada LLM + Design do Relatório
 
-Todas as OS abaixo estão **prontas para execução**, na ordem de dependência.
-Cada bloco é colável isoladamente. Contratos de arquitetura: `docs/SEGURANCA.md`
-(dimensão de segurança) e `docs/LLM.md` (camada de LLM local).
-
-Base do repositório: `main` atual (pós dimensão frontend/ux/lgpd, campanha,
-ledger com quarentena por versão de classificador, runtime Docker da VPS).
+Estado em 2026-07-30 · base: `main` @ `b22af7d` · 314 testes de verificação verdes.
+Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, e — para as OS de design —
+`docs/qa-suite design brief/referencia/` (spec visual: `componentes.html` §5/§8;
+folha canônica: bloco `<style>` de `referencia/summary.html`, copiar byte a byte).
 
 ---
 
-## Sequência e dependências
+## Sequência e dependências (atualizada)
 
 ```
-OS-20 v2 (network_log + value objects Finding/Recurso)
-   └── OS-21 (Fase A: headers/mixed/MIME/segredos/cookies)
-          └── OS-22 (Fase B: magic bytes/metadados/SVG/sourcemap/SRI)
-                 └── [Fase C — apenas desenhada em docs/SEGURANCA.md, TRAVADA]
+Trilha SEGURANÇA (checks) — CONCLUÍDA:
+  OS-20 v2 ✓ (#15, 5dd0245) → OS-21 ✓ (#16, 80d8269) → OS-22 ✓ (#17, b22af7d)
+     └── [Fase C — apenas desenhada em docs/SEGURANCA.md §7, TRAVADA]
 
-OS-23 v2 (webqa/llm.py — abstração + gate + veto de endpoint por IP)
-   └── OS-24 v2 (scripts/sumario.py — processo separado + guardas)
+Trilha LLM (independente):
+  OS-23 v2 (webqa/llm.py) → OS-24 v2 (scripts/sumario.py)
+
+Trilha DESIGN/RELATÓRIO (nova; depende só da base atual):
+  OS-25 (template seguranca no summary.html) → OS-26 (painel de estabilidade)
 ```
 
-As duas trilhas (segurança e LLM) são independentes entre si; a LLM só depende de
-que o `summary.json` exista, o que já é verdade hoje.
+⚠️ Numeração: OS-23/OS-24 são **LLM** (como neste pacote desde a origem). As OS
+de design que circularam em chat com esses números foram renumeradas para
+**OS-25/OS-26** — valem os blocos abaixo.
 
 ---
 
-## OS-20 v2 — `network_log` enriquecida + `Finding` como linguagem ubíqua (DDD)
+## Concluídas (registro)
 
-```xml
-<lang>Python 3.11 stdlib + Playwright (webqa/dominio.py novo, webqa/trackers.py, conftest.py; base: main atual)</lang>
-<task>Introduzir os value objects Finding/Recurso da dimensão seguranca e enriquecer a network_log com metadados de resposta, sem persistir corpo em disco. Commitar docs/SEGURANCA.md.</task>
-<context>Hoje NetworkLog guarda só (url, resource_type), frozen. Ver docs/SEGURANCA.md (deste PR). Finding é value object cuja invariante "evidência nunca em claro" mora no construtor. sanitize.py já existe e mascara PII na borda.</context>
-<rules>
-- webqa/dominio.py: @dataclass(frozen=True) Finding(tipo, recurso, severidade:Literal["alta","media","baixa"], evidencia, fase:Literal["A","B","C"]); no __post_init__ a evidencia passa por sanitize — impossível instanciar com segredo em claro.
-- Recurso(url, status, headers lowercase, content_type, size, scheme, from_origin:bool) via context.on("response"); ler_corpo(rec, max_bytes=512_000) em memória, retorna None+truncado acima do teto, NUNCA grava em disco.
-- from_origin normaliza www/sem-www reusando a normalização do inventário de terceiros.
-- Compatibilidade: campos antigos preservados; nenhum check atual regride.
-</rules>
-<aceite>
-- Finding com evidencia "AKIA1234..." nasce mascarado (teste prova a invariante; instanciar em claro é impossível).
-- network_log contra fixture expõe headers/content_type por Recurso; grep no PR confirma zero escrita de corpo em disco; git status limpo.
-- Recurso de 3ª parte from_origin=False; www e sem-www do alvo = True.
-</aceite>
-<testes>
-- Unit (sem rede): Finding mascara evidência com segredo; Recurso de response fake; normalização www.
-- ler_corpo >512KB → None+truncado; segunda leitura não falha.
-- Regressão: -m "lgpd or frontend or ux" contra o fixture sem quebra.
-</testes>
-<recomendacao>
-- DDD: Finding e Recurso são value objects imutáveis, NetworkLog é o aggregate; a invariante mora no construtor, não repetida em cada check.
-- Separe verificação (unit dos value objects sem rede) de validação (network_log real contra o fixture).
-</recomendacao>
-```
-
----
-
-## OS-21 — Dimensão `seguranca`, Fase A (passiva: headers/mixed/MIME/segredos/cookies)
-
-```xml
-<lang>Python 3.11 stdlib + pytest (checks/seguranca/; base: OS-20 mergeada)</lang>
-<task>Criar a dimensão seguranca com os checks passivos da Fase A sobre a network_log enriquecida, emitindo Finding.</task>
-<context>Ver docs/SEGURANCA.md Fase A. Reusar sanitize.py como DETECTOR: publicar find_secrets(text)->list[Finding] com AWS AKIA, JWT eyJ, Google AIza, GitHub ghp_, Stripe sk_live_, PEM privado (alta), genérico api_key/secret/token. Registrar "seguranca" em DIMENSIONS, pytest.ini, checks/seguranca/__init__.py.</context>
-<rules>
-- Agrupar por tema (não 1 arquivo por check): headers+mixed+MIME juntos; segredos; cookies.
-- headers por ASSET (não duplicar o HTML principal que backend já cobre): 3ª parte executável sem CSP/XCTO → xfail; mixed content http:// em https:// → FAIL.
-- MIME: content_type vs magic bytes (js como text/html) → FAIL crítico.
-- segredos em corpos js/json de 1ª parte → FAIL via Finding (valor mascarado); cookies: Secure/HttpOnly/SameSite, SameSite=None sem Secure → FAIL.
-</rules>
-<aceite>
-- fixture ganha 1 asset com AKIA fake e 1 http:// → ambos detectados; segredo mascarado no laudo, nunca em claro.
-- esperado.json do fixture atualizado 1:1 (nem a mais nem a menos).
-- Corpo truncado (>512KB) → check declara "não avaliado", não PASS silencioso.
-</aceite>
-<testes>
-- Unit find_secrets: AKIA+JWT+PEM+ghp_ detectados; sha256 hex → não falso-positiva; texto limpo → vazio.
-- Mixed content protocol-relative (//host) → herda https, não FAIL.
-- SameSite=None sem Secure → FAIL; com Secure → PASS.
-</testes>
-<recomendacao>
-- Cubra unidade (find_secrets, magic bytes) → sistema (dimensão contra o fixture) → aceitação (contrato esperado.json), focando limites e riscos.
-- Gere o teste do segredo fake antes do check (TDD).
-</recomendacao>
-```
-
----
-
-## OS-22 — Fase B (passiva: magic bytes/metadados/SVG/sourcemap/SRI)
-
-```xml
-<lang>Python 3.11 stdlib + lxml (checks/seguranca/; base: OS-21 mergeada)</lang>
-<task>Adicionar à dimensão seguranca os checks passivos de análise de arquivos baixados (Fase B), emitindo Finding.</task>
-<context>Ver docs/SEGURANCA.md Fase B. Opera sobre corpos JÁ baixados via ler_corpo. Stdlib para magic bytes (struct) e presença de EXIF/PDF-meta; lxml (já no projeto) para SVG. Dependência pesada (Pillow/pypdf/python-magic) PROIBIDA — fallback xfail "não avaliado". Baixar arquivo novo é Fase C.</context>
-<rules>
-- Agrupar em test_arquivos_e_metadados.py: magic bytes vs extensão/content_type (pdf %PDF, png, jpg, zip PK) → FAIL; SVG com <script>/on*= → FAIL; sourcemap //# sourceMappingURL → xfail apontando o .map SEM baixá-lo; EXIF-GPS → FAIL, EXIF-autor/PDF-Author → xfail (só presença, valor mascarado); SRI ausente em 3ª parte → xfail.
-- Nenhum download novo: recurso fora da network_log → "não presente na navegação", não sonda.
-</rules>
-<aceite>
-- fixture ganha 1 svg com onload, 1 js com sourceMappingURL, 1 img com EXIF-GPS → cada um detectado; esperado.json 1:1.
-- Contagem de requests da network_log inalterada pelos checks da Fase B (prova de que nada foi baixado).
-- Coordenada GPS reportada mascarada, nunca em claro.
-</aceite>
-<testes>
-- Unit magic bytes: .png renomeado .jpg → detectado; arquivo íntegro → PASS.
-- SVG com xlink:href javascript: → FAIL; SVG limpo → PASS.
-- Formato inviável em stdlib → xfail "não avaliado", nunca erro nem dependência nova.
-</testes>
-<recomendacao>
-- Separe verificação (unit dos parsers com arquivos fabricados em tmp_path) de validação (fixture real).
-- Foque limites: arquivo corrompido, extensão trocada, metadado ausente — as bordas onde o parser quebra.
-</recomendacao>
-```
+| OS | PR | Commit em `main` | Entrega |
+|---|---|---|---|
+| OS-20 v2 | #15 | `5dd0245` | `Finding`/`Recurso` + `network_log` enriquecida + `docs/SEGURANCA.md` |
+| OS-21 | #16 | `80d8269` | Fase A: headers/mixed/MIME/segredos/cookies |
+| OS-22 | #17 | `b22af7d` | Fase B: magic bytes/metadados/SVG/sourcemap/SRI · fixture com 11 FAILs · novo `alvo_sha256` |
 
 ---
 
@@ -149,14 +72,14 @@ que o `summary.json` exista, o que já é verdade hoje.
 ```xml
 <lang>Python 3.11 (scripts/sumario.py; consome webqa/llm.py da OS-23; base: OS-23 mergeada. Contrato: docs/LLM.md)</lang>
 <task>Gerar report/sumario.md a partir do summary.json via ResumidorLLM local, como etapa SEPARADA (nunca dentro do pytest_sessionfinish), anexo rotulado que nunca certifica nem altera o laudo.</task>
-<context>Ver docs/LLM.md. summary.json já é fonte da verdade e seus detail já nascem sanitizados (invariante do report.py — NÃO re-sanitizar). Separação de processo é exigência: falha da LLM não pode compartilhar o corpo do hook que escreve o laudo (lição do bug de erros engolidos no report.py). Lê WEBQA_REPORT_DIR com o mesmo default do report.py.</context>
+<context>Ver docs/LLM.md. summary.json já é fonte da verdade e seus detail já nascem sanitizados (invariante do report.py — NÃO re-sanitizar). Separação de processo é exigência: falha da LLM não pode compartilhar o corpo do hook que escreve o laudo. Lê WEBQA_REPORT_DIR com o mesmo default do report.py.</context>
 <rules>
 - scripts/sumario.py roda APÓS o pytest, lê summary.json; se gate off ou runtime local ausente → não gera nada, exit 0, laudo íntegro.
-- Health-check fail-fast: sonda GET no endpoint (timeout 2s) antes de montar o prompt; falha → log de 1 linha + exit 0 (não esperar o timeout de 120s do POST).
+- Health-check fail-fast: sonda GET no endpoint (timeout 2s) antes de montar o prompt; falha → log de 1 linha + exit 0.
 - Ordenar achados failed→error→xfail (estável) ANTES do teto de 80; prompt só com esses estados; temperature 0.2.
 - Guarda de linguagem: termo de certificação → prefixa "revisar", mantém rótulo, NÃO descarta.
 - Detector de omissão: para cada dimensão com ≥1 failed, o nome da dimensão deve aparecer no sumario.md; ausente → prefixa "revisar: achados de {dimensão} não cobertos".
-- summary.json/summary.html NUNCA tocados. sumario.md coberto por report/ no .gitignore. Cabeçalho do arquivo traz model/timestamp (rastreabilidade), mas NÃO no corpo do prompt.
+- summary.json/summary.html NUNCA tocados. sumario.md coberto por report/ no .gitignore. Cabeçalho traz model/timestamp, mas NÃO no corpo do prompt.
 </rules>
 <aceite>
 - Gate off → nenhum sumario.md, exit 0, summary.json byte-idêntico.
@@ -177,23 +100,86 @@ que o `summary.json` exista, o que já é verdade hoje.
 
 ---
 
+## OS-25 — Template `seguranca` no relatório (ex-"OS-23 do chat", renumerada)
+
+```xml
+<lang>Python 3.11 stdlib (report_html.py; base: main b22af7d, pós #15–#17)</lang>
+<task>Estender o template do summary.html para a dimensão seguranca: severidade e fase por achado, "não avaliado" no vocabulário existente, contagens interpoladas. Painel de estabilidade FORA desta OS (é a OS-26).</task>
+<context>Spec visual no repo: docs/qa-suite design brief/referencia/componentes.html §5 (achado de seguranca renderizado, exemplo AKIA) e §8 (regras); folha canônica = bloco <style> de referencia/summary.html, byte a byte. Contrato do fixture agora tem 11 FAILs; Finding{severidade, fase} são campos OPCIONAIS — dimensões antigas não os têm.</context>
+<rules>
+- Severidade é TIPOGRÁFICA, nunca cromática: rótulo mono caps "sev. alta/média/baixa" na margem, sob o chip de estado; ordenação alta → média → baixa dentro do grupo; os 4 estados seguem o único vocabulário de cor — nenhum tom novo.
+- fase (A/B/C) como chip .chip-dim na linha meta; card seguranca entra na grade como qualquer dimensão — zero componente novo.
+- "Não avaliado" (corpo truncado, formato inviável, fora_do_contrato) usa xfail/skipped existente com motivo por extenso na linha e na tabela — nunca PASS silencioso.
+- Nenhuma contagem literal ("N achados", browser_total interpolados); evidência mascarada (AKIA****, GPS) chega pronta do Finding — apresentar sem re-mascarar nem re-escapar.
+</rules>
+<aceite>
+- summary.json do fixture pós-#17 renderiza os achados de seguranca com sev./fase, ordenados, distinguíveis sem cor (P&B) nos dois temas.
+- Classes .passed/.failed/.xfail/.skipped verbatim; paleta inalterada; axe sem críticas/sérias.
+- Sourcemap/SRI (xfail) no bloco Alertas, fora de TODA soma de falha; fora_do_contrato pulados com motivo legível.
+- Dogfooding: relatório servido local passa em zero requisição externa e HTML < 300 KB.
+</aceite>
+<testes>
+- Grupo com sev. alta + media → alta primeiro; achado SEM severidade → margem sem rótulo, layout intacto.
+- Summary antigo (sem dimensão seguranca) → saída idêntica à atual, byte a byte. <!-- retrocompatibilidade -->
+- detail com "AKIA****************" → em <code>, sem escape duplo; nenhum GPS em claro no HTML.
+- Corpo truncado >512 KB → "não avaliado" com motivo, ausente de qualquer soma de falha.
+</testes>
+<recomendacao>
+- Separe verificação (summaries sintéticos com/sem severidade, sem rede) de validação (dogfooding contra o fixture pós-#17).
+- Clean code: a extensão entra nas MESMAS funções de montagem (card/achado/linha) — sem branch duplicado para seguranca.
+</recomendacao>
+```
+
+---
+
+## OS-26 — Painel de Estabilidade (ex-"OS-24 do chat", renumerada)
+
+```xml
+<lang>Python 3.11 stdlib (scripts/estabilidade.py + gerador HTML novo; base: OS-25 mergeada)</lang>
+<task>Gerar report/estabilidade.html a partir de docs/lgpd-estabilidade.json, espelhando a referência do designer (docs/qa-suite design brief/referencia/estabilidade.html).</task>
+<context>Referência navegável já no repo; folha canônica compartilhada com o summary (copiar, não recriar). Regras do ledger: só origem vps pontua, 1 execução por dia UTC (vale a primeira), streak recalculada do histórico inteiro, por alvo. O alvo_sha256 mudou no #17 (fixture ganhou 4 violações) — o reinício já terá o que mostrar.</context>
+<rules>
+- Mesmas restrições do relatório: arquivo único, zero requisição externa, sem JS obrigatório, @media print, dark por prefers-color-scheme + [data-tema].
+- Estrutura da referência: história em 1 parágrafo, progresso N/10 em slots, 3 cartões (zera / não zera–avança / não conta), timeline com chips de origem (vps forte; ci/local tracejados, rebaixados), marco "FASE 2" sem gamificação.
+- Troca de sha → sequência reiniciada com a nota "o alvo mudou de identidade"; entradas do sha anterior rotuladas como histórico, NUNCA removidas.
+- Número de violações do alvo na história interpolado do contrato (hoje 11), nunca literal; noite limpa = vocabulário passed, flake = failed com o sinal (TimeoutError etc.), informativa = skipped.
+</rules>
+<aceite>
+- Ledger real atual renderiza a streak correta e a entrada ci de 2026-07-30 como "histórico — anterior à emenda, não conta".
+- Um leigo entende a página sem explicação oral (critério §12 do brief de design).
+- Diff visual ~zero contra a referência ao renderizar o ledger de demonstração dela.
+- axe sem críticas/sérias; h1 único; zero requisição externa.
+</aceite>
+<testes>
+- Ledger com 2 shas → streak recalculada só sobre o novo; antigas rotuladas, presentes.
+- 2 execuções vps no mesmo dia UTC → vale a primeira; origem desconhecida ("banana") → degrada para local, não conta.
+- Noite com infra_flakes>0 → linha failed com motivo + "sequência zerada"; seguinte limpa → "sequência: 1".
+- Ledger vazio (instalação nova) → página válida, 0/10, estado explicativo — nunca parecer quebrada.
+</testes>
+<recomendacao>
+- Separe verificação (ledgers sintéticos cobrindo as 4 bordas acima) de validação (ledger real + referência do designer lado a lado).
+- Clean code: reuse a montagem do gerador do relatório (folha, header, footer) — um único ponto de verdade visual.
+</recomendacao>
+```
+
+---
+
 ## Fase C — desenhada, NÃO implementar agora
 
 A sondagem ativa (`/.git/`, `.env`, `.map`, sublinks) está especificada em
 `docs/SEGURANCA.md §7`, atrás do gate `WEBQA_ACTIVE_PROBES_AUTHORIZED` com audit
-log. **Não emitir OS** até haver autorização explícita do dono de um alvo — é
-capacidade intrusiva (prima de pentest) e construí-la antes da demanda real é
-YAGNI com peso ético.
+log. **Não emitir OS** até haver autorização explícita do dono de um alvo.
 
 ---
 
 ## Critérios de review do arquiteto (ao entregar)
 
-1. **OS-20:** grep no PR confirmando zero escrita de corpo de resposta em disco;
-   teste provando que `Finding` com segredo nasce mascarado (invariante estrutural).
-2. **OS-21:** o segredo fake aparece mascarado no laudo, nunca em claro; `esperado.json` 1:1.
-3. **OS-22:** contagem de requests da `network_log` inalterada pelos checks (nada baixado).
-4. **OS-23:** o veto de endpoint funciona por IP resolvido (hostname público
+1. ~~OS-20/21/22~~ — entregues e verificados nos merges #15–#17.
+2. **OS-23:** o veto de endpoint funciona por IP resolvido (hostname público
    rejeitado, `0.0.0.0` rejeitado, `192.168.x` aceito).
-5. **OS-24:** processo separado (não no `pytest_sessionfinish`); ausência de
-   modelo → exit 0 em ≤2s; guarda de linguagem e detector de omissão marcam "revisar".
+3. **OS-24:** processo separado (não no `pytest_sessionfinish`); ausência de
+   modelo → exit 0 em ≤2s; guardas de linguagem e omissão marcam "revisar".
+4. **OS-25:** severidade tipográfica (nunca cromática) ordenada alta→média→baixa;
+   summary antigo → saída byte-idêntica; dogfooding verde contra o fixture pós-#17.
+5. **OS-26:** diff ~zero contra a referência do designer; troca de sha reinicia a
+   streak COM nota e SEM apagar histórico; ledger vazio nunca parece quebrado.
