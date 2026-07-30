@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "execucoes": [
+    {
+      "generated_at": "2026-07-30 02:38:18",
+      "alvo_sha256": "a6ee5978da3bbfe091578e6dddbc63ecc22ea802f3e208d15f4cc580b6de15ca",
+      "browser_total": 9,
+      "infra_flakes": 0,
+      "streak": 1
+    }
+  ]
+}
