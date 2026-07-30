@@ -10,12 +10,14 @@ from pathlib import Path
 import pytest
 
 from scripts.estabilidade import (
+    ORIGEM_OFICIAL,
+    _dia_utc_de,
     carregar_ledger,
     classificar,
     main,
     origem_da_execucao,
     registrar,
-    sequencia_ci,
+    sequencia_oficial,
     sha256_do_alvo,
 )
 
@@ -61,8 +63,9 @@ def _escrever(tmp_path, nome, summary):
     return caminho
 
 
-def _aplicar(ledger, summary, origem="ci"):
-    """Aplica como se fosse execução de CI: é a origem que move a métrica."""
+def _aplicar(ledger, summary, origem=ORIGEM_OFICIAL):
+    """Aplica como se fosse execução do ambiente oficial (a origem é o que move
+    a métrica; ver a emenda de arquitetura em docs/LGPD.md)."""
     return registrar(ledger, classificar(summary), SHA, origem=origem)
 
 
@@ -141,7 +144,7 @@ def test_troca_de_alvo_reinicia_a_sequencia():
     ledger = {"schema": 1, "execucoes": []}
     _aplicar(ledger, _limpo("2026-01-01 10:00:00"))
     outro = registrar(ledger, classificar(_limpo("2026-01-02 10:00:00")),
-                      sha256_do_alvo("https://outro.com"), origem="ci")
+                      sha256_do_alvo("https://outro.com"), origem=ORIGEM_OFICIAL)
     assert outro.alvo_mudou and outro.streak == 1
 
 
@@ -156,7 +159,7 @@ def test_ledger_nunca_guarda_a_url_em_claro():
 # ---------- CLI ----------
 
 def test_rodar_duas_vezes_no_mesmo_summary_gera_uma_entrada(tmp_path, capsys, monkeypatch):
-    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("WEBQA_ORIGEM", ORIGEM_OFICIAL)
     summary = _escrever(tmp_path, "summary.json", _limpo("2026-01-01 10:00:00"))
     ledger = tmp_path / "ledger.json"
     argv = [str(summary), "--ledger", str(ledger), "--alvo", ALVO]
@@ -168,18 +171,18 @@ def test_rodar_duas_vezes_no_mesmo_summary_gera_uma_entrada(tmp_path, capsys, mo
 
 
 def test_streak_de_dez_destrava_a_fase_2(tmp_path, capsys, monkeypatch):
-    monkeypatch.setenv("GITHUB_ACTIONS", "true")   # dez dias UTC distintos, via CI
+    monkeypatch.setenv("WEBQA_ORIGEM", ORIGEM_OFICIAL)   # dez dias UTC distintos
     ledger = tmp_path / "ledger.json"
     for dia in range(1, 11):
         summary = _escrever(tmp_path, f"s{dia}.json", _limpo(f"2026-01-{dia:02d} 10:00:00"))
         assert main([str(summary), "--ledger", str(ledger), "--alvo", ALVO]) == 0
     saida = capsys.readouterr().out
     assert "FASE 2 DESTRAVADA" in saida
-    assert "streak 10/10 (ci, 10 dias distintos)" in saida
+    assert f"streak 10/10 ({ORIGEM_OFICIAL}, 10 dias distintos)" in saida
 
 
 def test_dry_run_nao_grava(tmp_path, capsys, monkeypatch):
-    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("WEBQA_ORIGEM", ORIGEM_OFICIAL)
     summary = _escrever(tmp_path, "summary.json", _limpo("2026-01-01 10:00:00"))
     ledger = tmp_path / "ledger.json"
     assert main([str(summary), "--ledger", str(ledger), "--alvo", ALVO, "--dry-run"]) == 0
@@ -189,7 +192,7 @@ def test_dry_run_nao_grava(tmp_path, capsys, monkeypatch):
 
 # ---------- Origem: só CI move a métrica ----------
 
-def _entrada(dia, *, origem="ci", flakes=0, alvo=SHA, quando=None, browser=9):
+def _entrada(dia, *, origem=ORIGEM_OFICIAL, flakes=0, alvo=SHA, quando=None, browser=9):
     return {
         "generated_at": quando or f"{dia} 03:17:00",
         "dia_utc": dia,
@@ -200,34 +203,34 @@ def _entrada(dia, *, origem="ci", flakes=0, alvo=SHA, quando=None, browser=9):
     }
 
 
-def test_entrada_local_entre_duas_de_ci_nao_avanca_nem_zera():
-    """Execução na máquina de alguém não é evidência de estabilidade do CI."""
+def test_entrada_local_entre_duas_oficiais_nao_avanca_nem_zera():
+    """Execução em ambiente não oficial não é evidência de estabilidade."""
     historico = [
         _entrada("2026-08-01"),
         _entrada("2026-08-01", origem="local", flakes=4),
         _entrada("2026-08-02"),
     ]
-    assert sequencia_ci(historico) == (2, 2)
+    assert sequencia_oficial(historico) == (2, 2)
 
 
-def test_flake_em_entrada_local_nao_derruba_a_sequencia_de_ci():
+def test_flake_em_entrada_local_nao_derruba_a_sequencia_oficial():
     historico = [_entrada("2026-08-01"), _entrada("2026-08-02", origem="local", flakes=7)]
-    assert sequencia_ci(historico) == (1, 1)
+    assert sequencia_oficial(historico) == (1, 1)
 
 
-def test_duas_execucoes_de_ci_no_mesmo_dia_contam_uma():
+def test_duas_execucoes_oficiais_no_mesmo_dia_contam_uma():
     """Noturno + dispatch manual no mesmo dia UTC não inflam a métrica."""
     historico = [
         _entrada("2026-08-01", quando="2026-08-01 03:17:00"),
         _entrada("2026-08-01", quando="2026-08-01 14:02:00"),
     ]
-    assert sequencia_ci(historico) == (1, 1)
+    assert sequencia_oficial(historico) == (1, 1)
 
 
 def test_vale_a_primeira_do_dia():
     """Primeira limpa e segunda com flake: o dia conta como limpo."""
     historico = [_entrada("2026-08-01"), _entrada("2026-08-01", flakes=3)]
-    assert sequencia_ci(historico) == (1, 1)
+    assert sequencia_oficial(historico) == (1, 1)
 
 
 def test_virada_de_dia_utc_conta_dois_dias():
@@ -235,88 +238,123 @@ def test_virada_de_dia_utc_conta_dois_dias():
         _entrada("2026-08-01", quando="2026-08-01 23:59:00"),
         _entrada("2026-08-02", quando="2026-08-02 00:01:00"),
     ]
-    assert sequencia_ci(historico) == (2, 2)
+    assert sequencia_oficial(historico) == (2, 2)
+
+
+def test_ledger_misto_conta_so_o_ambiente_oficial():
+    """Histórico 'ci' + noites 'vps': a conta é só das vps, e apagar o
+    histórico não muda o número (ele não contamina nem sustenta a métrica)."""
+    historico_ci = [
+        _entrada("2026-07-29", origem="ci"),
+        _entrada("2026-07-30", origem="ci"),
+    ]
+    noites_vps = [_entrada("2026-08-01"), _entrada("2026-08-02")]
+    misto = [*historico_ci, *noites_vps]
+    assert sequencia_oficial(misto) == (2, 2)
+    assert sequencia_oficial(noites_vps) == sequencia_oficial(misto)
+
+
+def test_flake_na_ultima_noite_vps_zera_apesar_do_historico_ci_limpo():
+    misto = [_entrada("2026-07-30", origem="ci"), _entrada("2026-08-01", flakes=2)]
+    assert sequencia_oficial(misto) == (0, 1)
 
 
 def test_entrada_sem_campo_origem_e_tratada_como_local():
-    """Pós-migração, ausência do campo significa procedência desconhecida."""
+    """Ausência do campo significa procedência desconhecida — não conta."""
     orfa = _entrada("2026-08-02")
     del orfa["origem"]
-    assert sequencia_ci([_entrada("2026-08-01"), orfa]) == (1, 1)
+    assert sequencia_oficial([_entrada("2026-08-01"), orfa]) == (1, 1)
 
 
-def test_flake_de_ci_zera_e_dia_seguinte_recomeca():
+def test_flake_oficial_zera_e_dia_seguinte_recomeca():
     historico = [
         _entrada("2026-08-01"), _entrada("2026-08-02"),
         _entrada("2026-08-03", flakes=1), _entrada("2026-08-04"),
     ]
-    assert sequencia_ci(historico) == (1, 4)
+    assert sequencia_oficial(historico) == (1, 4)
 
 
-def test_troca_de_alvo_entre_dias_de_ci_reinicia():
+def test_troca_de_alvo_entre_dias_oficiais_reinicia():
     historico = [
         _entrada("2026-08-01"), _entrada("2026-08-02"),
         _entrada("2026-08-03", alvo="outro-digest"),
     ]
-    assert sequencia_ci(historico) == (1, 3)
+    assert sequencia_oficial(historico) == (1, 3)
 
 
 def test_dia_utc_ausente_cai_para_o_prefixo_de_generated_at():
     """A entrada pré-migração não tem dia_utc; veio de runner em UTC."""
-    antiga = {"generated_at": "2026-07-30 02:38:18", "origem": "ci",
+    antiga = {"generated_at": "2026-07-30 02:38:18", "origem": ORIGEM_OFICIAL,
               "alvo_sha256": SHA, "browser_total": 9, "infra_flakes": 0}
-    assert sequencia_ci([antiga, _entrada("2026-07-31")]) == (2, 2)
+    assert sequencia_oficial([antiga, _entrada("2026-07-31")]) == (2, 2)
 
 
-def test_origem_vem_do_ambiente(monkeypatch):
+def test_github_actions_nao_declara_mais_origem(monkeypatch):
+    """Regressão da emenda: estar no runner do GitHub não basta — o ambiente
+    oficial é o container da VPS, e a origem é declarada, não detectada."""
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
-    assert origem_da_execucao() == "ci"
-    for valor in ("false", "1", ""):
-        monkeypatch.setenv("GITHUB_ACTIONS", valor)
-        assert origem_da_execucao() == "local"
-    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("WEBQA_ORIGEM", raising=False)
     assert origem_da_execucao() == "local"
 
 
 def test_registrar_grava_origem_e_dia_utc(monkeypatch):
-    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("WEBQA_ORIGEM", ORIGEM_OFICIAL)
     ledger = {"schema": 2, "execucoes": []}
     registro = registrar(ledger, classificar(_limpo("2026-08-01 03:17:00")), SHA,
                          dia_utc="2026-08-01")
-    assert registro.origem == "ci" and registro.streak == 1 and registro.dias_ci == 1
-    assert ledger["execucoes"][0]["origem"] == "ci"
+    assert registro.origem == ORIGEM_OFICIAL and registro.streak == 1 and registro.dias == 1
+    assert ledger["execucoes"][0]["origem"] == ORIGEM_OFICIAL
     assert ledger["execucoes"][0]["dia_utc"] == "2026-08-01"
 
 
 def test_registrar_local_nao_move_a_sequencia(monkeypatch):
-    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("WEBQA_ORIGEM", raising=False)
     ledger = {"schema": 2, "execucoes": [_entrada("2026-08-01")]}
     registro = registrar(ledger, classificar(_com_timeout("2026-08-02 10:00:00")), SHA,
                          dia_utc="2026-08-02")
     assert registro.origem == "local"
-    assert registro.streak == 1, "flake local não pode zerar a sequência de CI"
+    assert registro.streak == 1, "flake local não pode zerar a sequência oficial"
     assert ledger["execucoes"][-1]["streak"] == 1
 
 
 # ---------- VALIDAÇÃO: o ledger real do repositório ----------
 
-def test_ledger_real_migrado_recalcula_para_o_valor_commitado():
-    """Recalcular sobre o ledger versionado tem de dar o mesmo streak gravado."""
+def _ledger_real() -> dict:
     caminho = Path(__file__).resolve().parent.parent / "docs" / "lgpd-estabilidade.json"
     if not caminho.exists():
         pytest.skip("ledger ainda não existe no repositório")
-    ledger = json.loads(caminho.read_text(encoding="utf-8"))
-    execucoes = ledger["execucoes"]
-    assert ledger.get("schema") == 2, "ledger versionado precisa estar no schema migrado"
-    assert all("origem" in e for e in execucoes), (
-        "toda entrada do ledger versionado precisa declarar origem — sem o campo "
-        "ela deixa de contar e a sequência regride silenciosamente"
-    )
-    streak, _ = sequencia_ci(execucoes)
-    assert streak == int(execucoes[-1]["streak"]), (
-        f"streak recalculado ({streak}) difere do gravado na última entrada "
-        f"({execucoes[-1]['streak']}) — ledger inconsistente"
-    )
+    return json.loads(caminho.read_text(encoding="utf-8"))
+
+
+def test_ledger_real_declara_origem_em_toda_entrada():
+    """Sem o campo, a entrada deixa de contar — e a regressão seria silenciosa."""
+    execucoes = _ledger_real()["execucoes"]
+    sem_origem = [e.get("generated_at", "?") for e in execucoes if "origem" not in e]
+    assert not sem_origem, f"entradas sem origem no ledger versionado: {sem_origem}"
+    invalidas = [e["origem"] for e in execucoes if e["origem"] not in ("vps", "ci", "local")]
+    assert not invalidas, f"origens fora do vocabulário: {invalidas}"
+
+
+def test_ledger_real_recomputa_a_sequencia_oficial():
+    """A sequência recalculada é a verdade; o campo `streak` de entradas
+    anteriores à emenda foi gravado sob a regra antiga e é só histórico."""
+    execucoes = _ledger_real()["execucoes"]
+    streak, dias = sequencia_oficial(execucoes)
+    oficiais = [e for e in execucoes if e.get("origem") == ORIGEM_OFICIAL]
+    assert dias == len({_dia_utc_de(e) for e in oficiais})
+    assert streak <= dias
+    if not oficiais:
+        assert streak == 0, (
+            "sem nenhuma execução do ambiente oficial a sequência tem de ser 0 — "
+            "a emenda reiniciou a contagem, e entradas 'ci' são histórico"
+        )
+
+
+def test_remover_a_entrada_ci_historica_nao_altera_a_sequencia():
+    """Prova que o histórico não contamina a conta: com ou sem ele, o mesmo número."""
+    execucoes = _ledger_real()["execucoes"]
+    sem_historico = [e for e in execucoes if e.get("origem") != "ci"]
+    assert sequencia_oficial(execucoes) == sequencia_oficial(sem_historico)
 
 
 def test_summary_ausente_falha_com_instrucao(tmp_path, capsys):

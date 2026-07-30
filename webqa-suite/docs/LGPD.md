@@ -116,8 +116,9 @@ pelo Git.
 mantém o ledger versionado `docs/lgpd-estabilidade.json`:
 
 ```bash
-make estabilidade                       # ou: python scripts/estabilidade.py
-python scripts/estabilidade.py --dry-run   # classifica sem gravar (uso do CI)
+make estabilidade                          # execução local: entra como informativa
+python scripts/estabilidade.py --dry-run   # classifica sem gravar (uso do smoke-test)
+WEBQA_ORIGEM=vps python scripts/estabilidade.py   # só no container oficial
 ```
 
 A distinção que dá sentido à métrica:
@@ -134,27 +135,42 @@ deduplicação: rodar o script duas vezes no mesmo summary não infla a sequênc
 Ao atingir **10 dias consecutivos sem flake**, o script imprime
 `FASE 2 DESTRAVADA`.
 
-### Só o CI move a métrica
+### Só o ambiente oficial move a métrica
 
-`origem` é `"ci"` quando `GITHUB_ACTIONS=true`, `"local"` em qualquer outro
-lugar. A sequência é **recalculada do histórico inteiro** a cada rodada, com
-três regras:
+> **Emenda de arquitetura — 2026-07-30.** O ambiente oficial deixou de ser o
+> runner do GitHub e passou a ser o **container Docker da VPS**, com imagem
+> fixada por digest — mais controlado que um runner hospedado, que troca a
+> versão da imagem base sob os pés. Três consequências:
+>
+> 1. a origem não é mais **detectada** (`GITHUB_ACTIONS`), é **declarada** em
+>    `WEBQA_ORIGEM`, injetada somente no container oficial;
+> 2. a sequência **recomeçou do zero**: o streak mede a interação infra × alvo,
+>    e a infra mudou. A entrada `ci` existente fica no ledger como histórico;
+> 3. papéis separados — GitHub é CI de código, VPS é o **único escritor** do
+>    ledger. O noturno do GitHub foi removido: dois escritores no mesmo arquivo
+>    é conflito de push às 3h da manhã. Ver [`VPS.md`](VPS.md).
+
+`origem` vale `vps`, `ci` ou `local`; valor ausente ou desconhecido degrada para
+`local`. A sequência é **recalculada do histórico inteiro** a cada rodada:
 
 | Regra | Por quê |
 |---|---|
-| Só entradas `origem: "ci"` contam | uma execução na máquina de alguém não é evidência de estabilidade do pipeline; entradas locais ficam no ledger para auditoria, mas **não avançam nem zeram** |
-| No máximo **uma por dia UTC**, valendo a primeira | um dispatch manual depois do noturno não infla a sequência — dez execuções num dia não são dez dias estáveis |
-| Ausência do campo `origem` = `local` | a única entrada anterior à migração foi marcada explicitamente como `ci` (proveniência conhecida: autor `github-actions[bot]`); daí para frente, campo faltando é procedência desconhecida |
+| Só entradas `origem: "vps"` contam | execução fora do ambiente oficial não é evidência de estabilidade dele; entradas `ci` e `local` ficam no ledger para auditoria, mas **não avançam nem zeram** |
+| No máximo **uma por dia UTC**, valendo a primeira | dez execuções num dia não são dez dias estáveis |
+| Origem desconhecida (`banana`, vazio, campo ausente) = `local` | **fail-safe**: erro de digitação no compose jamais pode inflar a métrica de confiança. No pior caso ela deixa de contar, nunca conta errado |
 
-A saída informa a fonte: `streak 3/10 (ci, 3 dias distintos)`.
+A saída informa a fonte: `streak 3/10 (vps, 3 dias distintos)`, mais uma nota de
+histórico quando há entradas `ci` anteriores à emenda.
 
 Recalcular em vez de incrementar a partir da última entrada tem um motivo: o
-valor gravado passa a ser **derivável e auditável** — `test_ledger_real_migrado`
-recomputa sobre o ledger versionado e cobra que dê o mesmo número.
+valor gravado passa a ser **derivável e auditável** — há teste que recomputa
+sobre o ledger versionado, e outro que prova que **remover o histórico `ci` não
+altera o número** (o histórico não contamina nem sustenta a conta).
 
-Duas honestidades: `GITHUB_ACTIONS` é declaração do ambiente, não prova
+Duas honestidades: `WEBQA_ORIGEM` é declaração do ambiente, não prova
 criptográfica — quem tem push no repositório pode escrever o que quiser no
-ledger; a barreira existe contra descuido, não contra falsificação deliberada.
+ledger; a barreira existe contra descuido, não contra falsificação deliberada
+(isso exigiria assinar a entrada com credencial que só o runner oficial tem).
 E a deduplicação por `generated_at` ignora a origem: se uma execução for
 registrada localmente, aquela chave já está ocupada.
 
@@ -189,16 +205,22 @@ teste depende do **registro da requisição**, nunca da resposta, e funciona
 offline. Os dois testes de axe-core ficam **fora do contrato**: dependem de
 baixar a biblioteca de um CDN, logo não são determinísticos.
 
-### O noturno (`.github/workflows/estabilidade.yml`)
+### O noturno (container da VPS) e o smoke-test do GitHub
 
-Agendado diariamente (e sob demanda). Sobe o fixture, confere o contrato, roda a
-dimensão, classifica e **commita o ledger** com `[skip ci]`. É o único ponto do
-repositório com `contents: write`, concedido no job, não no workflow.
+O noturno oficial roda no **container Docker da VPS** — sobe o fixture, confere o
+contrato, roda a dimensão, classifica com `WEBQA_ORIGEM=vps` e commita o ledger.
+Operação, agendamento e segredo estão em [`VPS.md`](VPS.md).
 
-O passo da dimensão roda com `continue-on-error`: contra um alvo não conforme a
-execução **reprova por definição** (7 FAILs de contrato). O código de saída do
-pytest não diz nada sobre estabilidade — quem decide é o classificador, lendo o
-`summary.json`. Falha do workflow, por si só, não zera a sequência.
+`.github/workflows/estabilidade.yml` sobreviveu como **smoke-test sem escrita**
+(`workflow_dispatch` + `--dry-run`): descartar a capacidade de diagnosticar o
+pipeline pelo GitHub seria jogar fora diagnóstico de graça — ele perdeu a caneta,
+não os olhos. Um passo depois do dry-run **falha** se o ledger tiver sido tocado,
+para que a garantia não dependa de boa vontade.
+
+Nos dois ambientes o passo da dimensão roda tolerando falha: contra um alvo não
+conforme a execução **reprova por definição** (7 FAILs de contrato). O código de
+saída do pytest não diz nada sobre estabilidade — quem decide é o classificador,
+lendo o `summary.json`. Falha do noturno, por si só, não zera a sequência.
 
 Três decisões que valem registro:
 
@@ -212,9 +234,9 @@ Três decisões que valem registro:
 - **A sequência é por alvo**: se o `alvo_sha256` muda, ela reinicia. Nove
   execuções limpas contra um alvo mais uma contra outro não são dez execuções
   limpas contra nada.
-- **O CI não commita o ledger** (`contents: read`): o passo em `ci.yml` roda com
-  `--dry-run` e publica o número como artefato. Avançar a sequência é ato
-  deliberado de quem roda a validação.
+- **Nada no GitHub commita o ledger** (`contents: read` nos dois workflows): o
+  passo em `ci.yml` e o smoke-test rodam com `--dry-run`. O único escritor é o
+  container da VPS, com deploy key montada como volume somente-leitura.
 
 O `detail` de cada resultado passou a ser gravado também para **skip**: sem o
 motivo, "Sem imagens na página" (resultado legítimo) seria indistinguível de
@@ -222,7 +244,8 @@ motivo, "Sem imagens na página" (resultado legítimo) seria indistinguível de
 
 ## Backlog
 
-**Fase 2** (destravada quando o ledger atingir 10 execuções consecutivas sem flake)
+**Fase 2** (destravada com **10 noites `vps` consecutivas** sem flake de infra;
+entradas `ci` anteriores à emenda de 2026-07-30 são histórico e não contam)
 
 - canário de consentimento: aceitar/recusar banner e comparar antes/depois — exige `WEBQA_ACTIVE_PROBES_AUTHORIZED=1`;
 - detecção de CMPs (OneTrust, Cookiebot, Osano) e verificação de que "recusar" recusa de fato.

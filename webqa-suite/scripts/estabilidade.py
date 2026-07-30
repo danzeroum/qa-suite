@@ -35,9 +35,20 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PADRAO = ROOT / "report" / "summary.json"
 LEDGER_PADRAO = ROOT / "docs" / "lgpd-estabilidade.json"
 META_PADRAO = 10
-# schema 2: entradas ganham "origem" e "dia_utc"; a sequência passa a ser
-# recalculada do histórico, contando só CI e no máximo um dia por vez.
-SCHEMA = 2
+# schema 2: entradas ganham "origem" e "dia_utc"; sequência recalculada do
+#           histórico, contando só o ambiente oficial e um dia por vez.
+# schema 3: EMENDA de arquitetura (2026-07-30) — o ambiente oficial deixa de ser
+#           o runner do GitHub e passa a ser o container Docker da VPS, com
+#           imagem fixada por digest. A origem não é mais DETECTADA
+#           (GITHUB_ACTIONS), é DECLARADA por WEBQA_ORIGEM, injetada somente no
+#           container oficial. Entradas "ci" anteriores viram histórico.
+SCHEMA = 3
+
+# Só este ambiente move a métrica. Um runner hospedado troca a imagem base sob
+# os pés; um container fixado por digest não — logo é MAIS controlado, e é dele
+# que a sequência fala.
+ORIGEM_OFICIAL = "vps"
+ORIGENS_VALIDAS = ("vps", "ci", "local")
 
 # Assinaturas de falha do ambiente de teste — nunca de conformidade do alvo.
 #
@@ -99,15 +110,18 @@ def carregar_ledger(caminho: Path) -> dict:
 
 
 def origem_da_execucao() -> str:
-    """'ci' dentro do GitHub Actions, 'local' em qualquer outro lugar.
+    """Origem DECLARADA em WEBQA_ORIGEM: vps | ci | local.
 
-    GITHUB_ACTIONS=true existe em todo runner do Actions. Não é prova
-    criptográfica de proveniência — é declaração do ambiente, e quem tem push
-    no repositório pode escrever o que quiser no ledger. O objetivo é impedir
-    que uma execução local avance a métrica por descuido, não resistir a
-    falsificação deliberada.
+    Valor ausente ou desconhecido degrada para "local" — fail-safe deliberado:
+    um erro de digitação no compose jamais pode inflar a métrica de confiança.
+    No pior caso a execução deixa de contar; nunca conta errado.
+
+    Não é prova criptográfica de proveniência — é declaração do ambiente, e quem
+    tem push no repositório pode escrever o que quiser no ledger. A barreira
+    existe contra descuido, não contra falsificação deliberada.
     """
-    return "ci" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
+    declarada = (os.environ.get("WEBQA_ORIGEM") or "local").strip().lower()
+    return declarada if declarada in ORIGENS_VALIDAS else "local"
 
 
 def _dia_utc_de(entrada: dict) -> str:
@@ -119,8 +133,9 @@ def _dia_utc_de(entrada: dict) -> str:
     return str(entrada.get("dia_utc") or str(entrada.get("generated_at", ""))[:10])
 
 
-def sequencia_ci(execucoes: list[dict]) -> tuple[int, int]:
-    """(sequência sem flake, dias distintos) contando SÓ execuções de CI.
+def sequencia_oficial(execucoes: list[dict],
+                      origem_oficial: str = ORIGEM_OFICIAL) -> tuple[int, int]:
+    """(sequência sem flake, dias distintos) contando SÓ o ambiente oficial.
 
     Recalculada do histórico inteiro a cada rodada, em vez de incrementada a
     partir da última entrada: o valor gravado passa a ser derivável e auditável,
@@ -128,16 +143,16 @@ def sequencia_ci(execucoes: list[dict]) -> tuple[int, int]:
 
     Três regras:
 
-    * `origem != "ci"` não conta — ausência do campo é tratada como local
-      (entradas anteriores à migração já foram marcadas explicitamente);
-    * no máximo UMA por dia UTC, e vale a PRIMEIRA do dia: um dispatch manual
-      depois do noturno não infla a sequência;
+    * `origem != origem_oficial` não conta — inclui as entradas `ci` anteriores
+      à emenda, que permanecem no ledger como HISTÓRICO, e as `local`;
+    * no máximo UMA por dia UTC, e vale a PRIMEIRA do dia: uma segunda execução
+      no mesmo dia não infla a sequência;
     * a sequência é por alvo — se o `alvo_sha256` muda entre dias contados,
       recomeça.
     """
     primeira_do_dia: dict[str, dict] = {}
     for entrada in execucoes:
-        if entrada.get("origem") != "ci":
+        if entrada.get("origem") != origem_oficial:
             continue
         primeira_do_dia.setdefault(_dia_utc_de(entrada), entrada)
 
@@ -159,7 +174,7 @@ class Registro:
 
     streak: int
     entrada: dict | None
-    dias_ci: int = 0
+    dias: int = 0
     origem: str = "local"
     duplicada: bool = False
     ignorada: bool = False
@@ -171,25 +186,26 @@ def registrar(ledger: dict, classificacao: Classificacao, alvo_sha256: str,
     """Aplica a execução ao ledger (em memória) e devolve o que mudou."""
     execucoes = ledger["execucoes"]
     origem = origem or origem_da_execucao()
-    streak_atual, dias_atuais = sequencia_ci(execucoes)
+    streak_atual, dias_atuais = sequencia_oficial(execucoes)
 
     # generated_at é a chave: rodar o script duas vezes no mesmo summary não
     # infla a sequência nem cria entrada duplicada.
     for entrada in execucoes:
         if entrada.get("generated_at") == classificacao.generated_at:
-            return Registro(streak=streak_atual, entrada=entrada, dias_ci=dias_atuais,
+            return Registro(streak=streak_atual, entrada=entrada, dias=dias_atuais,
                             origem=str(entrada.get("origem", "local")), duplicada=True)
 
     # Execução sem nenhum teste de navegador não diz nada sobre a estabilidade
     # do network_log: não conta e não zera.
     if not classificacao.tem_browser:
-        return Registro(streak=streak_atual, entrada=None, dias_ci=dias_atuais,
+        return Registro(streak=streak_atual, entrada=None, dias=dias_atuais,
                         origem=origem, ignorada=True)
 
-    anterior_ci = next(
-        (e for e in reversed(execucoes) if e.get("origem") == "ci"), None
+    anterior_oficial = next(
+        (e for e in reversed(execucoes) if e.get("origem") == ORIGEM_OFICIAL), None
     )
-    alvo_mudou = bool(anterior_ci and anterior_ci.get("alvo_sha256") != alvo_sha256)
+    alvo_mudou = bool(anterior_oficial
+                      and anterior_oficial.get("alvo_sha256") != alvo_sha256)
 
     entrada = {
         "generated_at": classificacao.generated_at,
@@ -206,11 +222,11 @@ def registrar(ledger: dict, classificacao: Classificacao, alvo_sha256: str,
     execucoes.append(entrada)
     # `streak` gravado = sequência de CI DEPOIS desta entrada. Numa entrada
     # local ele repete o valor anterior, deixando explícito que nada mudou.
-    streak, dias = sequencia_ci(execucoes)
+    streak, dias = sequencia_oficial(execucoes)
     entrada["streak"] = streak
     ledger["schema"] = SCHEMA
-    return Registro(streak=streak, entrada=entrada, dias_ci=dias, origem=origem,
-                    alvo_mudou=alvo_mudou and origem == "ci")
+    return Registro(streak=streak, entrada=entrada, dias=dias, origem=origem,
+                    alvo_mudou=alvo_mudou and origem == ORIGEM_OFICIAL)
 
 
 def _resolver_alvo(explicito: str | None, usar_fixture: bool = False) -> str:
@@ -262,9 +278,16 @@ def main(argv: list[str] | None = None) -> int:
     registro = registrar(ledger, classificacao, sha256_do_alvo(alvo))
 
     def _placar() -> str:
-        plural = "dia" if registro.dias_ci == 1 else "dias"
-        return (f"streak {registro.streak}/{args.meta} (ci, {registro.dias_ci} {plural} "
-                f"{'distinto' if registro.dias_ci == 1 else 'distintos'})")
+        plural = "dia" if registro.dias == 1 else "dias"
+        distintos = "distinto" if registro.dias == 1 else "distintos"
+        placar = (f"streak {registro.streak}/{args.meta} "
+                  f"({ORIGEM_OFICIAL}, {registro.dias} {plural} {distintos})")
+        # Entradas de antes da emenda continuam no ledger; dizer isso evita que
+        # alguém leia "0/10" como perda de histórico.
+        historicas = sum(1 for e in ledger["execucoes"] if e.get("origem") == "ci")
+        if historicas:
+            placar += f" · histórico: {historicas} execução(ões) 'ci' anterior(es), fora da conta"
+        return placar
 
     if registro.ignorada:
         print("Execução sem testes de navegador — ignorada (não conta nem zera). "
@@ -276,8 +299,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if registro.alvo_mudou:
-        print("Alvo mudou desde a última execução de CI: sequência reiniciada "
-              "(métrica é por alvo).")
+        print(f"Alvo mudou desde a última execução '{ORIGEM_OFICIAL}': sequência "
+              "reiniciada (métrica é por alvo).")
     if classificacao.limpa:
         print(f"Execução limpa: {classificacao.browser_total} testes de navegador, 0 flakes.")
     else:
@@ -286,14 +309,15 @@ def main(argv: list[str] | None = None) -> int:
         for teste in classificacao.flakes[:5]:
             print(f"  - {teste}")
 
-    if registro.origem == "local":
-        # Registrada para auditoria, mas fora da métrica: uma execução na
-        # máquina de alguém não é evidência de estabilidade do CI.
-        print("Origem: local — entrada informativa, NÃO avança nem zera a sequência "
-              "(só execuções de CI contam).")
+    dia = registro.entrada["dia_utc"] if registro.entrada else "?"
+    if registro.origem == ORIGEM_OFICIAL:
+        print(f"Origem: {ORIGEM_OFICIAL} — conta no máximo uma vez por dia UTC (dia {dia}).")
     else:
-        print("Origem: ci — conta no máximo uma vez por dia UTC "
-              f"(dia {registro.entrada['dia_utc'] if registro.entrada else '?'}).")
+        # Registrada para auditoria, mas fora da métrica: execução em ambiente
+        # não oficial não é evidência de estabilidade do ambiente oficial.
+        print(f"Origem: {registro.origem} — entrada informativa, NÃO avança nem zera "
+              f"a sequência (só '{ORIGEM_OFICIAL}' conta; declare WEBQA_ORIGEM no "
+              "container oficial).")
 
     if not args.dry_run:
         args.ledger.parent.mkdir(parents=True, exist_ok=True)
