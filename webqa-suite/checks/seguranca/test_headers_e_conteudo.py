@@ -8,12 +8,18 @@ documento já são cobertos por `checks/backend/test_security_headers.py`, e
 repetir a mesma asserção aqui inflaria a contagem sem informação nova. O que
 nenhuma outra dimensão vê é o script de terceiro pelado servido dentro de uma
 página blindada — o elo fraco de uma cadeia que parece forte.
+
+Os checks que reprovam emitem `Finding` (docs/SEGURANCA.md §8); o que informa
+segue `xfail` e não produz achado. Severidade **alta** nos dois FAILs daqui pelo
+mesmo critério: em ambos o risco se realiza no navegador do titular sem depender
+de nenhuma outra condição — o conteúdo adulterado em trânsito já chegou, e o
+executável mal declarado já está sendo interpretado.
 """
 from __future__ import annotations
 
 import pytest
 
-from webqa.dominio import ler_corpo, parece_html
+from webqa.dominio import Finding, ler_corpo, parece_html, registrar_achados
 
 pytestmark = [pytest.mark.seguranca, pytest.mark.browser]
 
@@ -46,7 +52,7 @@ def test_assets_de_terceiro_declaram_nosniff(network_log):
         )
 
 
-def test_sem_mixed_content(network_log):
+def test_sem_mixed_content(network_log, request):
     """Asset `http://` numa página `https://` — FAIL sem atenuante.
 
     Vale só quando o alvo é https: num alvo http NADA é mixed content, e cobrar
@@ -56,15 +62,21 @@ def test_sem_mixed_content(network_log):
     """
     if not network_log.url.lower().startswith("https://"):
         pytest.skip("Alvo servido por http:// — mixed content não é aplicável.")
-    inseguros = [r.url for r in network_log.recursos if r.scheme == "http"]
-    assert not inseguros, (
-        f"{len(inseguros)} recurso(s) carregados por http:// numa página https:// "
-        f"(mixed content): {inseguros[:5]}. O conteúdo trafega em claro e pode ser "
-        "adulterado em trânsito, anulando o TLS da página."
+    achados = [Finding(tipo="mixed-content", recurso=r.url, severidade="alta",
+                       evidencia=f"carregado por {r.scheme}:// numa página https://",
+                       fase="A")
+               for r in network_log.recursos if r.scheme == "http"]
+
+    registrar_achados(request.node.nodeid, achados)
+    assert not achados, (
+        f"{len(achados)} recurso(s) carregados por http:// numa página https:// "
+        f"(mixed content):\n  " + "\n  ".join(str(a) for a in achados[:5])
+        + "\nO conteúdo trafega em claro e pode ser adulterado em trânsito, "
+          "anulando o TLS da página."
     )
 
 
-def test_tipo_declarado_corresponde_ao_conteudo(network_log):
+def test_tipo_declarado_corresponde_ao_conteudo(network_log, request):
     """`Content-Type` que mente sobre o corpo — FAIL.
 
     O caso que importa: um `.js` devolvido como página HTML (fallback de erro,
@@ -81,28 +93,33 @@ def test_tipo_declarado_corresponde_ao_conteudo(network_log):
     if not javascripts:
         pytest.skip("Nenhum recurso JavaScript no carregamento.")
 
-    divergentes, nao_avaliados = [], []
+    achados, nao_avaliados = [], []
     for recurso in javascripts:
         corpo = ler_corpo(recurso)
         if not corpo.avaliavel:
             nao_avaliados.append(f"{recurso.url} ({corpo.motivo})")
             continue
+        declarado = recurso.content_type or "sem Content-Type"
         declarado_js = recurso.content_type in ("application/javascript", "text/javascript")
+        # A evidência é o PAR (declarado, observado) — nunca um trecho do corpo.
+        # Um pedaço de HTML no laudo seria conteúdo do alvo republicado sem
+        # necessidade: o par já é a prova, e é tudo o que o leitor precisa.
         if parece_html(corpo.dados):
-            divergentes.append(
-                f"{recurso.url}: corpo é HTML, servido como "
-                f"{recurso.content_type or 'sem Content-Type'}")
+            achados.append(Finding(
+                tipo="tipo-declarado-divergente", recurso=recurso.url, severidade="alta",
+                evidencia=f"corpo é HTML, servido como {declarado}", fase="A"))
         elif recurso.url.split("?")[0].endswith(".js") and not declarado_js:
-            divergentes.append(
-                f"{recurso.url}: extensão .js servida como "
-                f"{recurso.content_type or 'sem Content-Type'}")
+            achados.append(Finding(
+                tipo="tipo-declarado-divergente", recurso=recurso.url, severidade="alta",
+                evidencia=f"extensão .js servida como {declarado}", fase="A"))
 
-    if nao_avaliados and not divergentes:
+    if nao_avaliados and not achados:
         pytest.xfail("Não avaliado (corpo acima do teto ou indisponível): "
                      + "; ".join(nao_avaliados[:3]))
-    assert not divergentes, (
-        f"{len(divergentes)} recurso(s) com tipo declarado divergente do conteúdo:\n  "
-        + "\n  ".join(divergentes[:5])
+    registrar_achados(request.node.nodeid, achados)
+    assert not achados, (
+        f"{len(achados)} recurso(s) com tipo declarado divergente do conteúdo:\n  "
+        + "\n  ".join(str(a) for a in achados[:5])
         + "\nServidor mentindo sobre o tipo faz o navegador adivinhar — e adivinhar "
           "é onde mora o content-sniffing malicioso."
     )

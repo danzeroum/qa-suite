@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **329 testes coletados**; num ambiente
-limpo o resultado é **326 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **338 testes coletados**; num ambiente
+limpo o resultado é **335 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -217,20 +217,22 @@ literal.
 Reuse a montagem do gerador do relatório (folha, header, footer) — um único
 ponto de verdade visual.
 
-### 4.2 Fase B emitindo `Finding` — ~~dívida conhecida~~ FEITO (OS-28)
+### 4.2 `Finding` em toda a dimensão `seguranca` — FEITO (OS-28 e OS-29)
 
-Os checks da Fase B constroem `Finding` e registram com
-`dominio.registrar_achados(request.node.nodeid, achados)`: GPS no EXIF e SVG
-executável saem com severidade **alta**, divergência de formato com **média**
-(sintoma de validação ausente, não prova de execução). Os que informam
-(sourcemap, SRI, autoria) seguem `xfail` e **não** produzem achado — alerta com
-selo de severidade seria um segundo semáforo dentro do estado, o que a regra 2.5
-evita. Há teste fixando isso.
+Dívida encerrada. **Todo** check que reprova na dimensão constrói `Finding` e
+registra com `dominio.registrar_achados(request.node.nodeid, achados)`; nenhum
+achado de `seguranca` chega ao laudo pelo caminho de retrocompatibilidade. A
+tabela de severidades é `SEGURANCA.md §8.1` — decidir severidade em revisão de
+PR sem registrar ali vira memória, e memória não sobrevive à próxima pessoa.
 
-**Resta um.** `checks/seguranca/test_headers_e_conteudo.py::test_tipo_declarado_corresponde_ao_conteudo`
-é Fase A e ainda reprova sem severidade — é o último FAIL da dimensão que
-renderiza pelo caminho de retrocompatibilidade. Ficou fora da OS-28, cujo escopo
-era a Fase B.
+Os checks que **informam** (sourcemap, SRI, autoria, `nosniff` de terceiro,
+`SameSite` ausente) seguem `xfail` e não produzem achado: alerta com selo de
+severidade seria um segundo semáforo dentro do estado, o que a regra 2.5 evita.
+Há teste lendo o corpo dessas funções e reprovando se alguma construir `Finding`.
+
+O caminho de retrocompatibilidade do template **permanece** — agora só para
+summary histórico, e há teste que o exercita com dado sintético. Removê-lo faria
+todo relatório antigo mudar de forma.
 
 ### 4.3 `seguranca` Fase C — sondagem ativa
 

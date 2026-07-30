@@ -93,6 +93,40 @@ identificável, **audit log** (`logging.warning` + timestamp) ao acionar o gate.
 direta; `skipped` = não aplicável; `error` = não pôde ser avaliado. Achado nunca é
 "certificação de seguro" — mesma nota epistêmica da dimensão `lgpd`.
 
+### 8.1 Severidade — critério e tabela
+
+**Só `failed` tem severidade.** `xfail` é alerta no vocabulário do relatório, e
+alerta com selo de severidade seria um segundo semáforo dentro do estado — o que
+a regra 2.5 evita, porque some na impressão em preto e branco. Há teste fixando
+que nenhum caminho de `xfail` constrói `Finding`.
+
+O critério, em uma frase: **alta é o risco que já se realizou no cliente; média
+é o que depende de uma pré-condição que a bateria não observa.**
+
+| Severidade | Achado | Por que aqui |
+|---|---|---|
+| **alta** | `segredo:*` (A) | credencial servida ao navegador já é credencial pública — todo visitante leu |
+| **alta** | `tipo-declarado-divergente` (A) | executável mal declarado já está sendo interpretado no navegador do titular |
+| **alta** | `mixed-content` (A) | o conteúdo em claro já trafegou e já pôde ser adulterado; o TLS da página está anulado |
+| **alta** | `svg-executavel` (B) | documento com DOM servido como imagem executa no contexto de origem do alvo |
+| **alta** | `exif-gps` (B) | dado pessoal por consequência, já publicado — revela onde o titular esteve |
+| **média** | `cookie-samesite-none-sem-secure` (A) | exposição em trânsito, condicionada a interceptação |
+| **média** | `cookie-sessao-sem-httponly` (A) | só vira incidente se houver XSS na página |
+| **média** | `cookie-sessao-sem-secure` (A) | só vira incidente num downgrade para http |
+| **média** | `formato-divergente` (B) | sintoma de validação ausente no upload; se executa depende do tratamento a jusante |
+
+Nenhum achado usa **baixa** hoje. O rótulo existe no value object e fica
+disponível, mas inventar ocupante para ele agora só diluiria os outros dois.
+
+Se tudo é alta, "alta" para de significar alguma coisa — e quem lê o laudo
+precisa saber o que fazer **hoje**. A dúvida se resolve para média: superestimar
+severidade queima a credibilidade da bateria do mesmo jeito que um falso
+positivo, só que mais devagar.
+
+Esta tabela é a fonte de verdade da decisão. Achado novo entra aqui no mesmo PR
+em que nasce — severidade decidida em revisão de PR e não registrada vira
+memória, e memória não sobrevive à próxima pessoa.
+
 ---
 
 ## 9. Veredito sobre os cinco pareceres externos
