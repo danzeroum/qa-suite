@@ -17,7 +17,8 @@ mesmo arquivo é conflito de push às 3h da manhã.
 |---|---|---|
 | GitHub Actions — `ci.yml` | `quality-gate` em push/PR; validação manual contra alvo real | **não** (`contents: read`) |
 | GitHub Actions — `estabilidade.yml` | smoke-test do pipeline em `--dry-run` | **não** (há passo que reprova se o arquivo mudar) |
-| Container desta VPS | medição noturna oficial | **sim**, via deploy key |
+| Container desta VPS — serviço `estabilidade` | medição noturna oficial | **sim**, via deploy key |
+| Container desta VPS — serviço `campanha` | validação de sistema contra alvos reais, sob demanda | **não** (sem segredo montado, sem `WEBQA_ORIGEM`) |
 
 ## Instalação
 
@@ -116,6 +117,58 @@ Saída esperada ao fim: `streak N/10 (vps, N dias distintos)` e
 `ledger publicado`. O commit aparece no GitHub como
 `chore(ledger): noite AAAA-MM-DD` com autor `webqa-vps-bot`, e **não dispara
 CI** (marcador de skip na mensagem).
+
+## Campanha contra alvos reais {#campanha}
+
+A VPS é o **único ambiente** onde a campanha (`docs/CAMPANHA.md`) mede tudo o
+que promete. Onde o Chromium não tem saída direta — o ambiente de desenvolvimento
+está atrás de um proxy que só faz CONNECT — as colunas FCP/LCP/CLS saem
+`não medido`. A campanha declara a ausência em vez de inventar número, mas
+declarar não é medir.
+
+```bash
+mkdir -p docker/report-campanha && sudo chown 1000 docker/report-campanha
+cd webqa-suite && make campanha-vps
+```
+
+O consolidado aparece em `docker/report-campanha/consolidado.md` (mais o
+`.json` e o `summary.json` bruto de cada execução). O diretório é **ignorado no
+Git** e fica **fora da árvore da suíte** de propósito: assim a campanha não tem
+como sujar o `git status` da VPS, que é o mesmo repositório de onde o noturno
+commita o ledger.
+
+`chown 1000` porque o container roda como `pwuser` (uid 1000) e o volume herda o
+dono do host — mesma razão da deploy key.
+
+### Custo e janela
+
+O custo é `alvos × repetições × duração de uma execução`. Com o `campanha.yaml`
+padrão (3 alvos × 3 repetições) e ~60–70 s por execução, mais 10 s de pausa entre
+elas: **cerca de 11 minutos**, dos quais ~80 s são só de pausa.
+
+**Rode FORA da janela do noturno.** As duas coisas usam a mesma imagem, o mesmo
+CPU e a mesma rede; sobrepor uma à outra contamina justamente o que o noturno
+mede (estabilidade da infraestrutura de navegador) e o que a campanha mede
+(tempo). Se o cron roda às 03:00 UTC, a campanha à tarde não incomoda ninguém.
+
+### O que a campanha NÃO faz
+
+Não monta segredo, não declara `WEBQA_ORIGEM` e não chama o classificador —
+portanto **não toca o ledger** por nenhum caminho. Uma medição contra alvo de
+terceiro não é evidência sobre a estabilidade do ambiente oficial, e misturar as
+duas coisas destruiria o sentido da sequência de 10 noites.
+
+### Validando no smoke
+
+```bash
+make vps-smoke                       # 5 passos: libera o cron
+scripts/vps_smoke.sh --com-campanha  # 6 passos: valida também a renderização
+```
+
+O passo 6 roda `campanha-smoke.yaml` (1 alvo × 1 repetição, ~1 minuto) e
+**reprova se FCP/LCP/CLS saírem `não medido`** — nesta VPS eles deveriam nascer
+preenchidos, e sair vazio significa que o Chromium não alcançou o alvo. É opt-in
+porque quem só quer liberar o cron não precisa pagar por ele.
 
 ## Agendamento (cron do host)
 

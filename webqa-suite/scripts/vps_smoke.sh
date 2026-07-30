@@ -19,7 +19,14 @@ IMAGEM=${WEBQA_IMAGEM:-webqa-estabilidade:local}
 CHAVE="$RAIZ/docker/secrets/deploy_key"
 KNOWN_HOSTS="$RAIZ/docker/secrets/known_hosts"
 UID_CONTAINER=${WEBQA_UID_CONTAINER:-1000}   # pwuser da imagem do Playwright
+# Passo 6 (campanha) é OPT-IN: custa ~1 minuto e depende de egresso para um alvo
+# de terceiro. Quem só quer liberar o cron não deve pagar por isso; quem quer
+# provar que a renderização mede de verdade pede explicitamente.
+COM_CAMPANHA=0
+[ "${1:-}" = "--com-campanha" ] && COM_CAMPANHA=1
+[ "${WEBQA_SMOKE_CAMPANHA:-0}" = "1" ] && COM_CAMPANHA=1
 TOTAL=5
+[ "$COM_CAMPANHA" = "1" ] && TOTAL=6
 OK=0
 
 titulo() { printf '\n[%d/%d] %s\n' "$1" "$TOTAL" "$2"; }
@@ -142,5 +149,46 @@ else
   pass "pipeline completo, HEAD local intacto (remoto não consultado: \`ls-remote\` indisponível)"
 fi
 
+# ---------- 6. Campanha mínima (opcional): renderização mede de verdade ----------
+
+if [ "$COM_CAMPANHA" = "1" ]; then
+  titulo 6 "Campanha mínima: 1 alvo × 1 repetição com Chromium de verdade"
+
+  SAIDA_CAMPANHA="$RAIZ/docker/report-campanha"
+  mkdir -p "$SAIDA_CAMPANHA" 2>/dev/null || true
+  if ! ( [ -d "$SAIDA_CAMPANHA" ] && [ -w "$SAIDA_CAMPANHA" ] ); then
+    fail "diretório de saída da campanha não é gravável: $SAIDA_CAMPANHA" \
+         "crie com \`mkdir -p docker/report-campanha && chown ${UID_CONTAINER} docker/report-campanha\` (VPS.md §campanha)"
+  fi
+
+  SAIDA=$(compose run --rm campanha --campanha campanha-smoke.yaml 2>&1)
+  CODIGO=$?
+  printf '%s\n' "$SAIDA" | sed 's/^/        | /' | tail -6
+
+  [ "$CODIGO" -eq 0 ] || fail "a campanha mínima saiu com código $CODIGO" \
+    "leia o log acima; alvo inacessível daqui é problema de rede da VPS (VPS.md §campanha)"
+
+  CONSOLIDADO="$SAIDA_CAMPANHA/consolidado.md"
+  [ -s "$CONSOLIDADO" ] || fail "consolidado não foi gerado em $CONSOLIDADO" \
+    "confira o volume ./report-campanha do serviço campanha (VPS.md §campanha)"
+
+  # O ponto do passo: sem egresso para o Chromium, FCP/LCP/CLS saem
+  # "não medido" — a campanha declara a ausência em vez de inventar número, e o
+  # smoke reprova porque este ambiente deveria conseguir medir.
+  if grep -qE '^\| (FCP|LCP|CLS) .*não medido' "$CONSOLIDADO"; then
+    grep -E '^\| (FCP|LCP|CLS)' "$CONSOLIDADO" | head -3 | sed 's/^/        | /'
+    fail "colunas de renderização saíram 'não medido' — o Chromium não alcançou o alvo" \
+         "a VPS precisa de saída direta para o alvo; sem ela a campanha só mede rede (VPS.md §campanha)"
+  fi
+  grep -qE '^\| FCP \(ms\)' "$CONSOLIDADO" || fail \
+    "o consolidado não trouxe a linha de FCP" \
+    "confirme que a imagem foi reconstruída após a última mudança (VPS.md §Imagem)"
+  pass "consolidado gerado com colunas de renderização preenchidas"
+fi
+
 printf '\n%d/%d PASS\n' "$OK" "$TOTAL"
 printf 'Pronto: agende o cron (VPS.md §agendamento)\n'
+if [ "$COM_CAMPANHA" = "0" ]; then
+  printf 'Opcional: %s --com-campanha valida tambem a renderizacao (VPS.md §campanha)\n' \
+    "$(basename "${BASH_SOURCE[0]}")"
+fi
