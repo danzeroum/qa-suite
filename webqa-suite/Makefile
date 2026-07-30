@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps
+.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -11,6 +11,9 @@ seguranca: ; pytest -m seguranca
 lgpd-passivo: ; pytest -m "lgpd and not browser"   # só HTTP, sem navegador
 load: ; pytest -m load
 estabilidade: ; python scripts/estabilidade.py
+# Anexo assistido por IA, APÓS o pytest e em processo separado (docs/LLM.md).
+# Sem WEBQA_LLM_ENABLED=1 ou sem runtime local: nao gera nada e sai 0.
+sumario: ; python scripts/sumario.py
 fixture: ; python fixture_target/servir.py   # alvo fabricado, porta efemera
 vps-smoke: ; scripts/vps_smoke.sh   # valida VPS antes de agendar o cron
 audita-design: ; python scripts/audita_design.py --suite   # gate do pacote de design (§12)

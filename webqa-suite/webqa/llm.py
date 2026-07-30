@@ -141,6 +141,14 @@ def modelo_configurado() -> str:
     return os.environ.get(MODELO_ENV) or MODELO_PADRAO
 
 
+# Ordem de corte quando o teto aperta. `failed` primeiro porque é veredito sobre
+# o alvo; `error` antes de `xfail` porque teste que NÃO ACONTECEU é notícia mais
+# urgente que sinal de maturidade ausente — perder um `error` no corte esconderia
+# infraestrutura quebrada, que é o defeito que este projeto mais pagou caro.
+ORDEM_ESTADO = {"failed": 0, "error": 1, "xfail": 2}
+_ORDEM_SEVERIDADE = {"alta": 0, "media": 1, "baixa": 2}
+
+
 def achados_para_prompt(resultados: list[dict]) -> list[dict]:
     """Achados que podem ir ao modelo: só `failed`/`xfail`/`error`, teto de 80.
 
@@ -149,12 +157,16 @@ def achados_para_prompt(resultados: list[dict]) -> list[dict]:
     defesas onde há uma só, e a segunda inevitavelmente diverge da primeira.
     Se a borda falhar, conserta-se a borda.
 
-    Ordena por severidade antes de cortar: se 80 não couberem tudo, o que fica
-    de fora tem de ser o menos grave, não o que por acaso rodou por último.
+    Ordena por (estado, severidade) antes de cortar, com `sort` estável: se 80
+    não couberem tudo, o que fica de fora é o menos urgente — nunca o que por
+    acaso rodou por último. Dentro do mesmo estado e da mesma severidade, a
+    ordem de execução é preservada.
     """
-    ordem_severidade = {"alta": 0, "media": 1, "baixa": 2}
     elegiveis = [r for r in resultados if r.get("estado") in ESTADOS_NO_PROMPT]
-    elegiveis.sort(key=lambda r: ordem_severidade.get(str(r.get("severidade") or ""), 3))
+    elegiveis.sort(key=lambda r: (
+        ORDEM_ESTADO.get(str(r.get("estado")), 9),
+        _ORDEM_SEVERIDADE.get(str(r.get("severidade") or ""), 3),
+    ))
     return [{campo: r[campo] for campo in CAMPOS_DO_PROMPT if r.get(campo)}
             for r in elegiveis[:TETO_ACHADOS]]
 
@@ -196,11 +208,70 @@ def aplicar_guarda_de_linguagem(texto: str) -> str:
     `conforme` produz falso positivo em português corrente ("conforme o
     esperado"). É aceito de propósito: um "revisar" indevido custa uma leitura
     humana, e uma certificação que passa custa a autoridade do laudo.
+
+    **Idempotente.** O próprio prefixo contém "aprovado" e "conforme", então uma
+    segunda aplicação casaria consigo mesma e empilharia marcações — foi o que
+    aconteceu quando a guarda morava em dois lugares. Hoje ela mora só em
+    `scripts/sumario.py::gerar`, e esta checagem é a rede embaixo disso.
     """
+    if texto.startswith(PREFIXO_REVISAR):
+        return texto
     encontradas = [rotulo for rotulo, padrao in _CERTIFICACAO if padrao.search(texto)]
     if not encontradas:
         return texto
     return f"{PREFIXO_REVISAR} ({', '.join(encontradas)})\n\n{texto}"
+
+
+PREFIXO_OMISSAO = "revisar: achados de {dimensoes} não cobertos"
+
+# Health-check curto de propósito: o POST do sumário tem timeout de minutos
+# porque geração é lenta, mas "o runtime está de pé?" se responde em
+# milissegundos. Sem este passo, ausência de runtime custaria a espera inteira
+# do POST — e uma etapa opcional que trava a execução por dois minutos deixa de
+# ser opcional na prática.
+TIMEOUT_HEALTH_S = 2.0
+
+
+def runtime_disponivel(endpoint: str, timeout_s: float = TIMEOUT_HEALTH_S) -> bool:
+    """O runtime local responde? Nunca levanta — ausência não é erro (§2.4).
+
+    Qualquer resposta HTTP serve como prova de vida, inclusive 404: o que se
+    quer saber é se há alguém escutando na porta, não se aquela rota existe.
+    """
+    import httpx
+
+    partes = urlsplit(endpoint)
+    raiz = f"{partes.scheme}://{partes.netloc}/"
+    try:
+        httpx.get(raiz, timeout=timeout_s)
+    except Exception:
+        return False
+    return True
+
+
+def dimensoes_com_falha(resultados: list[dict]) -> set[str]:
+    return {str(r.get("dimension") or "") for r in resultados
+            if r.get("estado") == "failed" and r.get("dimension")}
+
+
+def aplicar_guarda_de_omissao(texto: str, resultados: list[dict]) -> str:
+    """Marca sumário que deixou uma dimensão com `failed` fora do texto.
+
+    Irmã da guarda de linguagem, e pela mesma lógica: o risco de um modelo não é
+    só afirmar demais, é **calar**. Um sumário que fala de três dimensões e
+    ignora a quarta parece completo — e o leitor não tem como saber que faltou,
+    porque a ausência não deixa marca. Aqui ela deixa.
+
+    Só `failed` conta. `xfail` é sinal de maturidade e pode legitimamente não
+    entrar num sumário executivo; veredito de não conformidade, não.
+    """
+    if texto.startswith(PREFIXO_OMISSAO.split("{")[0]):
+        return texto        # idempotente, pelo mesmo motivo da guarda de linguagem
+    ausentes = sorted(d for d in dimensoes_com_falha(resultados)
+                      if d.lower() not in texto.lower())
+    if not ausentes:
+        return texto
+    return f"{PREFIXO_OMISSAO.format(dimensoes=', '.join(ausentes))}\n\n{texto}"
 
 
 @runtime_checkable
@@ -235,6 +306,16 @@ class ResumidorLocal:
         object.__setattr__(self, "modelo", self.modelo or modelo_configurado())
 
     def resumir(self, resultados: list[dict]) -> str:
+        """Texto CRU do modelo. As guardas são do orquestrador, não desta classe.
+
+        `scripts/sumario.py::gerar` é o único ponto que aplica guarda de
+        linguagem e de omissão — e tem de ser único por dois motivos. Guardar
+        aqui deixaria qualquer outra implementação do `Protocol` sem proteção
+        (a garantia viraria "cada impl que lembre"); e guardar nos dois lugares
+        empilha marcação, porque o prefixo de certificação contém as próprias
+        palavras que a guarda procura. Ambos aconteceram antes desta linha
+        existir. Ver `docs/LLM.md §8`, que já colocava a guarda no script.
+        """
         import httpx
 
         achados = achados_para_prompt(resultados)
@@ -244,5 +325,4 @@ class ResumidorLocal:
                               timeout=self.timeout_s)
         resposta.raise_for_status()
         dados = resposta.json()
-        texto = dados["choices"][0]["message"]["content"]
-        return aplicar_guarda_de_linguagem(str(texto).strip())
+        return str(dados["choices"][0]["message"]["content"]).strip()
