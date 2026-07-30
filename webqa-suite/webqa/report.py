@@ -18,7 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from webqa.sanitize import sanitize_text
+from webqa.report_html import montar
+from webqa.sanitize import safe_url, sanitize_text
 
 DIMENSIONS = (
     "backend", "frontend", "ux", "functional", "acceptance", "load", "lgpd", "verification",
@@ -42,6 +43,35 @@ REPORT_DIR = Path(
 )
 _RESULTS: list[dict] = []
 _START = time.time()
+
+
+def _alvo_observado() -> str:
+    """URL do alvo com a query oculta — relatório não reproduz parâmetro do alvo."""
+    try:
+        from webqa.config import load_settings
+
+        return safe_url(load_settings().target_url)
+    except Exception:
+        return ""
+
+
+def _allowlist() -> list[str]:
+    """Terceiros liberados pelo controlador — a classificação do inventário respeita."""
+    try:
+        from webqa.config import load_settings
+
+        return list(load_settings().lgpd_allowed_third_parties)
+    except Exception:
+        return []
+
+
+def _comando(session) -> str:
+    """Comando da execução, para o relatório dizer como reproduzir a si mesmo."""
+    try:
+        args = " ".join(session.config.invocation_params.args)
+    except Exception:
+        args = ""
+    return f"pytest {args}".strip()
 
 
 def report_dir() -> Path:
@@ -79,6 +109,11 @@ def pytest_runtest_logreport(report):
         if (report.failed or report.skipped)
         else ""
     )
+    # `outcome` fica VERBATIM do pytest (o classificador do ledger depende dele).
+    # `estado` é a leitura visual: xfail é estado próprio, não um skip qualquer —
+    # sem isso o relatório contaria alerta como pulado e perderia a distinção que
+    # a dimensão lgpd inteira usa (obrigação × sinal de maturidade).
+    estado = "xfail" if hasattr(report, "wasxfail") else report.outcome
     _RESULTS.append(
         {
             "test": report.nodeid,
@@ -86,6 +121,7 @@ def pytest_runtest_logreport(report):
             "dimensions": dims or ["other"],
             "browser": bool(getattr(report, "webqa_browser", "browser" in report.keywords)),
             "outcome": report.outcome,
+            "estado": estado,
             "duration_s": round(getattr(report, "duration", 0.0), 3),
             "detail": detalhe,
         }
@@ -103,40 +139,24 @@ def pytest_sessionfinish(session, exitstatus):
     summary = {
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "duration_s": round(time.time() - _START, 1),
+        "alvo": _alvo_observado(),
+        "comando": _comando(session),
         "by_dimension": by_dim,
         "dimension_notes": DIMENSION_NOTES,
         "results": _RESULTS,
     }
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    rows = "".join(
-        f"<tr class='{r['outcome']}'><td>{' + '.join(r.get('dimensions') or [r['dimension']])}</td>"
-        f"<td>{r['test']}</td>"
-        f"<td>{r['outcome']}</td><td>{r['duration_s']}s</td></tr>"
-        for r in _RESULTS
+    # HTML conforme o pacote de design liberado pelo gate (OS-14): a montagem
+    # vive em webqa/report_html.py, testável sem pytest e sem navegador.
+    inventario = None
+    caminho_terceiros = out_dir / "terceiros.json"
+    if caminho_terceiros.exists():
+        try:
+            inventario = json.loads(caminho_terceiros.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            inventario = None   # inventário ilegível não derruba o relatório
+
+    (out_dir / "summary.html").write_text(
+        montar(summary, inventario, _allowlist()), encoding="utf-8"
     )
-    dims = "".join(
-        f"<li><b>{d}</b>: {c.get('passed', 0)} ok / {c.get('failed', 0)} falhas "
-        f"/ {c.get('skipped', 0)} pulados"
-        + (f"<p class='nota'>{DIMENSION_NOTES[d]}</p>" if d in DIMENSION_NOTES else "")
-        + "</li>"
-        for d, c in sorted(by_dim.items())
-    )
-    html = f"""<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-<title>WebQA Suite — Relatório</title>
-<style>
- body{{font-family:system-ui,sans-serif;margin:2rem;color:#222}}
- table{{border-collapse:collapse;width:100%}} td,th{{border:1px solid #ddd;padding:.4rem;font-size:.85rem}}
- tr.passed td{{background:#eefbee}} tr.failed td{{background:#fdecec}} tr.skipped td{{background:#f4f4f4}}
- p.nota{{margin:.2rem 0 .6rem;padding:.4rem .6rem;border-left:3px solid #b58900;
-        background:#fffbe6;font-size:.8rem;color:#555;max-width:70ch}}
-</style></head><body>
-<h1>WebQA Suite — Relatório de Qualidade</h1>
-<p>Gerado em {summary['generated_at']} · duração {summary['duration_s']}s</p>
-<p style="font-size:.8rem;color:#666">Um teste pode contar em mais de uma dimensão
-(ex.: acessibilidade é <b>ux</b> e <b>lgpd</b> — LBI Art. 63); o agrupamento usa a
-primeira dimensão declarada.</p>
-<ul>{dims}</ul>
-<table><tr><th>Dimensão</th><th>Teste</th><th>Resultado</th><th>Duração</th></tr>{rows}</table>
-</body></html>"""
-    (out_dir / "summary.html").write_text(html, encoding="utf-8")

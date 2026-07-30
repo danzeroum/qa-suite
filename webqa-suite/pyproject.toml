@@ -14,6 +14,10 @@ select = ["E", "F", "W", "I", "B", "UP"]
 # opcional não deve derrubar a suíte — vira skip/xfail explicado.
 [tool.ruff.lint.per-file-ignores]
 "checks/**" = ["B017", "BLE001", "S110", "S112"]
+# webqa/report_style.py e o pacote de design sao COPIA VERBATIM do contrato
+# visual (bloco <style> da referencia, identico byte a byte). Reformatar para
+# caber em 110 colunas quebraria justamente a propriedade que se quer garantir.
+"webqa/report_style.py" = ["E501"]
 
 [tool.bandit]
 skips = ["B101"]  # assert é o mecanismo do pytest

@@ -35,10 +35,18 @@ CONFORME = """<!doctype html>
 <style>:root{--cor-passed:#0a0;--cor-failed:#a00;--cor-xfail:#a60;--cor-skipped:#666;--acento:#00a}
 @media print{@page{margin:15mm}.achado{break-inside:avoid}}
 @media screen and (prefers-color-scheme:dark){:root{--cor-passed:#6f6}}</style></head>
-<body><main><h1>Relatório</h1><section><h2>Panorama</h2>
-<p class="failed"><svg class="ic" aria-hidden="true"></svg>8 achados</p>
-<p>passar NÃO certifica conformidade</p></section></main>
+<body><main><h1>Relatório</h1><section class="resumo"><h2>Panorama</h2>
+<div class="dims"><p class="failed"><svg class="ic" aria-hidden="true"></svg>8 achados</p></div>
+<p>passar NÃO certifica conformidade</p></section>
+<section id="achados"></section></main>
 <script>addEventListener("beforeprint",function(){})</script></body></html>"""
+
+# O MESMO documento sem as marcas estruturais de relatório (§12: a especificação
+# de componentes não presta contas de execução nenhuma). Derivar por substituição
+# mantém os dois casos sincronizados — divergirem seria testar HTMLs diferentes.
+ESPECIFICACAO = (CONFORME.replace('<section class="resumo">', "<section>")
+                 .replace('<div class="dims">', "<div>")
+                 .replace('<section id="achados"></section>', ""))
 
 
 def _doc(tmp_path, html, nome="summary.html"):
@@ -122,7 +130,20 @@ def test_nota_epistemica_exigida_so_dos_relatorios(tmp_path):
     sem_nota = CONFORME.replace("passar NÃO certifica conformidade", "tudo certo")
     assert criterio_nota_epistemica(_doc(tmp_path, sem_nota)).status == FAIL
     # A especificação de componentes não é relatório de execução.
-    assert criterio_nota_epistemica(_doc(tmp_path, sem_nota, "componentes.html")).status == NA
+    espec = ESPECIFICACAO.replace("passar NÃO certifica conformidade", "tudo certo")
+    assert criterio_nota_epistemica(_doc(tmp_path, espec, "componentes.html")).status == NA
+
+
+def test_relatorio_identificado_por_estrutura_e_nao_pelo_nome(tmp_path):
+    """Regressão: enquanto a decisão era por nome, renomear o arquivo rebaixava
+    silenciosamente dois critérios bloqueantes a N.A. — o gate aprovava por não
+    ter olhado. A discriminação é estrutural, e vale nos DOIS sentidos."""
+    sem_nota = CONFORME.replace("passar NÃO certifica conformidade", "tudo certo")
+    renomeado = _doc(tmp_path, sem_nota, "relatorio-2026-07.html")
+    assert criterio_nota_epistemica(renomeado).status == FAIL, "nome não isenta do critério"
+    assert criterio_estados_sem_cor(_doc(tmp_path, CONFORME, "qualquer.html")).status == PASS
+    # E o inverso: chamar-se summary.html não transforma especificação em relatório.
+    assert criterio_nota_epistemica(_doc(tmp_path, ESPECIFICACAO, "summary.html")).status == NA
 
 
 def test_estado_marcado_so_por_cor(tmp_path):
