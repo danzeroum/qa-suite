@@ -18,6 +18,10 @@ apontando apenas a URL alvo. Cobre, em profundidade:
 > passar **não certifica** conformidade (base legal, contratos e governança interna
 > não são observáveis por HTTP). A nota vai no próprio `report/summary.html`.
 
+> **Chegando agora no projeto?** Comece por
+> [`docs/PROXIMOS-PASSOS.md`](docs/PROXIMOS-PASSOS.md): o que existe, onde o
+> trabalho parou, e as regras da casa que o código não explica sozinho.
+
 ## Uso rápido
 
 ```bash
