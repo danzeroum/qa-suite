@@ -556,3 +556,39 @@ def test_recompute_do_ledger_real_nao_grava_nada(tmp_path, capsys):
     assert caminho.read_text(encoding="utf-8") == original, "recompute não escreve"
     saida = capsys.readouterr().out
     assert "streak 0/10" in saida and "quarentena: v1" in saida
+
+
+# ---------- schema 5: assinaturas de infra (descritivo, não julga) ----------
+
+def test_assinatura_do_flake_e_gravada_para_o_painel():
+    """"1" manda abrir o log; "1 — TimeoutError" já responde.
+
+    O que se grava é o TEXTO CASADO pela alternação de INFRA — vocabulário
+    fechado, do nosso próprio regex. O trecho de erro ao redor não entra: o
+    ledger é versionado, e erro de execução em arquivo versionado é o R8.
+    """
+    classificacao = classificar(_com_timeout("2026-08-01 03:00:00"))
+    assert classificacao.assinaturas == ("TimeoutError",)
+    assert not classificacao.limpa
+
+    ledger = {"schema": SCHEMA, "execucoes": []}
+    _aplicar(ledger, _com_timeout("2026-08-01 03:00:00"))
+    assert ledger["execucoes"][0]["infra_assinaturas"] == ["TimeoutError"]
+
+
+def test_noite_limpa_nao_ganha_campo_de_assinatura():
+    """Campo presente e vazio e campo ausente diriam a mesma coisa, e o ledger
+    é lido por humano."""
+    ledger = {"schema": SCHEMA, "execucoes": []}
+    _aplicar(ledger, _limpo("2026-08-01 03:00:00"))
+    assert "infra_assinaturas" not in ledger["execucoes"][0]
+
+
+def test_assinatura_nao_muda_o_julgamento():
+    """Campo descritivo: nenhuma regra o lê, e por isso CLASSIFICADOR_VERSAO
+    não sobe (regra 2.3 é sobre mudar COMO se julga)."""
+    com = _entrada("2026-08-01")
+    com["infra_assinaturas"] = ["net::"]
+    sem = _entrada("2026-08-01")
+    assert sequencia_oficial([com]) == sequencia_oficial([sem])
+    assert CLASSIFICADOR_VERSAO == 2

@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **390 testes coletados**; num ambiente
-limpo o resultado é **387 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **418 testes coletados**; num ambiente
+limpo o resultado é **415 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -203,20 +203,30 @@ VPS antes de usá-los para qualquer coisa.
 
 ## 4. Próximos passos, em ordem de dependência
 
-### 4.1 Painel de estabilidade (OS-24, já especificada)
+### 4.1 Painel de estabilidade — FEITO (OS-26)
 
-Gerar `report/estabilidade.html` a partir de `docs/lgpd-estabilidade.json`,
-espelhando `docs/qa-suite design brief/referencia/estabilidade.html`.
+```bash
+make painel     # report/estabilidade.html a partir de docs/lgpd-estabilidade.json
+```
 
-Pontos de atenção que a spec já cobre e que é fácil errar: o `alvo_sha256`
-**mudou** (o fixture ganhou quatro violações), então a sequência reinicia e a
-página precisa dizer *"o alvo mudou de identidade"* com o histórico preservado;
-entradas `ci`/`local` aparecem rebaixadas, nunca removidas; e o número de
-violações do alvo na narrativa vem interpolado do contrato (hoje 11), nunca
-literal.
+> A spec circulou como "OS-24" enquanto a trilha de LLM já usava esse número
+> (`OS-24 v2`, `scripts/sumario.py`). Renumerada para **OS-26** aqui para que não
+> existam duas OS-24 diferentes no histórico.
 
-Reuse a montagem do gerador do relatório (folha, header, footer) — um único
-ponto de verdade visual.
+`webqa/estabilidade_html.py` reusa `ESTILO_CANONICO` byte a byte e **não inventa
+classe nenhuma** — as 42 que a referência usa já existiam na folha. A regra do
+ledger continua em `scripts/estabilidade.py::caminhada`, ponto único: o painel
+recebe a caminhada pronta e só rotula. Duas implementações da mesma regra
+divergiriam justamente no número que a página exibe como verdade.
+
+O que o gerador garante, com teste: troca de `alvo_sha256` reinicia a sequência e
+diz *"o alvo mudou de identidade"* preservando o histórico; entradas `ci`/`local`
+aparecem rebaixadas e nunca removidas; o número de violações vem interpolado do
+contrato, nunca literal; e ledger vazio produz página válida e explicativa —
+instalação nova não pode parecer defeito.
+
+**`--painel` nunca escreve no ledger**, em nenhuma combinação de flags. É leitura
+mais renderização, então é seguro no GitHub, onde nada pode tocar o arquivo.
 
 ### 4.2 `Finding` em toda a dimensão `seguranca` — FEITO (OS-28 e OS-29)
 
@@ -347,6 +357,7 @@ make campanha          # nível sistema: alvos reais × N, consolidado
 make audita-design     # gate do pacote de design (§12)
 make estabilidade      # classifica a execução e grava o ledger
 make sumario           # anexo assistido por IA local (desligado por padrão)
+make painel            # report/estabilidade.html a partir do ledger (só lê)
 make vps-smoke         # valida a VPS antes de agendar o cron
 
 python scripts/estabilidade.py --recompute   # auditoria do ledger, sem gravar
