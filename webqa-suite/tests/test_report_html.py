@@ -499,3 +499,45 @@ def test_summary_sem_seguranca_renderiza_identico_ao_anterior():
     assert "sev." not in base and "fase " not in base
     # E o mesmo summary com o campo AUSENTE (não vazio) produz o mesmo byte.
     assert montar(_summary([dict(r) for r in results])) == base
+
+
+# ---------- OS-34: derivação E presença, o par que o #31 mostrou faltar ----------
+
+def test_contagem_por_dimensao_derivada_e_presente_no_html():
+    """O par completo: a conta certa E a conta na página.
+
+    Só a primeira metade é o furo do #31: `motivos_do_zero` calculava certo,
+    tinha teste de retorno verde, e o bloco não estava interpolado. Aqui a
+    contagem por dimensão é conferida como DADO e depois procurada no HTML
+    renderizado — se `_panorama` sair do template, este teste cai.
+    """
+    from webqa.report_html import _por_dimensao
+
+    results = [
+        _r("checks/lgpd/a.py::t1", "failed", dimension="lgpd", detail="x"),
+        _r("checks/lgpd/b.py::t2", "passed", dimension="lgpd"),
+        _r("checks/ux/c.py::t3", "xfail", dimension="ux", detail="y"),
+    ]
+    # Verificação: a derivação separa as dimensões como se espera.
+    por_dim = _por_dimensao(results)
+    assert sorted(por_dim) == ["lgpd", "ux"]
+    assert len(por_dim["lgpd"]) == 2 and len(por_dim["ux"]) == 1
+
+    # Validação: os nomes derivados chegam à página, no card de panorama.
+    html = montar(_summary(results))
+    assert '<span class="dim-nome">lgpd</span>' in html
+    assert '<span class="dim-nome">ux</span>' in html
+    assert html.count('<span class="dim-nome">') == 2
+
+
+def test_panorama_sem_resultado_e_vazio_legitimo_e_nao_ausencia():
+    """Distinção que o teste de retorno sozinho não faz.
+
+    Sem resultados o panorama legitimamente não tem card nenhum — e a página
+    continua válida, com a seção presente e a explicação no lugar do conteúdo.
+    Isso é diferente de a seção ter sumido do template.
+    """
+    html = montar(_summary([]))
+    assert 'id="panorama"' in html, "a seção precisa existir mesmo vazia"
+    assert '<span class="dim-nome">' not in html, "sem dimensão, sem card"
+    assert "Nenhum resultado registrado" in html
