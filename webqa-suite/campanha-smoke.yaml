@@ -1,0 +1,16 @@
+# Campanha MÍNIMA do smoke da VPS (passo 6): 1 alvo × 1 repetição.
+#
+# Não serve para medir nada — serve para provar que o ambiente consegue medir.
+# O que se verifica é que as colunas de RENDERIZAÇÃO nascem preenchidas, o que só
+# acontece onde o Chromium tem egresso direto. No ambiente de dev, atrás de
+# proxy, elas saem "não medido" e este passo reprova — corretamente.
+#
+# A campanha completa está em campanha.yaml (3 alvos × 3 repetições).
+
+repeticoes: 1
+pausa_s: 10          # irrelevante com uma execução só; o piso do runner é 10s
+
+alvos:
+  - url: "https://example.com"
+    papel: "controle (smoke)"
+    crawl_max_pages: 5

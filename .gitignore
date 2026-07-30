@@ -7,6 +7,11 @@ webqa-suite/report/
 # VPS e são montados somente-leitura no container (docs/VPS.md).
 docker/secrets/
 
+# Consolidado da campanha na VPS: mesmo motivo do report/ acima (carrega host e
+# trecho de erro do ALVO), e o volume fica fora da árvore da suíte justamente
+# para a campanha não poder sujar o `git status` da VPS.
+docker/report-campanha/
+
 # Python
 __pycache__/
 *.py[cod]

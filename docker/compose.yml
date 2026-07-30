@@ -1,8 +1,16 @@
-# Execução noturna oficial da métrica de estabilidade.
+# Dois serviços, dois propósitos, uma imagem.
 #
-# Agendamento fica FORA do container (cron do host) — ver docs/VPS.md. Um
-# container que dorme 24h esperando a próxima noite é um processo de longa
-# duração acumulando estado; `run --rm` a cada noite é descartável e idêntico.
+# `estabilidade` — noturno oficial da métrica. Tem a caneta: monta a deploy key
+#   e commita o ledger. Agendamento fica FORA do container (cron do host) — ver
+#   docs/VPS.md. Um container que dorme 24h esperando a próxima noite é um
+#   processo de longa duração acumulando estado; `run --rm` a cada noite é
+#   descartável e idêntico.
+#
+# `campanha` — validação de sistema contra alvos reais, sob demanda. NÃO tem a
+#   caneta: nenhum segredo montado e nenhum WEBQA_ORIGEM, logo não toca o
+#   ledger. Existe porque as métricas de renderização (FCP/LCP/CLS) só nascem
+#   onde o Chromium tem egresso direto — o ambiente de dev, atrás de proxy, as
+#   declara "não medido".
 name: webqa-estabilidade
 
 services:
@@ -27,5 +35,37 @@ services:
       # Gere ./secrets/ na VPS conforme docs/VPS.md (a pasta é ignorada no Git).
       - ./secrets/deploy_key:/run/secrets/deploy_key:ro
       - ./secrets/known_hosts:/run/secrets/known_hosts:ro
+    tmpfs:
+      - /tmp
+
+  campanha:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: webqa-estabilidade:local   # MESMA imagem: o ambiente medido é um só
+    init: true
+    shm_size: 1gb
+    security_opt:
+      - no-new-privileges:true
+    # Sobrepõe o entrypoint do noturno: a campanha não atualiza repo, não sobe
+    # alvo fixture e não escreve no ledger — ela mede alvos externos e sai.
+    entrypoint: ["python", "scripts/campanha.py"]
+    working_dir: /app/webqa-suite
+    environment:
+      # WEBQA_ORIGEM AUSENTE de propósito. Sem ela nada aqui pode ser confundido
+      # com evidência de estabilidade do ambiente oficial — e, como a campanha
+      # nem chama o classificador, o ledger não é tocado de forma alguma.
+      TZ: UTC
+      # Anula o /tmp/report herdado da imagem: a campanha define o diretório de
+      # cada execução por conta própria (WEBQA_REPORT_DIR por alvo×repetição), e
+      # um valor fixo herdado do ambiente não a atrapalha — mas deixar explícito
+      # evita que alguém leia o valor da imagem como destino do consolidado.
+      WEBQA_REPORT_DIR: /tmp/report
+    volumes:
+      # ÚNICO volume, e sem segredo nenhum: o operador coleta o consolidado aqui.
+      # Fica fora da árvore do repositório (docker/report-campanha/, ignorado no
+      # Git), então a campanha não pode deixar `git status` sujo na VPS.
+      # O diretório precisa ser gravável pelo uid 1000 — ver docs/VPS.md.
+      - ./report-campanha:/app/webqa-suite/report/campanha
     tmpfs:
       - /tmp
