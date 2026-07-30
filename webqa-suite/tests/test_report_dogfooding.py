@@ -150,3 +150,58 @@ def test_execucao_real_gera_relatorio_conforme(tmp_path):
     assert dados.get("comando"), "summary.json precisa registrar o comando"
     assert any(r.get("estado") == "xfail" for r in dados["results"]), (
         "xfail precisa chegar ao relatório como estado próprio")
+
+
+# ---------- OS-20: o summary REAL da campanha, com 13 erros do Chromium ----------
+
+def _summaries_reais() -> list[Path]:
+    """Execuções reais gravadas pela campanha (report/ é ignorado no Git).
+
+    Dado de teste que ninguém fabricou: 13 erros de setup por Chromium sem
+    egresso, achados de verdade e métricas de rede medidas.
+    """
+    return sorted((RAIZ / "report" / "campanha").glob("*/run*/summary.json"))
+
+
+@pytest.mark.parametrize("indice", range(3))
+def test_summary_real_com_erros_de_infra_renderiza_corretamente(indice, tmp_path):
+    caminhos = _summaries_reais()
+    if len(caminhos) <= indice:
+        pytest.skip("sem execução real da campanha neste ambiente (rode `make campanha`)")
+    dados = json.loads(caminhos[indice].read_text(encoding="utf-8"))
+    from collections import Counter
+    contagem = Counter(r.get("estado") for r in dados["results"])
+    if not contagem.get("error"):
+        pytest.skip("esta execução não registrou erro de infraestrutura")
+
+    html = montar(dados)
+
+    # 1. A seção de infraestrutura existe e conta o que o summary traz.
+    assert 'id="erros"' in html
+    assert f"Erros de execução ({contagem['error']})" in html
+
+    # 2. Os achados continuam intactos — erro NÃO foi absorvido como achado.
+    assert f"Achados ({contagem.get('failed', 0)})" in html
+    if contagem.get("failed"):
+        assert f'id="a{contagem["failed"]}"' in html, "numeração A1…An preservada"
+
+    # 3. Banner coerente com o que aconteceu.
+    if contagem.get("failed"):
+        assert "Nenhuma não conformidade observada" not in html
+    else:
+        assert "Julgamento incompleto" in html
+
+    # 4. Métricas medidas aparecem; as não medidas não viram zero.
+    medidas = dados.get("metricas") or {}
+    if medidas:
+        faixa = html.split('id="metricas"', 1)[1].split("</dl>", 1)[0]
+        assert "TTFB" in faixa
+        assert "FCP" not in faixa, "FCP não foi medido nesta execução — não pode aparecer"
+
+    # 5. E o documento continua passando no próprio §12.
+    destino = tmp_path / "summary.html"
+    destino.write_text(html, encoding="utf-8")
+    doc = Documento(destino, html)
+    reprovados = [f"{nome}: {funcao(doc).evidencia}"
+                  for nome, funcao, _b in CRITERIOS if funcao(doc).status == FAIL]
+    assert not reprovados, "relatório de execução REAL reprova no §12:\n" + "\n".join(reprovados)
