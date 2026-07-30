@@ -23,7 +23,8 @@ from webqa.report_html import montar
 from webqa.sanitize import safe_url, sanitize_text
 
 DIMENSIONS = (
-    "backend", "frontend", "ux", "functional", "acceptance", "load", "lgpd", "verification",
+    "backend", "frontend", "ux", "functional", "acceptance", "load", "lgpd",
+    "seguranca", "verification",
 )
 
 # Honestidade epistêmica no CÓDIGO, não só na documentação: quem lê o relatório

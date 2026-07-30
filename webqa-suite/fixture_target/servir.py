@@ -52,11 +52,30 @@ COOKIES = (
     "sessionid=fixture; Path=/; HttpOnly",
 )
 
+# VIOLAÇÃO (seguranca, Fase A): credencial servida ao navegador. A chave é o
+# exemplo público da documentação da AWS — formato válido, valor inerte, e
+# nenhum segredo real entra no repositório. O check tem de detectá-la e o
+# relatório tem de mostrá-la MASCARADA.
+APP_JS = (
+    "// Bundle do alvo fixture.\n"
+    "var config = { region: 'us-east-1', accessKeyId: 'AKIAIOSFODNN7EXAMPLE' };\n"
+    "console.log('fixture');\n"
+)
+
+# VIOLAÇÃO (seguranca, Fase A): `.js` que o servidor devolve como HTML. Caso
+# clássico de fallback de erro numa SPA — o navegador recebe documento onde
+# esperava executável.
+MIME_TROCADO = "<!doctype html><html lang=\"pt-BR\"><body>pagina de erro</body></html>\n"
+
 HOME = f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <title>Loja Fixture — alvo deliberadamente nao conforme</title>
 <!-- VIOLACAO: script de terceiro sem integrity/crossorigin (SRI) -->
 <script src="{CDN_FALSO}"></script>
+<!-- VIOLACAO (seguranca): bundle de origem com credencial exposta -->
+<script src="/app.js"></script>
+<!-- VIOLACAO (seguranca): .js servido como text/html -->
+<script src="/fallback.js"></script>
 </head><body>
 <h1>Loja Fixture</h1>
 <!-- VIOLACAO: imagem sem atributo alt (WCAG / LBI Art. 63) -->
@@ -111,7 +130,7 @@ def identidade() -> str:
       e aí a sequência recomeça, porque o alvo passou a ser outro.
     """
     digest = hashlib.sha256()
-    for parte in (HOME, POLITICA, *COOKIES):
+    for parte in (HOME, POLITICA, APP_JS, MIME_TROCADO, *COOKIES):
         digest.update(parte.encode("utf-8"))
         digest.update(b"\0")
     return "fixture_target:" + digest.hexdigest()
@@ -124,7 +143,14 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802 (nome exigido pelo BaseHTTPRequestHandler)
         caminho = self.path.split("?", 1)[0]
-        if caminho == "/logo.png":
+        if caminho == "/app.js":
+            self._responder(APP_JS.encode("utf-8"), "application/javascript",
+                            com_cookies=False)
+        elif caminho == "/fallback.js":
+            # Content-Type MENTE sobre o corpo, de proposito.
+            self._responder(MIME_TROCADO.encode("utf-8"), "text/html; charset=utf-8",
+                            com_cookies=False)
+        elif caminho == "/logo.png":
             self._responder(PIXEL, "image/png", com_cookies=False)
         elif caminho.startswith("/privacidade"):
             self._responder(POLITICA.encode("utf-8"), "text/html; charset=utf-8")

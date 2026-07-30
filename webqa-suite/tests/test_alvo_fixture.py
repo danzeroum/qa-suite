@@ -1,4 +1,4 @@
-"""VERIFICAÇÃO (nível sistema): a dimensão lgpd detecta o que promete detectar.
+"""VERIFICAÇÃO (nível sistema): as dimensões lgpd e seguranca detectam o que prometem detectar.
 
 Este é o teste mais valioso da suíte e o mais desconfortável de escrever: sobe um
 alvo com violações conhecidas, roda a dimensão inteira contra ele e exige que os
@@ -41,7 +41,7 @@ def contrato() -> dict:
 
 @pytest.fixture(scope="module")
 def execucao(tmp_path_factory) -> dict:
-    """Sobe o alvo fixture, roda `pytest -m lgpd` contra ele e devolve o summary."""
+    """Sobe o alvo fixture, roda `pytest -m "lgpd or seguranca"` contra ele e devolve o summary."""
     pytest.importorskip("playwright", reason="Playwright ausente: teste de sistema exige navegador.")
     saida = tmp_path_factory.mktemp("alvo-fixture")
 
@@ -55,7 +55,7 @@ def execucao(tmp_path_factory) -> dict:
             "no_proxy": "*",
         }
         proc = subprocess.run(
-            [sys.executable, "-m", "pytest", "-m", "lgpd", "-p", "no:cacheprovider", "-q"],
+            [sys.executable, "-m", "pytest", "-m", "lgpd or seguranca", "-p", "no:cacheprovider", "-q"],
             cwd=RAIZ, env=env, capture_output=True, text=True, timeout=900,
         )
 
