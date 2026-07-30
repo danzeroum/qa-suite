@@ -39,6 +39,15 @@ pytest -m "lgpd and not browser"   # bateria de privacidade só por HTTP
 Ao final, um relatório consolidado é gravado em `report/summary.json` e
 `report/summary.html` (plugin próprio em `webqa/report.py`).
 
+### Pipeline (GitHub Actions)
+
+`quality-gate` roda em todo push e pull request: `ruff`, `bandit` e
+`pytest tests -m verification` — só a **verificação** da própria suíte, sem tocar
+em alvo externo. A **validação** contra um alvo real é manual
+(*Actions → CI → Run workflow*, informando `target_url`), depende do `quality-gate`
+verde e nunca executa carga (`-m "not load"`, sem `WEBQA_LOAD_AUTHORIZED`).
+O `report/` de cada execução sai como artefato com expurgo em 7 dias.
+
 ### Teste de carga (opcional, mais pesado)
 
 ```bash
@@ -98,7 +107,7 @@ violações WCAG críticas primeiro.
 | Segurança por Design (LGPD/GDPR, privilégio mínimo) | headers, cookies `Secure/HttpOnly/SameSite`, ausência de vazamento de stack trace |
 | Privacidade por Design (consentimento, minimização, transparência) | `checks/lgpd/` + `docs/LGPD.md`; gates de autorização em `webqa/gates.py` |
 | Acessibilidade como obrigação legal (LBI Art. 63) | `checks/ux/test_acessibilidade.py` com dimensão dupla `ux + lgpd` |
-| DevOps e Automação (CI/CD) | `.github/workflows/ci.yml` roda lint + verificação + suíte |
+| DevOps e Automação (CI/CD) | `.github/workflows/ci.yml`: `quality-gate` (lint + SAST + verificação) em todo push/PR; validação contra alvo real só por `workflow_dispatch` com `target_url` |
 | Leis da Arquitetura (trade-offs explícitos) | `docs/ARQUITETURA.md` — seção de decisões e preços pagos |
 | Documentação C4 | `docs/ARQUITETURA.md` (Contexto, Container, Componente) |
 

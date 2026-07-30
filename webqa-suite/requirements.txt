@@ -8,4 +8,6 @@ playwright>=1.44
 locust>=2.24
 # qualidade da própria suíte (verificação / SAST)
 ruff>=0.4
-bandit>=1.7
+# extra [toml]: sem ele o bandit ignora [tool.bandit] do pyproject.toml e
+# acusa 81 falsos positivos B101 (assert é o mecanismo do pytest).
+bandit[toml]>=1.7

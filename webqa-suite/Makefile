@@ -11,4 +11,8 @@ lgpd-passivo: ; pytest -m "lgpd and not browser"   # só HTTP, sem navegador
 load: ; pytest -m load
 verify: ; pytest -m verification tests
 lint: ; ruff check webqa checks tests
-sast: ; bandit -q -r webqa checks
+# Mesmos comandos do CI (.github/workflows/ci.yml): rigor total na biblioteca;
+# nos checks, as exceções já documentadas nos per-file-ignores do ruff.
+sast:
+	bandit -q -c pyproject.toml -r webqa
+	bandit -q -c pyproject.toml -r checks --skip B101,B110,B112
