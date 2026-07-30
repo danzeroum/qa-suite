@@ -7,9 +7,9 @@
 > colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
 > três lugares e os três divergiam.
 >
-> **Próximo número livre: OS-34.**
+> **Próximo número livre: OS-35.**
 
-Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 485 testes de verificação verdes.
+Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 506 testes de verificação verdes.
 Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
 de design — `docs/qa-suite design brief/referencia/` (spec visual:
 `componentes.html` §5/§8; folha canônica: bloco `<style>` de
@@ -32,6 +32,7 @@ Trilha LLM — CONCLUÍDA no que independe de runtime local:
 Trilha DESIGN/RELATÓRIO — CONCLUÍDA:
   OS-25 ✓ (#18, template seguranca) → OS-26 ✓ (#26, painel de estabilidade)
      └── OS-33 ✓ (#31, o zero do painel explicado)
+     └── OS-34 ✓ (#32, derivadores provados ligados ao template)
 
 Trilha CAMPANHA:
   OS-27 ✓ (#27, etiqueta: robots/recuo/sequencial)
@@ -63,6 +64,7 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-31 | #29 | — | Telemetria operacional: 3 cortes, `anonimizar_agregado`, `--calibrar` |
 | OS-32 | #30 | — | Armadilhas recorrentes como teste: prefixo de coleta, folga em float, anonimato recursivo |
 | OS-33 | #31 | — | Painel explica POR QUE a sequência está em zero (origem, quarentena, alvo novo) |
+| OS-34 | #32 | — | Cada derivador dos dois geradores provado LIGADO ao template (sentinela) |
 
 ### Fora da sequência do handoff — numeradas em chat, já em `main`
 

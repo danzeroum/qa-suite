@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **488 testes coletados**; num ambiente
-limpo o resultado é **485 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **509 testes coletados**; num ambiente
+limpo o resultado é **506 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -172,6 +172,33 @@ Consequência prática, em duas regras:
 As três estão fixadas em `tests/test_convencoes.py` e `tests/test_telemetria.py`
 — reintroduzir qualquer uma reprova a suíte. Antes da OS-32 elas viviam só em
 comentário, e comentário não reprova ninguém.
+
+#### A extensão: teste × coisa testada
+
+O padrão reincidiu **na própria OS que o registrou**. Na OS-33, `motivos_do_zero`
+tinha testes de derivação verdes enquanto o bloco **não estava interpolado** no
+template: a função calculava certo, os testes conferiam o retorno, e a página
+saía sem os três motivos. Suíte verde sobre função morta.
+
+É a mesma forma do D6, em que o `quality-gate` ficava verde sem exercer o
+contrato do alvo: **a garantia existia, a ligação não.**
+
+> **Teste que só exercita a derivação é verde sobre função morta.** Todo
+> derivador de conteúdo para página gerada precisa de um par: um teste do
+> **retorno** (verificação) e um que renderiza a página inteira e procura o
+> texto no HTML final (validação).
+
+`tests/test_derivadores_ligados.py` faz isso mecanicamente para os dois
+geradores: substitui cada derivador por uma sentinela e exige que ela apareça na
+página. A lista de derivadores é **explícita** de propósito — extraí-la do
+template faria a cobertura encolher junto com a interpolação removida, fechando
+o furo no papel e deixando-o aberto na página.
+
+Um cuidado que decorre disso: **vazio legítimo e não-interpolado são
+indistinguíveis no HTML.** `_bloco_do_zero` devolve `""` quando a sequência está
+viva, e `_achados` devolve seção vazia num laudo verde — os dois casos produzem
+a mesma ausência de texto que uma interpolação apagada produziria. A sentinela é
+o que separa os dois, e há teste para cada um.
 
 Uma nota sobre a primeira: o pytest coleta por `test*`, **não** por `test_*`.
 `testes_lentos` e `testar_alvo` entram na coleta, e em código português esse
