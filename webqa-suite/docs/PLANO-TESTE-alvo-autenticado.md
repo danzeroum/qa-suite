@@ -142,11 +142,40 @@ WEBQA_REPORT_DIR=report/auth pytest -m "not load and not verification"
 - Passada B gera laudo em `report/auth` sem erro fatal.
 - Todo `error`/`skipped` traz motivo legível; nenhum PASS silencioso.
 - Nenhuma métrica de renderização "não medida" (prova de que o Chromium alcançou
-  o alvo — se aparecer, é ambiente, refazer na VPS).
-- ⚠️ **`robots.txt` atrás do Basic Auth responde 401**, e a camada de etiqueta
-  (OS-27) trata isso como "não pude ler a política" → o crawl de links pula com
-  motivo. É skip explicado, não falha; anotar no laudo em vez de tratar como
-  defeito do alvo.
+  o alvo — se aparecer, é ambiente, refazer na VPS). No ensaio local o
+  `summary.json` trouxe `ttfb_ms`, `fcp_ms`, `lcp_ms`, `cls`, `dcl_ms` e
+  `page_kb` preenchidos; ausência de qualquer um deles na VPS é sinal de
+  ambiente, não do alvo.
+- Sete dimensões representadas em `by_dimension` — **menos `functional`**, pelo
+  limite do `robots.txt` descrito abaixo.
+### ⚠️ Limite conhecido: a dimensão `functional` fica cega no alvo real
+
+`PoliteFetcher` (OS-27) busca o `robots.txt` **anonimamente** — só com
+`User-Agent`, sem credencial. Atrás de Basic Auth isso responde **401**, e a
+regra da camada de etiqueta é: política ilegível → alvo pulado. Verificado
+contra o alvo de verdade:
+
+```
+$ python -c "from webqa.etiqueta import PoliteFetcher; \
+    print(PoliteFetcher('WebQA-Suite/1.0', 20).preparar('https://docker.danzeroum.com/').motivo)"
+robots.txt respondeu HTTP 401 — alvo pulado
+```
+
+Consequência prática: **`checks/functional/test_links.py` pula o crawl inteiro**
+contra qualquer alvo público protegido por Basic Auth. Não é falha e não é
+defeito do alvo — é a etiqueta funcionando como projetada, já que não conseguir
+ler a política de alguém não é licença para ignorá-la. Mas significa que a
+dimensão `functional` **não produz veredito** nesta campanha.
+
+Isso não aparece no alvo fixture local: loopback é isento de etiqueta por
+decisão de IP resolvido, então lá o crawl roda e passa — e um ensaio local
+sozinho daria a impressão errada.
+
+**Não contornar por conta própria.** Deixar o crawl anônimo ler `robots.txt` de
+um host protegido, ou pular a consulta, é decisão de arquitetura, não de
+execução. O caminho certo é a **OS-38** passar a credencial ao `PoliteFetcher`
+para a origem do próprio alvo — legítimo, porque o alvo é do dono — sob a mesma
+política de origem+esquema da OS-37. Registrar como achado no retorno.
 
 ---
 
