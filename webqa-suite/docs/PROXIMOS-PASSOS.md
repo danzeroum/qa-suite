@@ -258,7 +258,28 @@ Global Privacy Control (`Sec-GPC: 1`) e heurísticas de fingerprinting.
 ## 5. Como trabalhar aqui
 
 1. **Branch por ordem de serviço**, PR contra `main`, `quality-gate` verde antes
-   do merge. Squash no merge.
+   do merge.
+
+   **Squash** é o default, e vale para PR isolado. **Pilha de PRs encadeados usa
+   merge commit**, do topo da base para cima: squash gera sha novo, o commit em
+   que o PR seguinte se baseou deixa de existir na história, e o merge dele passa
+   a arrastar conteúdo duplicado para resolver à mão. Merge commit preserva o
+   encadeamento.
+
+   Procedimento da pilha, na ordem:
+
+   1. mergeie o PR de baixo;
+   2. **reaponte o próximo para `main` à mão** — o retarget automático do GitHub
+      não é confiável aqui (na pilha #20→#22 ele não ocorreu em nenhum dos dois,
+      e uma das chamadas de reaponte expirou e precisou de segunda tentativa);
+   3. **confirme o novo `base` LENDO o estado do PR**, não pelo retorno da
+      chamada que pediu a mudança — a chamada pode responder e não ter aplicado;
+   4. só então mergeie, e repita.
+
+   Precedente: **#20 → #21 → #22** (OS-27/28/29). O #20 entrou com merge commit,
+   `c869a28` ficou em `main`, e a pilha seguiu encadeada até o fim. Ao terminar,
+   confira o resultado em `main` (`git merge-base --is-ancestor <sha> origin/main`
+   para cada commit da pilha), não só a resposta de cada merge.
 2. **Verificação × validação separadas.** Verificação: unidade sobre dado
    fabricado, sem rede, em `tests/`. Validação: execução real contra o alvo
    fixture ou contra alvo externo. As duas entram no PR.
