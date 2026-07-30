@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel
+.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -14,6 +14,8 @@ estabilidade: ; python scripts/estabilidade.py
 # Painel do ledger. Só LE o ledger — nunca escreve, em nenhuma combinacao de
 # flags, entao e seguro rodar no GitHub (docs/VPS.md).
 painel: ; python scripts/estabilidade.py --painel
+# Agrega campanhas JA executadas. Nao faz requisicao nenhuma (docs/TELEMETRIA.md).
+telemetria: ; python scripts/telemetria.py
 # Anexo assistido por IA, APÓS o pytest e em processo separado (docs/LLM.md).
 # Sem WEBQA_LLM_ENABLED=1 ou sem runtime local: nao gera nada e sai 0.
 sumario: ; python scripts/sumario.py
