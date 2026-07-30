@@ -49,10 +49,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Lint (ruff)
-        run: ruff check webqa checks tests
+        run: ruff check webqa checks tests scripts
 
       - name: SAST — biblioteca (rigor total)
-        run: bandit -q -c pyproject.toml -r webqa
+        run: bandit -q -c pyproject.toml -r webqa scripts
 
       # Nos checks, capturar Exception é intencional: falha de rede num sinal
       # opcional vira skip/xfail explicado, não derruba a suíte. Mesma decisão
@@ -100,10 +100,21 @@ jobs:
       - name: Suíte completa (sem carga)
         run: pytest -m "not load"
 
+      # Passo informativo: classifica a execução (flake de infra × veredito
+      # sobre o alvo) e mostra a sequência sem flake — critério de saída da
+      # Fase 1. --dry-run porque o CI tem `contents: read` e NÃO commita o
+      # ledger: aqui o número é observado, não persistido. Para avançar a
+      # sequência de verdade, rode o script localmente e commite o ledger.
+      - name: Estabilidade da dimensão browser (informativo)
+        if: always()
+        run: python scripts/estabilidade.py --dry-run
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: webqa-report
-          path: webqa-suite/report/
+          path: |
+            webqa-suite/report/
+            webqa-suite/docs/lgpd-estabilidade.json
           retention-days: 7        # expurgo automático (minimização, R8)
           if-no-files-found: warn
