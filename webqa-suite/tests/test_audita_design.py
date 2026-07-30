@@ -159,6 +159,7 @@ def test_laudo_declara_veredito_e_bloqueios():
 def test_laudo_atribui_artefatos_conhecidos():
     """Reprovação da bateria que não é do design tem de vir atribuída."""
     laudo = montar_laudo({"summary.html": {"x": Resultado(PASS)}}, [], {}, "cmd",
-                         {"test_fcp": ["summary.html"], "test_novo": ["summary.html"]})
-    assert "defeito da SUÍTE" in laudo, "test_fcp precisa vir atribuído à suíte"
+                         {"test_ajuda_no_erro_pagina_404_amigavel": ["summary.html"],
+                          "test_novo": ["summary.html"]})
+    assert "artefato do ARRANJO" in laudo, "reprovação do arranjo precisa vir atribuída"
     assert "a investigar" in laudo, "teste não classificado não pode passar como conhecido"

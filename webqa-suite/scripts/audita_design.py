@@ -64,12 +64,6 @@ ARTEFATOS_CONHECIDOS = {
         "artefato do ARRANJO: o `SimpleHTTPRequestHandler` do auditor não tem página "
         "404 amigável. Um pacote de arquivos estáticos não tem handler de erro — "
         "critério não se aplica ao entregável.",
-    "test_fcp":
-        "defeito da SUÍTE: `VITALS_JS` lê `performance.getEntriesByType('paint')` em "
-        "t=0 e só resolve a promise 1500ms depois — se o paint não estava registrado "
-        "no instante da leitura, `fcp` fica `null` para sempre. Confirmado com "
-        "navegador que as entradas existem (FCP 120ms em summary.html). Não é "
-        "lentidão da página nem defeito do design.",
 }
 
 

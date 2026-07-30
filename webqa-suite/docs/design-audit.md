@@ -38,7 +38,6 @@ Comando: `python scripts/audita_design.py --suite`
 
 | Teste da bateria | Arquivos | Atribuição |
 |---|---|---|
-| `test_fcp` | 6/6 auditados | defeito da SUÍTE: `VITALS_JS` lê `performance.getEntriesByType('paint')` em t=0 e só resolve a promise 1500ms depois — se o paint não estava registrado no instante da leitura, `fcp` fica `null` para sempre. Confirmado com navegador que as entradas existem (FCP 120ms em summary.html). Não é lentidão da página nem defeito do design. |
 | `test_ajuda_no_erro_pagina_404_amigavel` | 6/6 auditados | artefato do ARRANJO: o `SimpleHTTPRequestHandler` do auditor não tem página 404 amigável. Um pacote de arquivos estáticos não tem handler de erro — critério não se aplica ao entregável. |
 
 Nenhum destes reprova o pacote: os critérios do §12 estão nas tabelas acima. Um laudo que confunde artefato do arranjo com defeito do entregável faz o designer perseguir fantasma.
