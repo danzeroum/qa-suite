@@ -7,9 +7,9 @@
 > colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
 > três lugares e os três divergiam.
 >
-> **Próximo número livre: OS-36.**
+> **Próximo número livre: OS-37.**
 
-Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 521 testes de verificação verdes.
+Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 555 testes de verificação verdes.
 Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
 de design — `docs/qa-suite design brief/referencia/` (spec visual:
 `componentes.html` §5/§8; folha canônica: bloco `<style>` de
@@ -24,6 +24,7 @@ Trilha SEGURANÇA (checks) — CONCLUÍDA:
   OS-20 v2 ✓ (#15) → OS-21 ✓ (#16) → OS-22 ✓ (#17)
      └── Finding em toda a dimensão ✓ (#21, #22)
      └── [Fase C — apenas desenhada em docs/SEGURANCA.md §7, TRAVADA]
+          └── OS-36 ✓ (#34, a trava provada por teste — a recusa, nunca a ação)
 
 Trilha LLM — CONCLUÍDA no que independe de runtime local:
   OS-23 v2 ✓ (#24, webqa/llm.py) → OS-24 v2 ✓ (#25, scripts/sumario.py)
@@ -67,6 +68,7 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-33 | #31 | — | Painel explica POR QUE a sequência está em zero (origem, quarentena, alvo novo) |
 | OS-34 | #32 | — | Cada derivador dos dois geradores provado LIGADO ao template (sentinela) |
 | OS-35 | #33 | — | `--painel` somente-leitura: capacidade reduzida + fronteira no fonte + prova por tentativa |
+| OS-36 | #34 | — | Fase C travada por teste: detector de sondagem, símbolos ausentes, matriz 2×2 dos gates |
 
 ### Fora da sequência do handoff — numeradas em chat, já em `main`
 
