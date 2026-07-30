@@ -18,6 +18,25 @@ Privacidade: a URL do alvo NUNCA entra no ledger, só o sha256. O digest serve
 para correlacionar execuções do mesmo alvo — não é segredo (o espaço de URLs é
 pequeno e enumerável), é chave de agrupamento.
 
+REGRA OBRIGATÓRIA — versão do classificador
+-------------------------------------------
+Toda entrada carrega `classificador`: a versão do juiz que a produziu. Qualquer
+PR que altere COMO uma execução é classificada (o regex de infra, o critério de
+`limpa`, o que conta como teste de navegador) **precisa** incrementar
+`CLASSIFICADOR_VERSAO`. Ver docs/LGPD.md §versão do classificador.
+
+O motivo é histórico e concreto: até a v1, erros de setup sumiam do summary, e
+uma noite com o navegador completamente inalcançável era classificada como
+LIMPA — a métrica de confiança inflava exatamente quando a infraestrutura
+quebrava. Entradas produzidas por um juiz defeituoso não podem sustentar a
+sequência que destrava a Fase 2, e não há como reclassificá-las: o dado que
+faltava nunca foi gravado.
+
+A saída para isso é QUARENTENA, não expurgo — entradas de versão com defeito
+conhecido não contam, não zeram e não são apagadas. As três propriedades juntas:
+a sequência só anda sobre dado íntegro, o histórico continua auditável, e a
+regra é retroativa sem reescrever o passado.
+
 Somente stdlib.
 """
 from __future__ import annotations
@@ -46,13 +65,31 @@ META_PADRAO = 10
 #           imagem fixada por digest. A origem não é mais DETECTADA
 #           (GITHUB_ACTIONS), é DECLARADA por WEBQA_ORIGEM, injetada somente no
 #           container oficial. Entradas "ci" anteriores viram histórico.
-SCHEMA = 3
+# schema 4: entradas ganham "classificador" (versão do juiz). Entradas sem o
+#           campo recebem 1 na carga — migração one-shot, ver carregar_ledger.
+SCHEMA = 4
 
 # Só este ambiente move a métrica. Um runner hospedado troca a imagem base sob
 # os pés; um container fixado por digest não — logo é MAIS controlado, e é dele
 # que a sequência fala.
 ORIGEM_OFICIAL = "vps"
 ORIGENS_VALIDAS = ("vps", "ci", "local")
+
+# Versão do CLASSIFICADOR (não do arquivo). Incrementar em todo PR que mude como
+# uma execução é julgada — ver a regra obrigatória no docstring do módulo.
+#
+# v1 → juiz anterior à correção de 2026-07-30.
+# v2 → passa a enxergar erro de setup/teardown (webqa/report.py registra a fase),
+#      então navegador inalcançável vira flake de infra em vez de noite limpa.
+CLASSIFICADOR_VERSAO = 2
+
+# Versões cujo veredito não sustenta a sequência. Lista FECHADA de culpados
+# conhecidos, deliberadamente — não é whitelist. Versão futura desconhecida
+# conta normalmente: travar a sequência para sempre porque um refactor esqueceu
+# de registrar o campo seria um fail-safe que falha para o lado errado.
+DEFEITOS_CONHECIDOS = {
+    1: "erros de setup invisíveis; noite limpa com navegador morto",
+}
 
 # Assinaturas de falha do ambiente de teste — nunca de conformidade do alvo.
 #
@@ -110,7 +147,34 @@ def carregar_ledger(caminho: Path) -> dict:
         return {"schema": SCHEMA, "execucoes": []}
     dados = json.loads(caminho.read_text(encoding="utf-8"))
     dados.setdefault("execucoes", [])
+    # Migração one-shot: entrada sem o campo é, por definição, anterior à
+    # introdução dele — logo v1. Assumir a versão CORRENTE seria dar fé de
+    # integridade a exatamente o dado que não a tem.
+    for entrada in dados["execucoes"]:
+        entrada.setdefault("classificador", 1)
     return dados
+
+
+def versao_de(entrada: dict) -> int:
+    """Versão do juiz que produziu a entrada (ausente = v1, pré-campo)."""
+    try:
+        return int(entrada.get("classificador", 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def em_quarentena(entrada: dict) -> bool:
+    return versao_de(entrada) in DEFEITOS_CONHECIDOS
+
+
+def quarentena(execucoes: list[dict]) -> dict[int, int]:
+    """Quantas entradas por versão defeituosa — insumo da mensagem de saída."""
+    contagem: dict[int, int] = {}
+    for entrada in execucoes:
+        if em_quarentena(entrada):
+            versao = versao_de(entrada)
+            contagem[versao] = contagem.get(versao, 0) + 1
+    return dict(sorted(contagem.items()))
 
 
 def origem_da_execucao() -> str:
@@ -145,10 +209,15 @@ def sequencia_oficial(execucoes: list[dict],
     partir da última entrada: o valor gravado passa a ser derivável e auditável,
     e uma entrada inserida fora de ordem não contamina o resto.
 
-    Três regras:
+    Quatro regras:
 
     * `origem != origem_oficial` não conta — inclui as entradas `ci` anteriores
       à emenda, que permanecem no ledger como HISTÓRICO, e as `local`;
+    * entrada de versão do classificador com DEFEITO CONHECIDO fica em
+      quarentena: não conta e **não zera**. Ela foi julgada por um juiz que
+      errava, então nem avança a sequência (o veredito não é confiável) nem a
+      derruba (a execução pode ter sido perfeitamente boa — não há como saber).
+      Também não é apagada: o histórico continua auditável;
     * no máximo UMA por dia UTC, e vale a PRIMEIRA do dia: uma segunda execução
       no mesmo dia não infla a sequência;
     * a sequência é por alvo — se o `alvo_sha256` muda entre dias contados,
@@ -157,6 +226,11 @@ def sequencia_oficial(execucoes: list[dict],
     primeira_do_dia: dict[str, dict] = {}
     for entrada in execucoes:
         if entrada.get("origem") != origem_oficial:
+            continue
+        # Filtrar a quarentena ANTES do agrupamento por dia é o que faz o
+        # "não zera": se a entrada em quarentena disputasse a vaga do dia, uma
+        # v1 no mesmo dia de uma v2 boa apagaria a boa da contagem.
+        if em_quarentena(entrada):
             continue
         primeira_do_dia.setdefault(_dia_utc_de(entrada), entrada)
 
@@ -222,6 +296,10 @@ def registrar(ledger: dict, classificacao: Classificacao, alvo_sha256: str,
         "alvo_sha256": alvo_sha256,
         "browser_total": classificacao.browser_total,
         "infra_flakes": len(classificacao.flakes),
+        # Versão do JUIZ que produziu este veredito. Sem ela, uma correção no
+        # classificador não tem como distinguir dado íntegro de dado viciado —
+        # e a sequência seguiria andando sobre os dois.
+        "classificador": CLASSIFICADOR_VERSAO,
     }
     execucoes.append(entrada)
     # `streak` gravado = sequência de CI DEPOIS desta entrada. Numa entrada
@@ -254,6 +332,26 @@ def _resolver_alvo(explicito: str | None, usar_fixture: bool = False) -> str:
         return ""
 
 
+def _quarentena_texto(execucoes: list[dict]) -> str:
+    """Sufixo do placar listando as versões em quarentena, com o motivo.
+
+    Sem o motivo à vista, "0/10" depois de nove noites parece bug do script; com
+    ele, fica claro que o ledger recusou dado viciado de propósito.
+    """
+    contagem = quarentena(execucoes)
+    if not contagem:
+        return ""
+    partes = [f"v{versao} ({n} entrada{'s' if n > 1 else ''}) — {DEFEITOS_CONHECIDOS[versao]}"
+              for versao, n in contagem.items()]
+    texto = " · quarentena: " + "; ".join(partes)
+
+    oficiais = [e for e in execucoes if e.get("origem") == ORIGEM_OFICIAL]
+    if oficiais and all(em_quarentena(e) for e in oficiais):
+        texto += (" · toda a sequência oficial está em quarentena: a contagem "
+                  "RECOMEÇA do zero, sem apagar o histórico")
+    return texto
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("summary", nargs="?", type=Path, default=SUMMARY_PADRAO)
@@ -265,7 +363,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--meta", type=int, default=META_PADRAO)
     parser.add_argument("--dry-run", action="store_true",
                         help="classifica e imprime sem gravar (uso em CI, que não commita)")
+    parser.add_argument("--recompute", action="store_true",
+                        help="reavalia o ledger existente sem registrar execução nova "
+                             "(auditoria: mostra a sequência e a quarentena atuais)")
     args = parser.parse_args(argv)
+
+    if args.recompute:
+        # Auditoria pura: nenhuma classificação, nenhuma escrita. Existe porque a
+        # sequência é DERIVADA do histórico — logo é verificável a qualquer
+        # momento, sem depender de uma execução nova da suíte.
+        ledger = carregar_ledger(args.ledger)
+        streak, dias = sequencia_oficial(ledger["execucoes"])
+        plural = "dia" if dias == 1 else "dias"
+        historicas = sum(1 for e in ledger["execucoes"] if e.get("origem") == "ci")
+        linha = (f"Recompute: streak {streak}/{args.meta} "
+                 f"({ORIGEM_OFICIAL}, {dias} {plural} contado{'s' if dias != 1 else ''}, "
+                 f"{len(ledger['execucoes'])} entrada(s) no ledger)")
+        if historicas:
+            linha += f" · histórico: {historicas} execução(ões) 'ci', fora da conta"
+        print(linha + _quarentena_texto(ledger["execucoes"]))
+        return 0
 
     if not args.summary.exists():
         print(f"summary não encontrado: {args.summary} — rode a suíte antes.", file=sys.stderr)
@@ -291,6 +408,7 @@ def main(argv: list[str] | None = None) -> int:
         historicas = sum(1 for e in ledger["execucoes"] if e.get("origem") == "ci")
         if historicas:
             placar += f" · histórico: {historicas} execução(ões) 'ci' anterior(es), fora da conta"
+        placar += _quarentena_texto(ledger["execucoes"])
         return placar
 
     if registro.ignorada:
