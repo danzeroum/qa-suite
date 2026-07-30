@@ -209,6 +209,31 @@ def texto_do_corpo(corpo: Corpo) -> str:
     return corpo.dados.decode("utf-8", errors="replace")
 
 
+# Achados por nodeid da execução corrente. O relatório precisa de `severidade` e
+# `fase` no summary.json, e a alternativa seria o template PARSEAR a mensagem de
+# assert — reintroduzindo exatamente o "achado é string" que o value object veio
+# eliminar. Aqui o dado viaja como dado; o ciclo de vida é a sessão pytest, como
+# em webqa/metricas.py.
+_ACHADOS_POR_TESTE: dict[str, list[Finding]] = {}
+
+SEVERIDADE_ORDEM = {"alta": 0, "media": 1, "baixa": 2}
+
+
+def registrar_achados(nodeid: str, achados: list[Finding]) -> None:
+    if achados:
+        _ACHADOS_POR_TESTE.setdefault(nodeid, []).extend(achados)
+
+
+def achados_de(nodeid: str) -> list[Finding]:
+    """Achados do teste, do mais severo ao menos — a ordem que o laudo usa."""
+    return sorted(_ACHADOS_POR_TESTE.get(nodeid, []),
+                  key=lambda a: SEVERIDADE_ORDEM.get(a.severidade, 9))
+
+
+def limpar_achados() -> None:
+    _ACHADOS_POR_TESTE.clear()
+
+
 def find_secrets(texto: str, recurso: str, fase: Fase = "A") -> list[Finding]:
     """Credenciais no texto, já como `Finding` — logo, já mascaradas.
 

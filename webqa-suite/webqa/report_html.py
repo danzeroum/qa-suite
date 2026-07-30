@@ -372,15 +372,50 @@ def _panorama(resultados: list[dict], notas: dict) -> str:
 </section>"""
 
 
+# Severidade é TIPOGRÁFICA, nunca cromática (componentes.html §5): os quatro
+# estados seguem sendo o ÚNICO vocabulário de cor do sistema. Um segundo semáforo
+# dentro de `failed` repetiria o erro que o brief proíbe — e some na impressão em
+# preto e branco, que é justamente quando o laudo circula.
+#
+# O estilo é inline porque a folha canônica não define classe para isto, e a
+# folha é congelada byte a byte. Copiado verbatim da referência.
+_ESTILO_SEVERIDADE = "font:700 .66rem/1 var(--mono);letter-spacing:.06em;text-transform:uppercase"
+ROTULO_SEVERIDADE = {"alta": "sev. alta", "media": "sev. média", "baixa": "sev. baixa"}
+
+
+def severidade_de(resultado: dict) -> str:
+    """Severidade do achado, "" quando o teste não a declarou.
+
+    Campo opcional de propósito: as dimensões anteriores à `seguranca` não têm
+    severidade, e exigi-la faria todo relatório antigo mudar de forma.
+    """
+    valor = str(resultado.get("severidade") or "").strip().lower()
+    return valor if valor in ROTULO_SEVERIDADE else ""
+
+
+def _ordem_severidade(resultado: dict) -> int:
+    """alta → média → baixa; sem severidade vai para o fim, sem se misturar."""
+    return {"alta": 0, "media": 1, "baixa": 2}.get(severidade_de(resultado), 3)
+
+
 def _bloco_achado(resultado: dict, identificador: str, estado: str) -> str:
     detalhe = destaca_leis(esc((resultado.get("detail") or "").strip() or "sem detalhe registrado"))
-    dims = "".join(f'<span class="chip-dim">{esc(d)}</span>'
-                   for d in (resultado.get("dimensions") or [resultado.get("dimension", "")]) if d)
+    chips = [d for d in (resultado.get("dimensions") or [resultado.get("dimension", "")]) if d]
+    # `fase` do achado (A/B/C) entra como mais um chip da linha meta — zero
+    # componente novo, como manda o §8. Não confundir com `fase` de execução
+    # (setup/call/teardown), que é outro campo e não aparece aqui.
+    fase = str(resultado.get("fase_seguranca") or "").strip()
+    dims = "".join(f'<span class="chip-dim">{esc(c)}</span>' for c in chips)
+    if fase:
+        dims += f'<span class="chip-dim">fase {esc(fase)}</span>'
     navegador = "<span>navegador</span>" if resultado.get("browser") else ""
     margem = (f'<span class="achado-id">{esc(identificador.upper())}</span>'
               if estado == "failed" else "")
+    severidade = severidade_de(resultado)
+    selo_severidade = (f'<span style="{_ESTILO_SEVERIDADE}">'
+                       f"{esc(ROTULO_SEVERIDADE[severidade])}</span>" if severidade else "")
     return f"""<article class="{"achado" if estado == "failed" else "alerta"}" id="{esc(identificador)}">
-    <div class="achado-margem">{margem}{_selo(estado)}</div>
+    <div class="achado-margem">{margem}{_selo(estado)}{selo_severidade}</div>
     <div><p class="detalhe">{detalhe}</p>
       <p class="achado-meta">{dims}<code>{esc(resultado.get("test", "?"))}</code>
         <span class="num">{esc(duracao(float(resultado.get("duration_s") or 0)))}</span>
@@ -411,7 +446,10 @@ def _achados(resultados: list[dict], mapa: dict[str, str], numero_secao: int = 2
         grupos.setdefault(r.get("dimension", "other"), []).append(r)
     partes = []
     for dim in sorted(grupos, key=lambda d: (-len(grupos[d]), d)):
-        itens = grupos[dim]
+        # Dentro do grupo: alta → média → baixa, preservando a ordem de chegada
+        # entre iguais (sorted é estável). Achado sem severidade fica ao fim, sem
+        # se misturar aos classificados.
+        itens = sorted(grupos[dim], key=_ordem_severidade)
         extra = ""
         if any(len(r.get("dimensions") or []) > 1 for r in itens):
             outras = sorted({d for r in itens for d in (r.get("dimensions") or []) if d != dim})
