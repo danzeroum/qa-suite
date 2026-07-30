@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from webqa.dominio import find_secrets, ler_corpo, texto_do_corpo
+from webqa.dominio import find_secrets, ler_corpo, registrar_achados, texto_do_corpo
 
 pytestmark = [pytest.mark.seguranca, pytest.mark.browser]
 
@@ -28,7 +28,7 @@ def _varreveis(network_log) -> list:
                  or r.url.split("?")[0].endswith((".js", ".json", ".map")))]
 
 
-def test_sem_credenciais_em_js_e_json_de_origem(network_log):
+def test_sem_credenciais_em_js_e_json_de_origem(network_log, request):
     """Credencial servida ao navegador é credencial pública — FAIL.
 
     Qualquer visitante lê o bundle. Uma chave ali não está "escondida no código":
@@ -52,6 +52,9 @@ def test_sem_credenciais_em_js_e_json_de_origem(network_log):
             f"{len(nao_avaliados)} recurso(s) não avaliados — ausência de achado aqui "
             "não é ausência de segredo: " + "; ".join(nao_avaliados[:3]))
 
+    # O relatório precisa da severidade e da fase como DADO, não como texto
+    # da mensagem de assert (ver webqa/dominio.py::registrar_achados).
+    registrar_achados(request.node.nodeid, achados)
     altas = [a for a in achados if a.severidade == "alta"]
     assert not achados, (
         f"{len(achados)} credencial(is) expostas em recursos do próprio alvo "

@@ -407,3 +407,95 @@ def test_achados_vazio_com_erros_nao_usa_a_caixa_verde():
     sem = montar(_summary([_r("t::ok", "passed")]))
     secao_verde = sem.split('id="achados"', 1)[1].split("</section>", 1)[0]
     assert "intro-sec vazio" in secao_verde, "sem erros, a caixa verde é correta"
+
+
+# ---------- OS-23: severidade tipográfica e fase (dimensão seguranca) ----------
+
+def _s(test, severidade=None, fase=None, **kw):
+    r = _r(test, "failed", dimension="seguranca", dimensions=["seguranca"],
+           detail=kw.pop("detail", "achado"), **kw)
+    if severidade:
+        r["severidade"] = severidade
+    if fase:
+        r["fase_seguranca"] = fase
+    return r
+
+
+def test_severidade_e_rotulo_mono_e_nunca_cor_nova():
+    """Regra do §5: severidade é TIPOGRÁFICA. Nenhum tom fora dos 4 estados."""
+    html = montar(_summary([_s("t::a", "alta", "A")]))
+    assert ">sev. alta</span>" in html
+    corpo = html.split("</style>", 1)[1]
+    assert "var(--mono)" in corpo, "o rótulo usa a fonte mono do contrato"
+    for inventado in ("--cor-alta", "--cor-media", "--cor-severidade", 'class="alta"'):
+        assert inventado not in corpo, f"sub-semáforo dentro de failed: {inventado}"
+
+
+def test_ordenacao_alta_antes_de_media_e_baixa():
+    results = [_s("t::baixa", "baixa", "A"), _s("t::media", "media", "A"),
+               _s("t::alta", "alta", "A")]
+    html = montar(_summary(results))
+    assert html.index("t::alta") < html.index("t::media") < html.index("t::baixa")
+
+
+def test_achado_sem_severidade_mantem_a_margem_intacta():
+    """Caso da OS: dimensões antigas não têm o campo — layout não pode quebrar."""
+    html = montar(_summary([_r("t::antigo", "failed", detail="x")]))
+    assert "sev." not in html
+    assert '<div class="achado-margem"><span class="achado-id">A1</span>' in html
+
+
+def test_sem_severidade_vai_depois_dos_classificados():
+    results = [_r("t::antigo", "failed", dimension="seguranca",
+                  dimensions=["seguranca"], detail="x"),
+               _s("t::alta", "alta", "A")]
+    html = montar(_summary(results))
+    assert html.index("t::alta") < html.index("t::antigo")
+
+
+def test_fase_entra_como_chip_dim_sem_componente_novo():
+    html = montar(_summary([_s("t::a", "alta", "A")]))
+    assert '<span class="chip-dim">fase A</span>' in html
+    assert '<span class="chip-dim">seguranca</span>' in html
+
+
+def test_fase_de_execucao_nao_vira_chip():
+    """`fase` (setup/call/teardown) é outro campo — não pode virar chip A/B/C."""
+    resultado = _r("t::a", "failed", detail="x")
+    resultado["fase"] = "call"
+    html = montar(_summary([resultado]))
+    assert "chip-dim\">fase call" not in html
+
+
+def test_evidencia_mascarada_chega_pronta_e_nao_e_reescapada():
+    """Caso da OS: AKIA**** em <code>, sem escape duplo."""
+    detalhe = "Segredo em <code>/static/app.js</code>: AKIA****************"
+    html = montar(_summary([_s("t::a", "alta", "A", detail=detalhe)]))
+    assert "AKIA****************" in html
+    assert "&amp;lt;" not in html, "escape duplo"
+
+
+def test_nenhuma_coordenada_gps_em_claro():
+    detalhe = "1 imagem publicada com coordenada GPS no EXIF (valor não reproduzido)"
+    html = montar(_summary([_s("t::gps", "alta", "B", detail=detalhe)]))
+    assert "não reproduzido" in html
+    assert not re.search(r"-?\d{1,3}\.\d{4,}", html), "coordenada em claro no HTML"
+
+
+def test_nao_avaliado_usa_xfail_com_motivo_e_fora_da_soma_de_falha():
+    """Corpo truncado: xfail com motivo, jamais somado a achados."""
+    motivo = "não avaliado: 800000 bytes excedem o teto de 512000"
+    html = montar(_summary([_r("t::truncado", "xfail", dimension="seguranca",
+                               dimensions=["seguranca"], detail=motivo)]))
+    assert "Achados (0)" in html and "Alertas (1)" in html
+    assert "excedem o teto" in html
+
+
+def test_summary_sem_seguranca_renderiza_identico_ao_anterior():
+    """Retrocompatibilidade: campo opcional não pode mudar um byte do que existia."""
+    results = [_r("t::a", "failed", detail="x"), _r("t::b", "xfail", detail="y"),
+               _r("t::c", "passed")]
+    base = montar(_summary(results))
+    assert "sev." not in base and "fase " not in base
+    # E o mesmo summary com o campo AUSENTE (não vazio) produz o mesmo byte.
+    assert montar(_summary([dict(r) for r in results])) == base

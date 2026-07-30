@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from webqa.dominio import achados_de
 from webqa.metricas import coletadas
 from webqa.report_html import montar
 from webqa.sanitize import safe_url, sanitize_text
@@ -150,8 +151,23 @@ def pytest_runtest_logreport(report):
             "fase": report.when,
             "duration_s": round(getattr(report, "duration", 0.0), 3),
             "detail": detalhe,
+            **_metadados_de_seguranca(report.nodeid),
         }
     )
+
+
+def _metadados_de_seguranca(nodeid: str) -> dict:
+    """`severidade` e `fase_seguranca` quando o teste produziu Findings.
+
+    Campos OPCIONAIS: dimensões anteriores não os têm, e o template não pode
+    exigi-los — um summary antigo tem de renderizar exatamente como antes.
+    A severidade reportada é a PIOR do teste: um teste que achou uma chave AWS e
+    um token nomeado é um achado de severidade alta, não uma média das duas.
+    """
+    achados = achados_de(nodeid)
+    if not achados:
+        return {}
+    return {"severidade": achados[0].severidade, "fase_seguranca": achados[0].fase}
 
 
 def pytest_sessionfinish(session, exitstatus):
