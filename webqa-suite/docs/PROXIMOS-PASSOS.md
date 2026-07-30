@@ -49,6 +49,7 @@ Consulta, não leitura de entrada:
 | Doc | Quando abrir |
 |---|---|
 | [`LLM.md`](LLM.md) | contrato da camada de sumário por LLM local — leia antes de tocar em `webqa/llm.py` |
+| [`PLANO-TESTE-alvo-autenticado.md`](PLANO-TESTE-alvo-autenticado.md) | roteiro de campanha contra alvo com Basic Auth, na VPS — 6 fases, com a verificação de vazamento como gate |
 | [`TELEMETRIA.md`](TELEMETRIA.md) | o que a telemetria coleta, sobre quê, e as duas linhas que ela não cruza |
 | [`RECOMENDACOES.md`](RECOMENDACOES.md) | rastrear uma prática de engenharia até onde ela é coberta |
 | [`dimensao-seguranca-consolidado.md`](dimensao-seguranca-consolidado.md) | histórico da consolidação da dimensão `seguranca` |
