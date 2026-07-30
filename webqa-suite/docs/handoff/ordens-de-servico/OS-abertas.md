@@ -7,9 +7,9 @@
 > colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
 > três lugares e os três divergiam.
 >
-> **Próximo número livre: OS-32.**
+> **Próximo número livre: OS-33.**
 
-Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 464 testes de verificação verdes.
+Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 477 testes de verificação verdes.
 Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
 de design — `docs/qa-suite design brief/referencia/` (spec visual:
 `componentes.html` §5/§8; folha canônica: bloco `<style>` de
@@ -36,6 +36,7 @@ Trilha CAMPANHA:
   OS-27 ✓ (#27, etiqueta: robots/recuo/sequencial)
      └── OS-28 (campanha multi-alvo) — EM ABERTO
      └── OS-31 ✓ (#29, telemetria operacional)
+     └── OS-32 ✓ (#30, armadilhas recorrentes viram teste)
      └── [validação contra sites públicos na VPS — pendente de ambiente]
 ```
 
@@ -59,6 +60,7 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-26 | #26 | `172ba20` | Painel de estabilidade (`report/estabilidade.html`) + `caminhada()` + schema 5 |
 | OS-27 | #27 | `db7f948` | Camada de etiqueta: robots.txt, recuo 429/503, crawl sequencial, `webqa/rede.py` |
 | OS-31 | #29 | — | Telemetria operacional: 3 cortes, `anonimizar_agregado`, `--calibrar` |
+| OS-32 | #30 | — | Armadilhas recorrentes como teste: prefixo de coleta, folga em float, anonimato recursivo |
 
 ### Fora da sequência do handoff — numeradas em chat, já em `main`
 

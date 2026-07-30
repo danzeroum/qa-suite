@@ -281,6 +281,20 @@ def _thresholds_atuais() -> dict:
         return {}
 
 
+def rotulo_de_folga(fator: float = FOLGA_CALIBRACAO) -> str:
+    """`1.20` → `"20%"`. Função própria porque a aritmética já mentiu uma vez.
+
+    `int((1.20 - 1) * 100)` devolve **19**: o produto é `19.999999999999996` em
+    binário, e `int` trunca. A saída do `--calibrar` anunciava "folga de 19%"
+    enquanto aplicava 20% — prosa e código discordando, com a prosa certa.
+
+    `round` resolve, e existir como função é o que permite fixar em teste que
+    `1.05` vira `5%` e `1.333` vira `33%`. Enquanto a conta vivia dentro de uma
+    f-string no meio de uma lista, ela não tinha como ser verificada.
+    """
+    return f"{round((fator - 1) * 100)}%"
+
+
 def sugerir_thresholds(dados: dict) -> list[str]:
     """Diff COMENTADO de limiares, para leitura humana. Nunca escreve nada.
 
@@ -293,7 +307,7 @@ def sugerir_thresholds(dados: dict) -> list[str]:
     """
     atuais = _thresholds_atuais()
     linhas = ["# Sugestão de limiares a partir do p75 observado + folga de "
-              f"{round((FOLGA_CALIBRACAO - 1) * 100)}%.",
+              f"{rotulo_de_folga()}.",
               "# NADA foi escrito: revise e edite config.yaml à mão, se concordar.",
               "# Limiar que se ajusta sozinho ao que mediu converge para aprovar tudo.",
               ""]
