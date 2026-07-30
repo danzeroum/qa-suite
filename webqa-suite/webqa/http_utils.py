@@ -12,7 +12,43 @@ from dataclasses import dataclass
 
 import httpx
 
+from .auth import Credencial, credencial_do_ambiente, origem_de, pode_enviar_credencial
 from .config import Settings
+
+
+class AutenticacaoDeOrigem(httpx.Auth):
+    """Basic Auth que só vai para a origem do alvo, e só sob transporte seguro.
+
+    Existe porque `httpx.BasicAuth` anexa `Authorization` em TODA requisição do
+    cliente — e este cliente é de sessão, compartilhado por checks que buscam o
+    axe-core num CDN, seguem o link da política de privacidade (com frequência em
+    outro domínio) e batem no alvo em `http://` puro para conferir o
+    redirecionamento. Com `BasicAuth`, a senha do operador iria para a Cloudflare
+    e trafegaria em claro na rede.
+
+    A decisão de enviar mora em `webqa.auth.pode_enviar_credencial` — aqui só se
+    obedece, para que a política seja a mesma no httpx e no Playwright.
+    """
+
+    def __init__(self, credencial: Credencial, origem: str) -> None:
+        self._credencial = credencial
+        self._origem = origem
+
+    def auth_flow(self, request):
+        if pode_enviar_credencial(str(request.url), self._origem):
+            request.headers["Authorization"] = self._credencial.cabecalho_basic
+        yield request
+
+    def __repr__(self) -> str:
+        return f"AutenticacaoDeOrigem(origem={self._origem!r})"
+
+
+def autenticacao_do_alvo(settings: Settings) -> httpx.Auth | None:
+    """Autenticação a usar contra o alvo, ou None quando o acesso é anônimo."""
+    credencial = credencial_do_ambiente()
+    if credencial is None:
+        return None
+    return AutenticacaoDeOrigem(credencial, origem_de(settings.target_url))
 
 
 def make_client(settings: Settings) -> httpx.Client:
@@ -21,6 +57,7 @@ def make_client(settings: Settings) -> httpx.Client:
         follow_redirects=True,
         headers={"User-Agent": settings.user_agent},
         http2=True,
+        auth=autenticacao_do_alvo(settings),
     )
 
 
@@ -68,10 +105,13 @@ async def burst(settings: Settings, url: str) -> list[float]:
     sem = asyncio.Semaphore(settings.load_concurrency)
     latencies: list[float] = []
 
+    # A mesma autenticação do cliente síncrono: sem isto, a rajada bateria
+    # anônima num alvo protegido e mediria a latência da página de 401.
     async with httpx.AsyncClient(
         timeout=settings.timeout_s,
         follow_redirects=True,
         headers={"User-Agent": settings.user_agent},
+        auth=autenticacao_do_alvo(settings),
     ) as client:
 
         async def one() -> None:

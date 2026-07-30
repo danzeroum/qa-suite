@@ -44,6 +44,25 @@ funções. A coesão da dimensão vem de tornar explícito o vocabulário:
   fronteira ética mais dura deixa de ser regra que cada check lembra de seguir e
   vira impossibilidade estrutural. É a jogada do `sanitize.py` (mascarar na borda)
   elevada a value object.
+- **A segunda invariante, mesma jogada (OS-37):** não existe `Credencial` cuja
+  senha não esteja registrada para mascaramento — o registro é feito pelo
+  `__post_init__` de `webqa/auth.py::Credencial`. A diferença em relação ao
+  `Finding` é o mecanismo: um segredo de terceiro é reconhecido por FORMATO
+  (`AKIA…`, `ghp_…`), mas a senha de um Basic Auth de nginx não tem prefixo de
+  emissor, não tem rótulo e não tem forma — só quem a configurou sabe que aquilo
+  é segredo. Por isso ela é mascarada por **valor**, e em todas as formas em que
+  pode reaparecer num artefato (escapada para JSON, escapada para HTML,
+  percent-encoded, e o blob base64 do cabeçalho `Authorization`). Varrer o
+  arquivo procurando só o valor cru falharia justamente com as senhas boas — as
+  que têm caractere especial.
+- **Onde a credencial NÃO vai** (`webqa/auth.py::pode_enviar_credencial`): o
+  cliente HTTP é de sessão e visita hosts que não são o alvo — o CDN do axe-core
+  e o host da política de privacidade. Um `httpx.BasicAuth` comum anexa
+  `Authorization` em toda requisição do cliente, o que mandaria a senha do
+  operador para a Cloudflare e a faria trafegar em claro no teste que bate em
+  `http://` de propósito. A autenticação é presa a **origem + esquema**; a
+  exceção para rede local existe pelo alvo fixture e é decidida por IP resolvido
+  (`webqa/rede.py`), nunca por casar string.
 
 Hoje um achado é uma string de mensagem de assert — dado sem modelo. Com `Finding`,
 checks, relatório e contrato do fixture compartilham o mesmo vocabulário.

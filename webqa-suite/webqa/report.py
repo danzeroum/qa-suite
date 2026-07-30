@@ -18,10 +18,11 @@ from pathlib import Path
 
 import pytest
 
+from webqa.auth import credencial_do_ambiente
 from webqa.dominio import achados_de
 from webqa.metricas import coletadas
 from webqa.report_html import montar
-from webqa.sanitize import safe_url, sanitize_text
+from webqa.sanitize import mascarar_valores_registrados, safe_url, sanitize_text
 
 DIMENSIONS = (
     "backend", "frontend", "ux", "functional", "acceptance", "load", "lgpd",
@@ -74,13 +75,36 @@ def _comando(session) -> str:
         args = " ".join(session.config.invocation_params.args)
     except Exception:
         args = ""
-    return f"pytest {args}".strip()
+    # Sanitizado como qualquer outro texto que vai a disco: era o único campo do
+    # laudo que chegava ao arquivo sem passar por nada, e argv aceita URL com
+    # `?token=` como argumento tanto quanto uma mensagem de erro.
+    return sanitize_text(f"pytest {args}".strip())
 
 
 def report_dir() -> Path:
     """Diretório de artefatos, criado sob demanda (usado também pelos checks)."""
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     return REPORT_DIR
+
+
+def pytest_configure(config):
+    """Resolve a credencial UMA vez, antes da coleta, e assim a registra.
+
+    Aqui, e não numa fixture, porque construir a `Credencial` é o que a torna
+    mascarável — e uma execução só de navegador (`-m "lgpd and browser"`) nunca
+    constrói o cliente HTTP. Amarrar o registro ao cliente deixaria a varredura
+    vazia justamente na execução em que o Chromium autenticou.
+
+    Registro e varredura moram no mesmo módulo de propósito: a sincronia entre os
+    dois vira invariante local em vez de acoplamento a distância.
+
+    Configuração pela metade aborta AQUI, antes de qualquer requisição — a
+    mensagem nomeia a variável que falta e nunca cita valor.
+    """
+    try:
+        credencial_do_ambiente()
+    except ValueError as erro:
+        pytest.exit(str(erro), returncode=4)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -192,7 +216,17 @@ def pytest_sessionfinish(session, exitstatus):
         "metricas": coletadas(),
         "results": _RESULTS,
     }
-    (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    # A varredura por VALOR acontece sobre a string SERIALIZADA, não sobre o
+    # dicionário — e é isso que a torna estrutural. Campo novo que alguém
+    # acrescente ao `summary` amanhã já nasce coberto; chave conta tanto quanto
+    # valor; e o que entra pelo `montar` sem passar por `summary` (inventário de
+    # terceiros, allowlist) também. As formas escapadas registradas em
+    # `auth.variantes_da_senha` são o que faz isso valer apesar do escape de JSON
+    # e do `html.escape` do template.
+    (out_dir / "summary.json").write_text(
+        mascarar_valores_registrados(json.dumps(summary, indent=2, ensure_ascii=False)),
+        encoding="utf-8",
+    )
 
     # HTML conforme o pacote de design liberado pelo gate (OS-14): a montagem
     # vive em webqa/report_html.py, testável sem pytest e sem navegador.
@@ -205,5 +239,6 @@ def pytest_sessionfinish(session, exitstatus):
             inventario = None   # inventário ilegível não derruba o relatório
 
     (out_dir / "summary.html").write_text(
-        montar(summary, inventario, _allowlist()), encoding="utf-8"
+        mascarar_valores_registrados(montar(summary, inventario, _allowlist())),
+        encoding="utf-8",
     )

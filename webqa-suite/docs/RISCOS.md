@@ -19,6 +19,8 @@ Matriz probabilidade (P) × impacto (I), com resposta planejada e monitoramento.
 | R13 | Deploy key do noturno vazar (escrita no repositório) | segurança | Baixo | Alto | **Mitigar**: deploy key exclusiva do repo (não PAT de pessoa), só no disco da VPS, montada `ro`, ausente de camada de imagem (`.dockerignore` + conferência com `docker history`) | `docs/VPS.md`; revisão de PR do Dockerfile |
 | R14 | Dois escritores no ledger (GitHub + VPS) colidindo | técnico | M | Médio | **Evitar**: schedule removido do GitHub; único escritor é a VPS. Colisão com humano tratada com `pull --rebase` + 1 retry | log do noturno; `estabilidade.yml` reprova se tocar o ledger |
 | R15 | Imagem base mudar sob os pés e falsear a sequência | técnico | M | Alto | **Mitigar**: imagem fixada por digest, não por tag; `playwright install chromium` no build casa a revisão do navegador com a do pacote | `docker/Dockerfile` |
+| R16 | Credencial de Basic Auth do operador vazar em relatório, log ou artefato | segurança | Baixo | Alto | **Evitar**: só por ambiente (nunca em YAML versionado); registro por VALOR no construtor da `Credencial` (invariante estrutural); varredura da string SERIALIZADA na borda de escrita; `__repr__` redigido | `tests/test_vazamento_de_credencial.py` (grep na saída + guarda AST de toda escrita) |
+| R17 | Credencial enviada a terceiro (CDN, host da política) ou em `http://` claro | segurança | M | Alto | **Evitar**: o cliente de sessão é compartilhado com CDN e links externos, então a autenticação é presa a **origem + esquema** (`AutenticacaoDeOrigem`), não ao cliente; exceção local decidida por IP resolvido | `tests/test_auth.py::test_credencial_nao_vai_para_o_cdn_do_axe` |
 
 Revisar esta matriz a cada release da suíte ou mudança relevante no alvo.
 
@@ -37,6 +39,7 @@ Hierarquia adotada: **não coletar > mascarar > reter pouco > criptografar**
 | Interação ativa com sistema de terceiro (formulário, banner) | **Mitigado** | gate independente `WEBQA_ACTIVE_PROBES_AUTHORIZED=1` (`webqa/gates.py`); Fase 1 não o consome |
 | PII do alvo capturada pela bateria LGPD (e-mail do encarregado, CPF em URL) | **Mitigado** | detector e mascarador compartilham as regexes (`sanitize.find_pii`); URL ofensora reportada via `safe_url`; cookie só por nome; e-mail do DPO nunca reproduzido |
 | Inventário de terceiros persistido em `report/terceiros.json` | **Mitigado** | só hosts e contagens (sem path nem query), sanitizado na escrita, `report/` no `.gitignore` |
+| Credencial de acesso do operador no relatório | **Mitigado** | `webqa/auth.py::Credencial` registra a senha — e suas formas escapadas para JSON/HTML/URL, mais o blob base64 do cabeçalho — no `sanitize` **no construtor**; a borda de escrita varre a string serializada. Mascarar por VALOR, não por nome: a senha de um nginx não tem prefixo de emissor nem rótulo que uma regex reconheça |
 | Relatório versionado no Git | **Mitigado** | `.gitignore` cobre `report/*`; atenção ao subir o repo — dotfiles se perdem em upload via interface web |
 | Artefato de relatório no CI | **Mitigado** | `retention-days: 7` no upload-artifact (expurgo automático, criptografia em repouso do provedor) |
 | Job de expurgo local com TTL | **Descartado (consciente)** | `summary.json` é sobrescrito a cada execução — TTL para arquivo auto-substituído é cerimônia sem risco correspondente |

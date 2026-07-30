@@ -7,7 +7,7 @@
 > colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
 > três lugares e os três divergiam.
 >
-> **Próximo número livre: OS-37.**
+> **Próximo número livre: OS-39.**
 
 Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 555 testes de verificação verdes.
 Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
@@ -35,6 +35,11 @@ Trilha DESIGN/RELATÓRIO — CONCLUÍDA:
      └── OS-33 ✓ (#31, o zero do painel explicado)
      └── OS-34 ✓ (#32, derivadores provados ligados ao template)
      └── OS-35 ✓ (#33, --painel provado somente-leitura sobre o ledger)
+
+Trilha ACESSO AUTENTICADO (nova):
+  OS-37 ✓ (Basic Auth: entra na aplicação) — ex-"OS-39 do chat"
+     └── OS-38 (passivo autenticado: explora a área logada) — EM ABERTO
+          └── [Fase C segue DESLIGADA — autorizada pelo dono, não acionada]
 
 Trilha CAMPANHA:
   OS-27 ✓ (#27, etiqueta: robots/recuo/sequencial)
@@ -69,6 +74,7 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-34 | #32 | — | Cada derivador dos dois geradores provado LIGADO ao template (sentinela) |
 | OS-35 | #33 | — | `--painel` somente-leitura: capacidade reduzida + fronteira no fonte + prova por tentativa |
 | OS-36 | #34 | — | Fase C travada por teste: detector de sondagem, símbolos ausentes, matriz 2×2 dos gates |
+| OS-37 | — | — | HTTP Basic Auth: `webqa/auth.py`, autenticação presa a origem+esquema, mascaramento por VALOR e grep na saída como aceite |
 
 ### Fora da sequência do handoff — numeradas em chat, já em `main`
 
@@ -95,6 +101,8 @@ quatro casos. Não é erro de leitura:
 | **OS-27** | camada de etiqueta (`db7f948`) | `c869a28`, correções de doc — hoje **OS-27-bis** |
 | **OS-28** | campanha multi-alvo (**em aberto**) | `e391e55`, Fase B `Finding` — hoje **OS-28-bis** |
 | **OS-29** | — (número aposentado; a telemetria virou **OS-31**) | `980b094`, Fase A `Finding` — hoje **OS-29-bis** |
+| **OS-39** | **OS-37** (Basic Auth) | número que circulou em chat; o registro dizia "próximo livre: OS-37" |
+| **OS-40** | **OS-38** (passivo autenticado) | idem — emitida em chat como OS-40, registrada como OS-38 |
 
 Duas notas de auditoria, para que o histórico se explique sozinho:
 
@@ -255,3 +263,75 @@ log. **Não emitir OS** até haver autorização explícita do dono de um alvo.
    summary antigo → saída byte-idêntica; dogfooding verde contra o fixture pós-#17.
 5. **OS-26:** diff ~zero contra a referência do designer; troca de sha reinicia a
    streak COM nota e SEM apagar histórico; ledger vazio nunca parece quebrado.
+
+---
+
+## OS-38 — Exploração passiva autenticada (rica, mas nunca intrusiva)
+
+> Emitida em chat como "OS-40"; registrada como **OS-38** pela regra do topo
+> deste arquivo. Depende da **OS-37** (sem entrar, não há passivo autenticado).
+
+**A distinção que dá razão a esta OS.** Não é "Fase C travada por falta de
+autorização" — é **Fase C autorizada e conscientemente não acionada**. O alvo é
+ambiente de teste do próprio dono, então a autorização existe; o interruptor
+permanece desligado por decisão. Isso abre um território que o projeto ainda não
+tinha: o **passivo autenticado**, entre o que se observa como visitante anônimo e
+o que só se descobre sondando.
+
+A área logada tem muito mais superfície — mais JavaScript, mais chamadas de API,
+mais cookies, mais terceiros contactados — e a passiva captura tudo isso apenas
+navegando as telas que a aplicação oferece. Ganhos concretos que hoje não
+existem: segredo em JS de painel interno (mais comum e mais grave que na
+landing page), **cookie de sessão real** auditável por `HttpOnly`/`Secure`/
+`SameSite` (hoje o check pula por não haver cookie), e as APIs internas que a
+própria aplicação chama ao renderizar.
+
+**A linha, mesmo logado e mesmo autorizado:** a exploração passiva navega apenas
+onde a aplicação oferece ir — segue os links e botões que estão na tela. Não
+adivinha URL, não testa `/admin` sem link, não sonda `/.git/`. Isso continua
+sendo Fase C e continua desligado. E a diferença é **código** (proveniência de
+cada URL), não convenção.
+
+Os dois gates ganham significados distintos e independentes, que é exatamente por
+que foram criados separados: `WEBQA_BASIC_AUTH_*` diz "entre na aplicação";
+`WEBQA_ACTIVE_PROBES_AUTHORIZED` diz "sonde o que não foi oferecido". Autorizar
+login nunca autoriza sondagem.
+
+```xml
+<lang>Python 3.11 + Playwright (webqa/ crawler autenticado, checks/seguranca + lgpd; base: OS-37 mergeada)</lang>
+<task>Após o login (OS-37), explorar passivamente a área autenticada — seguindo só links/botões que a aplicação oferece — para produzir relatórios ricos, SEM sondar nada não-oferecido (isso é Fase C, permanece desligada).</task>
+<context>Alvo é ambiente de teste do próprio dono, com Basic Auth. Fase C autorizada mas conscientemente NÃO acionada. Passivo autenticado = navegar a app logada como usuário real; nunca adivinhar URL, nunca /admin sem link, nunca /.git. A network_log já captura tudo que o navegador baixa.</context>
+<rules>
+- Crawl autenticado segue APENAS href/botões presentes no DOM renderizado (mesma regra do crawler atual: mesmo host, respeita robots quando aplicável, sequencial entre páginas). NUNCA constrói URL por adivinhação.
+- A sessão autenticada é reusada nas páginas internas; cookie de sessão auditado por flags (agora existe de verdade).
+- Todos os checks passivos A/B/lgpd/seguranca rodam contra as páginas internas descobertas — mais superfície, mesmos checks, mesma sanitização.
+- Guarda dura: teste de fonte (AST) garante que o crawler autenticado NÃO contém lista de caminhos sensíveis nem geração de URL — se aparecer, é Fase C vazando, reprova no CI.
+- WEBQA_ACTIVE_PROBES_AUTHORIZED continua governando só a Fase C; exploração autenticada roda com ele DESLIGADO.
+</rules>
+<aceite>
+- Contra alvo autenticado de teste: crawler entra, navega N páginas internas descobertas por link, roda todos os checks passivos, gera laudo mais rico que o anônimo.
+- Nenhuma URL acessada que não tenha vindo de um link/botão do DOM (verificável por log de proveniência de cada URL visitada).
+- Cookie de sessão real auditado (HttpOnly/Secure/SameSite) — achado real, não "sem cookies".
+- AST do crawler autenticado: zero caminho sensível, zero geração de URL — passivo por construção.
+</aceite>
+<testes>
+- App de teste com 3 páginas internas ligadas por menu → todas visitadas; página órfã (sem link) → NÃO visitada.
+- Proveniência: cada URL no log tem origem "link em X" — nenhuma "adivinhada".
+- Credencial nunca no laudo (herda garantia da OS-37).
+- Símbolo de sondagem colado no crawler → teste de fronteira reprova.
+</testes>
+<recomendacao>
+- Segurança/ética: a diferença entre passivo-autenticado e Fase C é "seguir o que foi oferecido" × "investigar o que não foi" — e ela é código (proveniência de URL), não convenção.
+- Níveis de teste: app de teste com topologia conhecida (páginas ligadas + órfã) é o fixture que prova a disciplina do crawler.
+</recomendacao>
+```
+
+**A página órfã é o coração do aceite.** Uma página interna sem link para ela,
+que o crawler nunca visita, é a prova executável de que a exploração segue o que
+a aplicação oferece — e não o que ela esconde. Sem esse caso no fixture, "passivo
+autenticado" seria uma promessa; com ele, é uma propriedade verificada.
+
+**Operacional para quem for rodar:** usuário de teste **descartável** (não
+credencial real, mesmo em ambiente próprio — higiene), credenciais por ambiente,
+rede liberada na VPS, e conferir com `grep` que a senha não vazou no laudo antes
+de devolver o resultado.
