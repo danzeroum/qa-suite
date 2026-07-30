@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="omelette-owns-print" content="">
+<meta name="color-scheme" content="light dark">
+<title>WebQA Suite — Relatório de Qualidade — Loja Fixture — 2026-07-30</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M2 6V3.5A1.5 1.5 0 0 1 3.5 2H6M14 2h2.5A1.5 1.5 0 0 1 18 3.5V6M18 14v2.5a1.5 1.5 0 0 1-1.5 1.5H14M6 18H3.5A1.5 1.5 0 0 1 2 16.5V14" fill="none" stroke="%231C2228" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="10" r="2.6" fill="%231C2228"/></svg>'>
+<style>
+/* ============================================================
+   WebQA Suite — folha de estilo única do relatório (summary.html)
+   Arquivo único · zero requisições externas · funciona sem JS.
+   Tokens em custom properties; classes de estado = outcomes do
+   pytest, verbatim: .passed .failed .xfail .skipped
+   Tema escuro: o MESMO bloco de tokens aparece 2x — sob
+   prefers-color-scheme (automático) e sob [data-tema="escuro"]
+   (forçável). No template Python, interpolar o bloco uma vez.
+   ============================================================ */
+:root{
+  color-scheme:light dark;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
+  --serif:Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --fundo:#F5F3EF; --papel:#FFFFFF;
+  --tinta:#1C2228; --tinta-2:#4A5560;
+  --linha:#DED9D1; --linha-forte:#1C2228;
+  --acento:#1E5A8A; --fundo-acento:#EDF2F7;
+  --cor-failed:#9E2222;  --fundo-failed:#F9ECEA;  --borda-failed:#D9ACA6;
+  --cor-xfail:#8A5800;   --fundo-xfail:#F8F0DE;   --borda-xfail:#D9C084;
+  --cor-passed:#2F6B4F;  --fundo-passed:#EBF2EC;  --borda-passed:#ABC7B3;
+  --cor-skipped:#5C6670; --fundo-skipped:#F0F0F1; --borda-skipped:#C5CACF;
+}
+@media screen and (prefers-color-scheme:dark){
+  :root:not([data-tema="claro"]){
+    --fundo:#12161A; --papel:#1A2026;
+    --tinta:#E6E9EC; --tinta-2:#A9B2BC;
+    --linha:#323B43; --linha-forte:#DEE3E8;
+    --acento:#82B5DD; --fundo-acento:#1D2B37;
+    --cor-failed:#E98D82;  --fundo-failed:#2C1B18;  --borda-failed:#5F352F;
+    --cor-xfail:#DCA845;   --fundo-xfail:#2A2213;   --borda-xfail:#5E4B1E;
+    --cor-passed:#7CBA90;  --fundo-passed:#17241C;  --borda-passed:#31543F;
+    --cor-skipped:#9AA4AE; --fundo-skipped:#1E252B; --borda-skipped:#3C454E;
+  }
+}
+@media screen{
+  :root[data-tema="escuro"]{
+    --fundo:#12161A; --papel:#1A2026;
+    --tinta:#E6E9EC; --tinta-2:#A9B2BC;
+    --linha:#323B43; --linha-forte:#DEE3E8;
+    --acento:#82B5DD; --fundo-acento:#1D2B37;
+    --cor-failed:#E98D82;  --fundo-failed:#2C1B18;  --borda-failed:#5F352F;
+    --cor-xfail:#DCA845;   --fundo-xfail:#2A2213;   --borda-xfail:#5E4B1E;
+    --cor-passed:#7CBA90;  --fundo-passed:#17241C;  --borda-passed:#31543F;
+    --cor-skipped:#9AA4AE; --fundo-skipped:#1E252B; --borda-skipped:#3C454E;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 .95rem/1.55 var(--sans)}
+a{color:var(--acento);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--acento);outline-offset:2px;border-radius:2px}
+code{font-family:var(--mono);font-size:.88em}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.pular{position:absolute;left:-9999px;top:0;background:var(--papel);color:var(--acento);padding:10px 16px;z-index:9;border:1px solid var(--linha-forte)}
+.pular:focus{left:12px;top:12px}
+.folha{max-width:1120px;margin:28px auto;background:var(--papel);border:1px solid var(--linha);padding:44px 52px 60px}
+
+/* ---- cabeçalho ---- */
+.marca-linha{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:16px;border-bottom:2px solid var(--linha-forte)}
+.marca{display:inline-flex;align-items:center;gap:10px}
+.marca svg{flex:none}
+.marca-nome{font:400 .98rem var(--sans);letter-spacing:.01em}
+.marca-nome b{font-weight:650}
+.doc-tipo{font:500 .68rem var(--mono);text-transform:uppercase;letter-spacing:.11em;color:var(--tinta-2)}
+h1{font:650 1.5rem/1.25 var(--sans);letter-spacing:-.01em;margin:28px 0 4px}
+.alvo-sub{margin:0;color:var(--tinta-2);font-size:1rem}
+.meta{display:grid;grid-template-columns:repeat(4,auto);justify-content:start;gap:10px 48px;margin:24px 0 0}
+.meta div{margin:0}
+.meta dt{font:600 .66rem var(--mono);text-transform:uppercase;letter-spacing:.11em;color:var(--tinta-2)}
+.meta dd{margin:3px 0 0;font-size:.86rem}
+.meta dd code{font-size:.78rem}
+
+/* resumo (fotografia) */
+.resumo{display:flex;flex-wrap:wrap;align-items:center;gap:14px 30px;margin-top:26px;padding:15px 18px;background:var(--fundo);border:1px solid var(--linha)}
+.resumo-item{display:flex;align-items:center;gap:9px}
+.resumo-item .ic{flex:none}
+.resumo-item b{font:650 1.3rem/1 var(--sans);font-variant-numeric:tabular-nums}
+.resumo-item span{font-size:.82rem;color:var(--tinta-2)}
+.resumo-item.failed b,.resumo-item.failed .ic{color:var(--cor-failed)}
+.resumo-item.xfail .ic{color:var(--cor-xfail)}
+.resumo-item.passed .ic{color:var(--cor-passed)}
+.resumo-item.skipped .ic{color:var(--cor-skipped)}
+.resumo-total{margin-left:auto;font:400 .76rem/1.5 var(--mono);color:var(--tinta-2);text-align:right}
+.indice{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:14px;font-size:.84rem}
+.indice a{text-decoration:none}
+.indice a:hover{text-decoration:underline}
+.indice .n{font:600 .72rem var(--mono);color:var(--tinta-2);margin-right:5px}
+
+/* ---- seções ---- */
+section{margin-top:46px}
+.sec-h{border-top:2px solid var(--linha-forte);padding-top:13px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+h2{font:700 .9rem/1.3 var(--sans);text-transform:uppercase;letter-spacing:.09em;margin:0}
+h2 .n{font:600 .8rem var(--mono);color:var(--tinta-2);margin-right:8px}
+.sec-sub{font-size:.82rem;color:var(--tinta-2)}
+h3{font:600 .8rem/1.4 var(--mono);letter-spacing:.02em;margin:26px 0 2px}
+h3 .ct-grupo{color:var(--tinta-2);font-weight:400}
+
+/* estados: ícone + rótulo + cor — nunca cor sozinha */
+.ic{display:inline-block;vertical-align:-1px}
+.estado{display:inline-flex;align-items:center;gap:6px;font:700 .66rem/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;padding:4px 8px;border:1px solid;border-radius:3px;white-space:nowrap}
+.estado.failed{color:var(--cor-failed);background:var(--fundo-failed);border-color:var(--borda-failed)}
+.estado.xfail{color:var(--cor-xfail);background:var(--fundo-xfail);border-color:var(--borda-xfail)}
+.estado.passed{color:var(--cor-passed);background:var(--fundo-passed);border-color:var(--borda-passed)}
+.estado.skipped{color:var(--cor-skipped);background:var(--fundo-skipped);border-color:var(--borda-skipped)}
+.estado-min{display:inline-flex;align-items:center;gap:5px;font:700 .66rem/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.estado-min.failed{color:var(--cor-failed)}
+.estado-min.xfail{color:var(--cor-xfail)}
+.estado-min.passed{color:var(--cor-passed)}
+.estado-min.skipped{color:var(--cor-skipped)}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 20px;margin:16px 0 0;font:400 .74rem var(--mono);color:var(--tinta-2)}
+.legenda span{display:inline-flex;align-items:center;gap:6px}
+
+/* panorama por dimensão */
+.dims{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+.dim{border:1px solid var(--linha);border-radius:3px;padding:13px 15px;background:var(--papel)}
+.dim-nome{font:650 .8rem var(--mono);letter-spacing:.02em}
+.dim-veredito{margin:7px 0 11px;font:600 .95rem/1.3 var(--sans)}
+.dim-veredito.failed{color:var(--cor-failed)}
+.dim-veredito.passed{color:var(--cor-passed)}
+.dim-veredito.skipped{color:var(--cor-skipped)}
+.cts{display:flex;gap:13px;font:400 .76rem var(--mono);color:var(--tinta-2)}
+.ct{display:inline-flex;align-items:center;gap:4px}
+.ct.failed .ic{color:var(--cor-failed)}
+.ct.xfail .ic{color:var(--cor-xfail)}
+.ct.passed .ic{color:var(--cor-passed)}
+.ct.skipped .ic{color:var(--cor-skipped)}
+.ct.zero{color:var(--tinta-2)}
+.ct.zero .ic{opacity:.35}
+.dim-obs{margin-top:9px;font-size:.74rem;line-height:1.5;color:var(--tinta-2)}
+.dim-lgpd{grid-column:1/-1;display:grid;grid-template-columns:230px 1fr;gap:14px 28px;border:1px solid var(--linha-forte);padding:16px 18px}
+.nota-epistemica{border:1px solid var(--linha);background:var(--fundo);padding:13px 16px;max-width:76ch}
+.nota-epistemica .nota-k{font:700 .64rem var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--tinta-2);margin:0 0 6px}
+.nota-epistemica p{margin:0;font:italic 400 .95rem/1.6 var(--serif)}
+.nota-epistemica .sem-selo{margin-top:7px;font:400 .74rem/1.5 var(--sans);font-style:normal;color:var(--tinta-2)}
+.nota-dupla{margin:14px 0 0;font-size:.76rem;color:var(--tinta-2);max-width:90ch}
+
+/* achados / alertas */
+.achado,.alerta{display:grid;grid-template-columns:118px 1fr;gap:8px 26px;padding:17px 0 19px;border-top:1px solid var(--linha)}
+.achado-margem{display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+.achado-id{font:700 1rem/1 var(--mono)}
+.detalhe{margin:0;font:400 1.03rem/1.62 var(--serif);max-width:72ch;text-wrap:pretty}
+.alerta .detalhe{font-size:.96rem}
+.detalhe code{font-size:.8em;background:var(--fundo);border:1px solid var(--linha);padding:.08em .3em;border-radius:2px;overflow-wrap:anywhere}
+.lei{font-weight:700;text-decoration:underline dotted 1.2px;text-underline-offset:3px;white-space:nowrap}
+.achado-meta{margin-top:9px;display:flex;flex-wrap:wrap;align-items:center;gap:5px 16px;font:400 .74rem/1.6 var(--mono);color:var(--tinta-2)}
+.achado-meta code{font-size:1em;overflow-wrap:anywhere}
+.chip-dim{border:1px solid var(--linha);padding:.18em .5em;border-radius:3px;white-space:nowrap}
+.intro-sec{margin:14px 0 0;font-size:.84rem;color:var(--tinta-2);max-width:80ch}
+
+/* estados vazios / avisos (usados nas variações) */
+.vazio{border:1px solid var(--borda-passed);background:var(--fundo-passed);padding:20px 24px;margin-top:18px;max-width:none}
+.vazio p{margin:0;font:400 1.05rem/1.6 var(--serif)}
+.vazio .destaque{display:flex;align-items:center;gap:10px;font:650 1.1rem var(--sans);color:var(--cor-passed);margin-bottom:8px}
+.vazio .lembrete{margin-top:10px;font:400 .82rem/1.55 var(--sans);color:var(--tinta-2)}
+.aviso{border:1px solid var(--borda-xfail);background:var(--fundo-xfail);padding:13px 18px;margin-top:20px;font-size:.88rem;line-height:1.6}
+.aviso b{color:var(--cor-xfail)}
+.fora-escopo{border:1px dashed var(--linha);border-radius:3px;padding:13px 15px;color:var(--tinta-2);font-size:.82rem;line-height:1.55;display:flex;align-items:center}
+
+/* tabelas */
+.rolagem{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.8rem}
+caption{text-align:left}
+th{font:700 .66rem var(--mono);text-transform:uppercase;letter-spacing:.09em;text-align:left;color:var(--tinta-2);border-bottom:2px solid var(--linha-forte);padding:8px 10px;white-space:nowrap}
+td{border-top:1px solid var(--linha);padding:8px 10px;vertical-align:top}
+td.t-teste{font:400 .74rem/1.6 var(--mono);overflow-wrap:anywhere}
+td.t-dur{white-space:nowrap;text-align:right;font:400 .74rem var(--mono);font-variant-numeric:tabular-nums}
+td.t-det{font-size:.78rem;line-height:1.55;color:var(--tinta-2)}
+tr.failed>td{background:var(--fundo-failed)}
+tr.xfail>td{background:var(--fundo-xfail)}
+tr.skipped>td{color:var(--tinta-2)}
+details.tabela-wrap{margin-top:16px;border:1px solid var(--linha);border-radius:3px}
+details.tabela-wrap summary{cursor:pointer;padding:13px 16px;font:600 .85rem var(--sans)}
+details.tabela-wrap summary:hover{background:var(--fundo)}
+details.tabela-wrap[open] summary{border-bottom:1px solid var(--linha)}
+details.tabela-wrap .rolagem{padding:0 16px 14px}
+.chip-tracker{font:600 .68rem var(--mono);border:1px solid var(--linha-forte);padding:.2em .55em;border-radius:3px;white-space:nowrap}
+.chip-neutro{font:400 .68rem var(--mono);border:1px solid var(--linha);color:var(--tinta-2);padding:.2em .55em;border-radius:3px;white-space:nowrap}
+
+/* painel de estabilidade */
+.historia{margin:16px 0 0;font:400 1.05rem/1.65 var(--serif);max-width:72ch;text-wrap:pretty}
+.progresso{display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap;margin-top:22px}
+.prog-num{font:700 3.1rem/1 var(--sans);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.prog-num small{font:600 1.5rem var(--sans);color:var(--tinta-2)}
+.prog-rot{font:600 .66rem var(--mono);text-transform:uppercase;letter-spacing:.11em;color:var(--tinta-2);margin-top:6px}
+.slots{display:flex;gap:7px;padding-bottom:10px}
+.slot{width:36px;height:15px;border:1px solid var(--linha);border-radius:2px}
+.slot.ok{background:var(--cor-passed);border-color:var(--cor-passed)}
+.slot.meta-slot{border-style:dashed}
+.regras{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+.regra{border:1px solid var(--linha);border-radius:3px;padding:13px 15px}
+.regra h3{margin:0 0 7px;display:flex;align-items:center;gap:7px}
+.regra p{margin:0;font-size:.82rem;line-height:1.55;color:var(--tinta-2)}
+.regra.zera h3{color:var(--cor-failed)}
+.regra.avanca h3{color:var(--cor-passed)}
+.regra.neutra h3{color:var(--cor-skipped)}
+td.t-efeito{white-space:nowrap}
+.origem{font:600 .68rem var(--mono);border:1px solid var(--linha-forte);padding:.2em .55em;border-radius:3px;white-space:nowrap}
+.origem.nao-conta{border:1px dashed var(--linha);color:var(--tinta-2);font-weight:400}
+.marco{border:1px solid var(--linha-forte);padding:16px 20px;margin-top:26px;max-width:80ch}
+.marco p{margin:0;font-size:.9rem;line-height:1.6}
+.marco .marco-k{font:700 .64rem var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--tinta-2);display:block;margin-bottom:6px}
+
+/* spec de componentes */
+.spec{margin:22px 0 0;border:1px dashed var(--linha);padding:20px 22px}
+.spec figcaption{font:400 .74rem/1.7 var(--mono);color:var(--tinta-2);margin-top:14px;border-top:1px solid var(--linha);padding-top:10px;max-width:90ch}
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.sw{border:1px solid var(--linha);border-radius:3px;overflow:hidden}
+.sw .cor{height:44px}
+.sw .rot{padding:7px 9px;font:400 .68rem/1.6 var(--mono)}
+.tipo-linha{border-top:1px solid var(--linha);padding:12px 0;display:grid;grid-template-columns:210px 1fr;gap:20px;align-items:baseline}
+.tipo-linha .uso{font:400 .72rem/1.6 var(--mono);color:var(--tinta-2)}
+
+/* rodapé */
+footer{margin-top:60px;border-top:2px solid var(--linha-forte);padding-top:16px;font-size:.78rem;line-height:1.7;color:var(--tinta-2)}
+footer .sha{font:400 .72rem var(--mono);overflow-wrap:anywhere}
+.so-impressao{display:none}
+
+/* móvel (~380px) */
+@media (max-width:700px){
+  .folha{margin:0;border:none;padding:24px 18px 40px}
+  h1{font-size:1.25rem}
+  .meta{grid-template-columns:1fr 1fr;gap:12px 20px}
+  .resumo{gap:10px 18px;padding:13px 14px}
+  .resumo-item b{font-size:1.1rem}
+  .resumo-total{margin-left:0;text-align:left;flex-basis:100%}
+  .dims{grid-template-columns:1fr 1fr}
+  .dim-lgpd{grid-template-columns:1fr;padding:14px}
+  .achado,.alerta{grid-template-columns:1fr;gap:9px}
+  .achado-margem{flex-direction:row;align-items:center;gap:12px}
+  .regras{grid-template-columns:1fr}
+  .progresso{gap:18px}
+  .tipo-linha{grid-template-columns:1fr;gap:6px}
+}
+/* impressão — cenário de primeira classe (DPO) */
+@media print{
+  @page{margin:15mm}
+  body{background:#fff;font-size:10.5pt}
+  .folha{max-width:none;margin:0;border:none;padding:0}
+  .pular,.indice{display:none}
+  .so-impressao{display:block}
+  a{color:inherit;text-decoration:none}
+  .indice a,.t-det a{text-decoration:none}
+  section{margin-top:30px}
+  .achado,.alerta,.dim,tr,.regra,.marco,.nota-epistemica{break-inside:avoid}
+  .resumo{background:none}
+  details.tabela-wrap summary{list-style:none}
+  details.tabela-wrap summary::-webkit-details-marker{display:none}
+}
+</style>
+</head>
+<body>
+<a class="pular" href="#achados">Ir direto aos achados</a>
+<div class="folha">
+
+<header>
+  <div class="marca-linha">
+    <span class="marca">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M2 6V3.5A1.5 1.5 0 0 1 3.5 2H6M14 2h2.5A1.5 1.5 0 0 1 18 3.5V6M18 14v2.5a1.5 1.5 0 0 1-1.5 1.5H14M6 18H3.5A1.5 1.5 0 0 1 2 16.5V14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>
+      <span class="marca-nome"><b>WebQA</b> Suite</span>
+    </span>
+    <span class="doc-tipo">Relatório por execução · report/summary.html</span>
+  </div>
+
+  <h1>Relatório de Qualidade</h1>
+  <p class="alvo-sub">Alvo auditado: <strong>Loja Fixture</strong> — alvo de teste fabricado, deliberadamente não conforme</p>
+
+  <dl class="meta">
+    <div><dt>Identidade do alvo</dt><dd><code title="fixture_target:a6ee5978da3bbfe091578e6dddbc63ecc22ea802f3e208d15f4cc580b6de15ca">fixture_target:a6ee5978…b6de15ca</code></dd></div>
+    <div><dt>Gerado em</dt><dd class="num">2026-07-30 03:12:44</dd></div>
+    <div><dt>Duração</dt><dd class="num">41,7 s</dd></div>
+    <div><dt>Execução</dt><dd><code>pytest checks tests</code> · Chromium 126</dd></div>
+  </dl>
+
+  <p class="resumo" role="group" aria-label="Resumo da execução">
+    <span class="resumo-item failed"><svg class="ic" viewBox="0 0 12 12" width="15" height="15" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg><b>8</b><span>achados</span></span>
+    <span class="resumo-item xfail"><svg class="ic" viewBox="0 0 12 12" width="15" height="15" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg><b>3</b><span>alertas</span></span>
+    <span class="resumo-item passed"><svg class="ic" viewBox="0 0 12 12" width="15" height="15" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><b>31</b><span>passaram</span></span>
+    <span class="resumo-item skipped"><svg class="ic" viewBox="0 0 12 12" width="15" height="15" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><b>2</b><span>pulados</span></span>
+    <span class="resumo-total num">44 testes · 10 de navegador<br>41,7 s no total</span>
+  </p>
+
+  <nav class="indice" aria-label="Seções do relatório">
+    <a href="#panorama"><span class="n">1</span>Panorama</a>
+    <a href="#achados"><span class="n">2</span>Achados (8)</a>
+    <a href="#alertas"><span class="n">3</span>Alertas (3)</a>
+    <a href="#terceiros"><span class="n">4</span>Terceiros</a>
+    <a href="#tabela"><span class="n">5</span>Todos os resultados</a>
+  </nav>
+</header>
+
+<main>
+
+<section id="panorama" aria-labelledby="h-panorama">
+  <div class="sec-h">
+    <h2 id="h-panorama"><span class="n">1</span>Panorama por dimensão</h2>
+    <span class="sec-sub">passar é o esperado; o conteúdo deste relatório são os achados</span>
+  </div>
+
+  <div class="dims">
+    <div class="dim dim-lgpd">
+      <div>
+        <span class="dim-nome">lgpd</span>
+        <p class="dim-veredito failed">8 achados · 3 alertas</p>
+        <p class="cts">
+          <span class="ct failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>8<span class="sr"> falhas</span></span>
+          <span class="ct xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>3<span class="sr"> alertas</span></span>
+          <span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>7<span class="sr"> passaram</span></span>
+          <span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0<span class="sr"> pulados</span></span>
+        </p>
+        <p class="dim-obs">Conformidade LGPD observável de fora (caixa-preta). Inclui os testes de acessibilidade, que contam também aqui — LBI, Art. 63.</p>
+      </div>
+      <div class="nota-epistemica">
+        <p class="nota-k">Nota epistêmica — vale para toda a dimensão</p>
+        <p>Verificação caixa-preta do que é observável de fora. Falha PROVA não conformidade; passar NÃO certifica conformidade — base legal, contrato com operador, ROPA e governança interna não são observáveis por HTTP.</p>
+        <p class="sem-selo">Nenhum elemento deste relatório constitui selo, certificação ou aprovação.</p>
+      </div>
+    </div>
+
+    <div class="dim">
+      <span class="dim-nome">backend</span>
+      <p class="dim-veredito passed">sem achados</p>
+      <p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>5</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p>
+    </div>
+
+    <div class="dim">
+      <span class="dim-nome">frontend</span>
+      <p class="dim-veredito passed">sem achados</p>
+      <p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>5</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p>
+    </div>
+
+    <div class="dim">
+      <span class="dim-nome">ux</span>
+      <p class="dim-veredito failed">2 achados</p>
+      <p class="cts"><span class="ct failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>2</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>2</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p>
+      <p class="dim-obs">Acessibilidade conta aqui e em lgpd.</p>
+    </div>
+
+    <div class="dim">
+      <span class="dim-nome">functional</span>
+      <p class="dim-veredito passed">sem achados</p>
+      <p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>3</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p>
+    </div>
+
+    <div class="dim">
+      <span class="dim-nome">acceptance</span>
+      <p class="dim-veredito passed">sem achados</p>
+      <p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>3</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p>
+    </div>
+
+    <div class="dim">
+      <span class="dim-nome">verification</span>
+      <p class="dim-veredito passed">sem achados</p>
+      <p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>8</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p>
+      <p class="dim-obs">A suíte testando a si mesma (tests/).</p>
+    </div>
+
+    <div class="dim">
+      <span class="dim-nome">load</span>
+      <p class="dim-veredito skipped">não avaliada</p>
+      <p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>0</span><span class="ct skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>2</span></p>
+      <p class="dim-obs">Gate de carga fechado (<code>WEBQA_LOAD_AUTHORIZED</code>).</p>
+    </div>
+  </div>
+
+  <p class="nota-dupla">Um teste pode contar em mais de uma dimensão — acessibilidade é <code>ux</code> e é <code>lgpd</code> (LBI, Art. 63). No agrupamento dos achados ele aparece uma vez, sob a primeira dimensão declarada.</p>
+
+  <p class="legenda" aria-label="Legenda dos estados">
+    <span><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>= failed · prova de não conformidade</span>
+    <span><span class="estado-min xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>alerta</span>= xfail · informativo, sem obrigação legal direta</span>
+    <span><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passou</span>= passed · conforme no observável</span>
+    <span><span class="estado-min skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>pulado</span>= skipped · não aplicável, motivo registrado</span>
+  </p>
+</section>
+
+<section id="achados" aria-labelledby="h-achados">
+  <div class="sec-h">
+    <h2 id="h-achados"><span class="n">2</span>Achados — 8 não conformidades observadas</h2>
+    <span class="sec-sub">cite-os por número (A1–A8) em tickets e planos de ação</span>
+  </div>
+
+  <h3>lgpd <span class="ct-grupo">— 6 achados</span></h3>
+
+  <article class="achado" id="a1">
+    <div class="achado-margem">
+      <span class="achado-id">A1</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">Tracker de terceiro contactado <strong>antes</strong> de qualquer interação de consentimento: <code>www.googletagmanager.com</code> (1 requisição de script no carregamento). Consentimento precisa ser prévio, livre e específico — <strong class="lei">Art. 7º, I</strong> e <strong class="lei">Art. 8º, §4</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento</code><span class="num">2,14 s</span><span>navegador</span></p>
+    </div>
+  </article>
+
+  <article class="achado" id="a2">
+    <div class="achado-margem">
+      <span class="achado-id">A2</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">Cookie de analytics gravado no primeiro carregamento, antes de qualquer aceite: <code>_ga</code>. Medição de audiência fundada em consentimento exige consentimento prévio — <strong class="lei">Art. 8º, §4</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_consentimento.py::test_sem_cookies_nao_essenciais_pre_aceite</code><span class="num">2,08 s</span><span>navegador</span></p>
+    </div>
+  </article>
+
+  <article class="achado" id="a3">
+    <div class="achado-margem">
+      <span class="achado-id">A3</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">Dado pessoal em query string: <code>/newsletter?email=***</code> (parâmetros mascarados pela própria suíte). Query strings terminam em logs de servidor e no cabeçalho Referer — <strong class="lei">Art. 6º, VII e VIII</strong>; <strong class="lei">Art. 46</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_pii_transito.py::test_pii_em_query_string</code><span class="num">0,35 s</span></p>
+    </div>
+  </article>
+
+  <article class="achado" id="a4">
+    <div class="achado-margem">
+      <span class="achado-id">A4</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">Formulário com campo de e-mail submete via <code>GET</code> e fora de HTTPS (<code>action</code> resolvido: <code>http://…/newsletter</code>). Dado pessoal exposto na URL e em claro no transporte — <strong class="lei">Art. 46</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_pii_transito.py::test_forms_pii_post_https</code><span class="num">0,29 s</span></p>
+    </div>
+  </article>
+
+  <article class="achado" id="a5">
+    <div class="achado-margem">
+      <span class="achado-id">A5</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">Script de terceiro sem verificação de integridade (SRI): <code>cdn.exemplo-fixture.invalid/jquery-3.7.1.min.js</code>. Sem <code>integrity</code>, um CDN comprometido executa código no navegador do titular — <strong class="lei">Art. 46</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_terceiros.py::test_sri_scripts_externos</code><span class="num">0,31 s</span></p>
+    </div>
+  </article>
+
+  <article class="achado" id="a6">
+    <div class="achado-margem">
+      <span class="achado-id">A6</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">Cookie <code>_ga</code> declara <code>Max-Age</code> de 63 072 000 s (730 dias) — teto da suíte: 400 dias. Vida útil declarada de cookie é política de retenção publicada no protocolo — <strong class="lei">Art. 15</strong> e <strong class="lei">Art. 16</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_retencao_observavel.py::test_cookies_expiracao</code><span class="num">0,05 s</span></p>
+    </div>
+  </article>
+
+  <h3>ux <span class="ct-grupo">— 2 achados · contam também em lgpd (LBI, Art. 63)</span></h3>
+
+  <article class="achado" id="a7">
+    <div class="achado-margem">
+      <span class="achado-id">A7</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">1 de 1 imagem sem atributo <code>alt</code> (<code>/logo.png</code>). Leitores de tela não têm o que anunciar — WCAG 1.1.1; no Brasil, acessibilidade é obrigação legal: <strong class="lei">LBI, Art. 63</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">ux + lgpd</span><code>checks/ux/test_acessibilidade.py::test_imagens_com_alt</code><span class="num">1,98 s</span><span>navegador</span></p>
+    </div>
+  </article>
+
+  <article class="achado" id="a8">
+    <div class="achado-margem">
+      <span class="achado-id">A8</span>
+      <span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span>
+    </div>
+    <div>
+      <p class="detalhe">axe-core 4.9.1: 1 violação <strong>crítica</strong> — <code>image-alt</code>, 1 elemento afetado. Orçamento da suíte para violações críticas: 0 (<code>a11y_critical_max</code>) — <strong class="lei">LBI, Art. 63</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">ux + lgpd</span><code>checks/ux/test_acessibilidade.py::test_sem_violacoes_criticas</code><span class="num">3,41 s</span><span>navegador</span></p>
+    </div>
+  </article>
+</section>
+
+<section id="alertas" aria-labelledby="h-alertas">
+  <div class="sec-h">
+    <h2 id="h-alertas"><span class="n">3</span>Alertas — 3 sinais de maturidade ausentes</h2>
+    <span class="sec-sub">xfail · não entram em nenhuma contagem de falha</span>
+  </div>
+  <p class="intro-sec">Vale a pena ter; não é ilegal não ter. Nenhum item abaixo constitui não conformidade.</p>
+
+  <article class="alerta" id="x1">
+    <div class="achado-margem">
+      <span class="estado xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>alerta</span>
+    </div>
+    <div>
+      <p class="detalhe"><code>Referrer-Policy</code> ausente. Declarar <code>strict-origin-when-cross-origin</code> evita vazar URLs completas a terceiros.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_pii_transito.py::test_referrer_policy_declarada</code><span class="num">0,02 s</span></p>
+    </div>
+  </article>
+
+  <article class="alerta" id="x2">
+    <div class="achado-margem">
+      <span class="estado xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>alerta</span>
+    </div>
+    <div>
+      <p class="detalhe"><code>Permissions-Policy</code> ausente. Declarar o bloqueio de câmera, microfone e geolocalização documenta minimização no protocolo — dialoga com o <strong class="lei">Art. 6º, III</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_retencao_observavel.py::test_permissions_policy</code><span class="num">0,02 s</span></p>
+    </div>
+  </article>
+
+  <article class="alerta" id="x3">
+    <div class="achado-margem">
+      <span class="estado xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>alerta</span>
+    </div>
+    <div>
+      <p class="detalhe"><code>/.well-known/security.txt</code> ausente (404). Canal público para reporte de vulnerabilidade é prática recomendada — dialoga com o <strong class="lei">Art. 48</strong>.</p>
+      <p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_retencao_observavel.py::test_security_txt</code><span class="num">0,04 s</span></p>
+    </div>
+  </article>
+</section>
+
+<section id="terceiros" aria-labelledby="h-terceiros">
+  <div class="sec-h">
+    <h2 id="h-terceiros"><span class="n">4</span>Inventário de terceiros</h2>
+    <span class="sec-sub">quem recebeu requisições do navegador ao carregar a página</span>
+  </div>
+  <p class="intro-sec">Registro factual — não acusa nem absolve. Insumo para ROPA e contratos de operador (DPA). Hosts do próprio alvo não entram; por política da suíte, sem paths e sem query strings. Fonte: <code>report/terceiros.json</code>.</p>
+
+  <div class="rolagem">
+  <table>
+    <caption class="sr">Hosts de terceiros contactados no carregamento</caption>
+    <thead><tr><th scope="col">Host</th><th scope="col">Requisições</th><th scope="col">Tipos de recurso</th><th scope="col">Classificação</th><th scope="col">Observação</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="t-teste">www.googletagmanager.com</td>
+        <td class="t-dur">1</td>
+        <td>script</td>
+        <td><span class="chip-tracker">consta em TRACKER_DOMAINS</span></td>
+        <td class="t-det">Contactado antes do consentimento — ver <a href="#a1">A1</a></td>
+      </tr>
+      <tr>
+        <td class="t-teste">cdn.exemplo-fixture.invalid</td>
+        <td class="t-dur">1</td>
+        <td>script</td>
+        <td><span class="chip-neutro">não classificado</span></td>
+        <td class="t-det">Sem SRI — ver <a href="#a5">A5</a>. Domínio não resolveu (.invalid)</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="tabela" aria-labelledby="h-tabela">
+  <div class="sec-h">
+    <h2 id="h-tabela"><span class="n">5</span>Todos os resultados</h2>
+    <span class="sec-sub">registro completo da execução, incluindo o que passou</span>
+  </div>
+
+  <details class="tabela-wrap">
+    <summary>Abrir a tabela completa — 44 resultados (8 achados · 3 alertas · 31 passaram · 2 pulados)</summary>
+    <div class="rolagem">
+    <table>
+      <caption class="sr">Todos os resultados da execução</caption>
+      <thead><tr><th scope="col">Estado</th><th scope="col">Dimensão</th><th scope="col">Teste</th><th scope="col">Duração</th><th scope="col">Motivo / referência</th></tr></thead>
+      <tbody>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">backend</td><td class="t-teste">checks/backend/test_disponibilidade.py::test_status_200</td><td class="t-dur">0,021 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">backend</td><td class="t-teste">checks/backend/test_disponibilidade.py::test_sem_erros_5xx</td><td class="t-dur">0,018 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">backend</td><td class="t-teste">checks/backend/test_latencia.py::test_ttfb_dentro_do_orcamento</td><td class="t-dur">0,31 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">backend</td><td class="t-teste">checks/backend/test_latencia.py::test_percentis_p50_p95</td><td class="t-dur">1,28 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">backend</td><td class="t-teste">checks/backend/test_latencia.py::test_percentil_p99</td><td class="t-dur">1,30 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">frontend</td><td class="t-teste">checks/frontend/test_peso.py::test_peso_total_da_pagina</td><td class="t-dur">0,40 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">frontend</td><td class="t-teste">checks/frontend/test_peso.py::test_tamanho_do_html</td><td class="t-dur">0,011 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">frontend</td><td class="t-teste">checks/frontend/test_recursos.py::test_numero_de_css</td><td class="t-dur">0,009 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">frontend</td><td class="t-teste">checks/frontend/test_recursos.py::test_numero_de_js</td><td class="t-dur">0,008 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">frontend</td><td class="t-teste">checks/frontend/test_recursos.py::test_scripts_bloqueantes</td><td class="t-dur">0,010 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">ux + lgpd</td><td class="t-teste">checks/ux/test_acessibilidade.py::test_imagens_com_alt</td><td class="t-dur">1,98 s</td><td class="t-det">ver <a href="#a7">A7</a></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">ux + lgpd</td><td class="t-teste">checks/ux/test_acessibilidade.py::test_sem_violacoes_criticas</td><td class="t-dur">3,41 s</td><td class="t-det">ver <a href="#a8">A8</a></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">ux + lgpd</td><td class="t-teste">checks/ux/test_acessibilidade.py::test_sem_violacoes_serias</td><td class="t-dur">3,38 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">ux + lgpd</td><td class="t-teste">checks/ux/test_acessibilidade.py::test_lang_declarado</td><td class="t-dur">0,87 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">functional</td><td class="t-teste">checks/functional/test_navegacao.py::test_home_carrega_sem_erros</td><td class="t-dur">2,44 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">functional</td><td class="t-teste">checks/functional/test_navegacao.py::test_links_internos_respondem</td><td class="t-dur">1,92 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">functional</td><td class="t-teste">checks/functional/test_formularios.py::test_formularios_tem_envio</td><td class="t-dur">1,05 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">acceptance</td><td class="t-teste">checks/acceptance/test_conteudo.py::test_titulo_da_pagina</td><td class="t-dur">0,61 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">acceptance</td><td class="t-teste">checks/acceptance/test_conteudo.py::test_h1_presente</td><td class="t-dur">0,59 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">acceptance</td><td class="t-teste">checks/acceptance/test_conteudo.py::test_politica_de_privacidade_linkada</td><td class="t-dur">0,64 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento</td><td class="t-dur">2,14 s</td><td class="t-det">ver <a href="#a1">A1</a></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_consentimento.py::test_sem_cookies_nao_essenciais_pre_aceite</td><td class="t-dur">2,08 s</td><td class="t-det">ver <a href="#a2">A2</a></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_pii_transito.py::test_pii_em_query_string</td><td class="t-dur">0,35 s</td><td class="t-det">ver <a href="#a3">A3</a></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_pii_transito.py::test_forms_pii_post_https</td><td class="t-dur">0,29 s</td><td class="t-det">ver <a href="#a4">A4</a></td></tr>
+<tr class="xfail"><td><span class="estado-min xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>xfail</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_pii_transito.py::test_referrer_policy_declarada</td><td class="t-dur">0,020 s</td><td class="t-det">Referrer-Policy ausente — sinal de maturidade, sem obrigação legal direta</td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_transparencia.py::test_politica_alcancavel</td><td class="t-dur">0,41 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_transparencia.py::test_politica_cita_direitos_do_titular</td><td class="t-dur">0,38 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_transparencia.py::test_canal_do_encarregado</td><td class="t-dur">0,36 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_terceiros.py::test_inventario_terceiros</td><td class="t-dur">2,02 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_terceiros.py::test_sri_scripts_externos</td><td class="t-dur">0,31 s</td><td class="t-det">ver <a href="#a5">A5</a></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_terceiros.py::test_fontes_locais</td><td class="t-dur">0,070 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_retencao_observavel.py::test_cookies_expiracao</td><td class="t-dur">0,050 s</td><td class="t-det">ver <a href="#a6">A6</a></td></tr>
+<tr class="xfail"><td><span class="estado-min xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>xfail</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_retencao_observavel.py::test_permissions_policy</td><td class="t-dur">0,020 s</td><td class="t-det">Permissions-Policy ausente — sinal de maturidade, sem obrigação legal direta</td></tr>
+<tr class="xfail"><td><span class="estado-min xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>xfail</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_retencao_observavel.py::test_security_txt</td><td class="t-dur">0,040 s</td><td class="t-det">security.txt ausente (404) — sinal de maturidade, sem obrigação legal direta</td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_sanitize.py::test_mascara_email_e_cpf</td><td class="t-dur">0,004 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_sanitize.py::test_find_pii_usa_mesmas_regexes</td><td class="t-dur">0,003 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_trackers.py::test_casamento_por_rotulo</td><td class="t-dur">0,003 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_trackers.py::test_allowlist_vence</td><td class="t-dur">0,002 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_gates.py::test_carga_exige_autorizacao</td><td class="t-dur">0,002 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_config.py::test_thresholds_carregados</td><td class="t-dur">0,011 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_http_utils.py::test_safe_url_remove_query</td><td class="t-dur">0,002 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="passed"><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">verification</td><td class="t-teste">tests/test_estabilidade.py::test_streak_recalculado_do_historico</td><td class="t-dur">0,018 s</td><td class="t-det"><span class="t-det">—</span></td></tr>
+<tr class="skipped"><td><span class="estado-min skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>skipped</span></td><td class="t-teste">load</td><td class="t-teste">checks/backend/test_carga.py::test_rajada_leve</td><td class="t-dur">0,001 s</td><td class="t-det">Gate de carga fechado: defina WEBQA_LOAD_AUTHORIZED=1 para autorizar a rajada (30 req / 10 conc) — RISCOS.md R1</td></tr>
+<tr class="skipped"><td><span class="estado-min skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>skipped</span></td><td class="t-teste">load</td><td class="t-teste">checks/backend/test_carga.py::test_p95_sob_carga</td><td class="t-dur">0,001 s</td><td class="t-det">Gate de carga fechado (WEBQA_LOAD_AUTHORIZED ausente)</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </details>
+  <p class="intro-sec so-impressao">Na versão impressa sem a tabela expandida, o registro completo permanece disponível em <code>report/summary.json</code>.</p>
+</section>
+
+</main>
+
+<footer>
+  <p><strong>WebQA Suite</strong> v1.0 · relatório gerado automaticamente por <code>webqa/report.py</code> · comando: <code>pytest checks tests</code> · projeto: github.com/danzeroum/qa-suite</p>
+  <p>Este documento registra observações de caixa-preta sobre o alvo. Não constitui certificação, selo ou aprovação de conformidade.</p>
+  <p class="sha">Identidade do alvo (sha-256 do conteúdo servido): fixture_target:a6ee5978da3bbfe091578e6dddbc63ecc22ea802f3e208d15f4cc580b6de15ca</p>
+  <p>Dados desta página: execução de demonstração contra <code>fixture_target/</code> — alvo fabricado e deliberadamente não conforme, usado como referência de design.</p>
+</footer>
+
+</div>
+<script>
+/* Progressivo e opcional: sem JS o documento é 100% funcional (a tabela
+   completa apenas permanece recolhida na impressão). */
+addEventListener("beforeprint",function(){document.querySelectorAll("details").forEach(function(d){d.dataset.aberto=d.open?"1":"";d.open=true})});
+addEventListener("afterprint",function(){document.querySelectorAll("details").forEach(function(d){d.open=d.dataset.aberto==="1"})});
+</script>
+</body>
+</html>

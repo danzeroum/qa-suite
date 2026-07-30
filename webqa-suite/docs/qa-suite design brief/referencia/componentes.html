@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="omelette-owns-print" content="">
+<meta name="color-scheme" content="light dark">
+<title>WebQA Suite — Especificação de componentes</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M2 6V3.5A1.5 1.5 0 0 1 3.5 2H6M14 2h2.5A1.5 1.5 0 0 1 18 3.5V6M18 14v2.5a1.5 1.5 0 0 1-1.5 1.5H14M6 18H3.5A1.5 1.5 0 0 1 2 16.5V14" fill="none" stroke="%231C2228" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="10" r="2.6" fill="%231C2228"/></svg>'>
+<style>
+/* ============================================================
+   WebQA Suite — folha de estilo única do relatório (summary.html)
+   Arquivo único · zero requisições externas · funciona sem JS.
+   Tokens em custom properties; classes de estado = outcomes do
+   pytest, verbatim: .passed .failed .xfail .skipped
+   Tema escuro: o MESMO bloco de tokens aparece 2x — sob
+   prefers-color-scheme (automático) e sob [data-tema="escuro"]
+   (forçável). No template Python, interpolar o bloco uma vez.
+   ============================================================ */
+:root{
+  color-scheme:light dark;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
+  --serif:Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --fundo:#F5F3EF; --papel:#FFFFFF;
+  --tinta:#1C2228; --tinta-2:#4A5560;
+  --linha:#DED9D1; --linha-forte:#1C2228;
+  --acento:#1E5A8A; --fundo-acento:#EDF2F7;
+  --cor-failed:#9E2222;  --fundo-failed:#F9ECEA;  --borda-failed:#D9ACA6;
+  --cor-xfail:#8A5800;   --fundo-xfail:#F8F0DE;   --borda-xfail:#D9C084;
+  --cor-passed:#2F6B4F;  --fundo-passed:#EBF2EC;  --borda-passed:#ABC7B3;
+  --cor-skipped:#5C6670; --fundo-skipped:#F0F0F1; --borda-skipped:#C5CACF;
+}
+@media screen and (prefers-color-scheme:dark){
+  :root:not([data-tema="claro"]){
+    --fundo:#12161A; --papel:#1A2026;
+    --tinta:#E6E9EC; --tinta-2:#A9B2BC;
+    --linha:#323B43; --linha-forte:#DEE3E8;
+    --acento:#82B5DD; --fundo-acento:#1D2B37;
+    --cor-failed:#E98D82;  --fundo-failed:#2C1B18;  --borda-failed:#5F352F;
+    --cor-xfail:#DCA845;   --fundo-xfail:#2A2213;   --borda-xfail:#5E4B1E;
+    --cor-passed:#7CBA90;  --fundo-passed:#17241C;  --borda-passed:#31543F;
+    --cor-skipped:#9AA4AE; --fundo-skipped:#1E252B; --borda-skipped:#3C454E;
+  }
+}
+@media screen{
+  :root[data-tema="escuro"]{
+    --fundo:#12161A; --papel:#1A2026;
+    --tinta:#E6E9EC; --tinta-2:#A9B2BC;
+    --linha:#323B43; --linha-forte:#DEE3E8;
+    --acento:#82B5DD; --fundo-acento:#1D2B37;
+    --cor-failed:#E98D82;  --fundo-failed:#2C1B18;  --borda-failed:#5F352F;
+    --cor-xfail:#DCA845;   --fundo-xfail:#2A2213;   --borda-xfail:#5E4B1E;
+    --cor-passed:#7CBA90;  --fundo-passed:#17241C;  --borda-passed:#31543F;
+    --cor-skipped:#9AA4AE; --fundo-skipped:#1E252B; --borda-skipped:#3C454E;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 .95rem/1.55 var(--sans)}
+a{color:var(--acento);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--acento);outline-offset:2px;border-radius:2px}
+code{font-family:var(--mono);font-size:.88em}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.pular{position:absolute;left:-9999px;top:0;background:var(--papel);color:var(--acento);padding:10px 16px;z-index:9;border:1px solid var(--linha-forte)}
+.pular:focus{left:12px;top:12px}
+.folha{max-width:1120px;margin:28px auto;background:var(--papel);border:1px solid var(--linha);padding:44px 52px 60px}
+
+/* ---- cabeçalho ---- */
+.marca-linha{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:16px;border-bottom:2px solid var(--linha-forte)}
+.marca{display:inline-flex;align-items:center;gap:10px}
+.marca svg{flex:none}
+.marca-nome{font:400 .98rem var(--sans);letter-spacing:.01em}
+.marca-nome b{font-weight:650}
+.doc-tipo{font:500 .68rem var(--mono);text-transform:uppercase;letter-spacing:.11em;color:var(--tinta-2)}
+h1{font:650 1.5rem/1.25 var(--sans);letter-spacing:-.01em;margin:28px 0 4px}
+.alvo-sub{margin:0;color:var(--tinta-2);font-size:1rem}
+.meta{display:grid;grid-template-columns:repeat(4,auto);justify-content:start;gap:10px 48px;margin:24px 0 0}
+.meta div{margin:0}
+.meta dt{font:600 .66rem var(--mono);text-transform:uppercase;letter-spacing:.11em;color:var(--tinta-2)}
+.meta dd{margin:3px 0 0;font-size:.86rem}
+.meta dd code{font-size:.78rem}
+
+/* resumo (fotografia) */
+.resumo{display:flex;flex-wrap:wrap;align-items:center;gap:14px 30px;margin-top:26px;padding:15px 18px;background:var(--fundo);border:1px solid var(--linha)}
+.resumo-item{display:flex;align-items:center;gap:9px}
+.resumo-item .ic{flex:none}
+.resumo-item b{font:650 1.3rem/1 var(--sans);font-variant-numeric:tabular-nums}
+.resumo-item span{font-size:.82rem;color:var(--tinta-2)}
+.resumo-item.failed b,.resumo-item.failed .ic{color:var(--cor-failed)}
+.resumo-item.xfail .ic{color:var(--cor-xfail)}
+.resumo-item.passed .ic{color:var(--cor-passed)}
+.resumo-item.skipped .ic{color:var(--cor-skipped)}
+.resumo-total{margin-left:auto;font:400 .76rem/1.5 var(--mono);color:var(--tinta-2);text-align:right}
+.indice{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:14px;font-size:.84rem}
+.indice a{text-decoration:none}
+.indice a:hover{text-decoration:underline}
+.indice .n{font:600 .72rem var(--mono);color:var(--tinta-2);margin-right:5px}
+
+/* ---- seções ---- */
+section{margin-top:46px}
+.sec-h{border-top:2px solid var(--linha-forte);padding-top:13px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+h2{font:700 .9rem/1.3 var(--sans);text-transform:uppercase;letter-spacing:.09em;margin:0}
+h2 .n{font:600 .8rem var(--mono);color:var(--tinta-2);margin-right:8px}
+.sec-sub{font-size:.82rem;color:var(--tinta-2)}
+h3{font:600 .8rem/1.4 var(--mono);letter-spacing:.02em;margin:26px 0 2px}
+h3 .ct-grupo{color:var(--tinta-2);font-weight:400}
+
+/* estados: ícone + rótulo + cor — nunca cor sozinha */
+.ic{display:inline-block;vertical-align:-1px}
+.estado{display:inline-flex;align-items:center;gap:6px;font:700 .66rem/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;padding:4px 8px;border:1px solid;border-radius:3px;white-space:nowrap}
+.estado.failed{color:var(--cor-failed);background:var(--fundo-failed);border-color:var(--borda-failed)}
+.estado.xfail{color:var(--cor-xfail);background:var(--fundo-xfail);border-color:var(--borda-xfail)}
+.estado.passed{color:var(--cor-passed);background:var(--fundo-passed);border-color:var(--borda-passed)}
+.estado.skipped{color:var(--cor-skipped);background:var(--fundo-skipped);border-color:var(--borda-skipped)}
+.estado-min{display:inline-flex;align-items:center;gap:5px;font:700 .66rem/1 var(--sans);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.estado-min.failed{color:var(--cor-failed)}
+.estado-min.xfail{color:var(--cor-xfail)}
+.estado-min.passed{color:var(--cor-passed)}
+.estado-min.skipped{color:var(--cor-skipped)}
+.legenda{display:flex;flex-wrap:wrap;gap:8px 20px;margin:16px 0 0;font:400 .74rem var(--mono);color:var(--tinta-2)}
+.legenda span{display:inline-flex;align-items:center;gap:6px}
+
+/* panorama por dimensão */
+.dims{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+.dim{border:1px solid var(--linha);border-radius:3px;padding:13px 15px;background:var(--papel)}
+.dim-nome{font:650 .8rem var(--mono);letter-spacing:.02em}
+.dim-veredito{margin:7px 0 11px;font:600 .95rem/1.3 var(--sans)}
+.dim-veredito.failed{color:var(--cor-failed)}
+.dim-veredito.passed{color:var(--cor-passed)}
+.dim-veredito.skipped{color:var(--cor-skipped)}
+.cts{display:flex;gap:13px;font:400 .76rem var(--mono);color:var(--tinta-2)}
+.ct{display:inline-flex;align-items:center;gap:4px}
+.ct.failed .ic{color:var(--cor-failed)}
+.ct.xfail .ic{color:var(--cor-xfail)}
+.ct.passed .ic{color:var(--cor-passed)}
+.ct.skipped .ic{color:var(--cor-skipped)}
+.ct.zero{color:var(--tinta-2)}
+.ct.zero .ic{opacity:.35}
+.dim-obs{margin-top:9px;font-size:.74rem;line-height:1.5;color:var(--tinta-2)}
+.dim-lgpd{grid-column:1/-1;display:grid;grid-template-columns:230px 1fr;gap:14px 28px;border:1px solid var(--linha-forte);padding:16px 18px}
+.nota-epistemica{border:1px solid var(--linha);background:var(--fundo);padding:13px 16px;max-width:76ch}
+.nota-epistemica .nota-k{font:700 .64rem var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--tinta-2);margin:0 0 6px}
+.nota-epistemica p{margin:0;font:italic 400 .95rem/1.6 var(--serif)}
+.nota-epistemica .sem-selo{margin-top:7px;font:400 .74rem/1.5 var(--sans);font-style:normal;color:var(--tinta-2)}
+.nota-dupla{margin:14px 0 0;font-size:.76rem;color:var(--tinta-2);max-width:90ch}
+
+/* achados / alertas */
+.achado,.alerta{display:grid;grid-template-columns:118px 1fr;gap:8px 26px;padding:17px 0 19px;border-top:1px solid var(--linha)}
+.achado-margem{display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+.achado-id{font:700 1rem/1 var(--mono)}
+.detalhe{margin:0;font:400 1.03rem/1.62 var(--serif);max-width:72ch;text-wrap:pretty}
+.alerta .detalhe{font-size:.96rem}
+.detalhe code{font-size:.8em;background:var(--fundo);border:1px solid var(--linha);padding:.08em .3em;border-radius:2px;overflow-wrap:anywhere}
+.lei{font-weight:700;text-decoration:underline dotted 1.2px;text-underline-offset:3px;white-space:nowrap}
+.achado-meta{margin-top:9px;display:flex;flex-wrap:wrap;align-items:center;gap:5px 16px;font:400 .74rem/1.6 var(--mono);color:var(--tinta-2)}
+.achado-meta code{font-size:1em;overflow-wrap:anywhere}
+.chip-dim{border:1px solid var(--linha);padding:.18em .5em;border-radius:3px;white-space:nowrap}
+.intro-sec{margin:14px 0 0;font-size:.84rem;color:var(--tinta-2);max-width:80ch}
+
+/* estados vazios / avisos (usados nas variações) */
+.vazio{border:1px solid var(--borda-passed);background:var(--fundo-passed);padding:20px 24px;margin-top:18px;max-width:none}
+.vazio p{margin:0;font:400 1.05rem/1.6 var(--serif)}
+.vazio .destaque{display:flex;align-items:center;gap:10px;font:650 1.1rem var(--sans);color:var(--cor-passed);margin-bottom:8px}
+.vazio .lembrete{margin-top:10px;font:400 .82rem/1.55 var(--sans);color:var(--tinta-2)}
+.aviso{border:1px solid var(--borda-xfail);background:var(--fundo-xfail);padding:13px 18px;margin-top:20px;font-size:.88rem;line-height:1.6}
+.aviso b{color:var(--cor-xfail)}
+.fora-escopo{border:1px dashed var(--linha);border-radius:3px;padding:13px 15px;color:var(--tinta-2);font-size:.82rem;line-height:1.55;display:flex;align-items:center}
+
+/* tabelas */
+.rolagem{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.8rem}
+caption{text-align:left}
+th{font:700 .66rem var(--mono);text-transform:uppercase;letter-spacing:.09em;text-align:left;color:var(--tinta-2);border-bottom:2px solid var(--linha-forte);padding:8px 10px;white-space:nowrap}
+td{border-top:1px solid var(--linha);padding:8px 10px;vertical-align:top}
+td.t-teste{font:400 .74rem/1.6 var(--mono);overflow-wrap:anywhere}
+td.t-dur{white-space:nowrap;text-align:right;font:400 .74rem var(--mono);font-variant-numeric:tabular-nums}
+td.t-det{font-size:.78rem;line-height:1.55;color:var(--tinta-2)}
+tr.failed>td{background:var(--fundo-failed)}
+tr.xfail>td{background:var(--fundo-xfail)}
+tr.skipped>td{color:var(--tinta-2)}
+details.tabela-wrap{margin-top:16px;border:1px solid var(--linha);border-radius:3px}
+details.tabela-wrap summary{cursor:pointer;padding:13px 16px;font:600 .85rem var(--sans)}
+details.tabela-wrap summary:hover{background:var(--fundo)}
+details.tabela-wrap[open] summary{border-bottom:1px solid var(--linha)}
+details.tabela-wrap .rolagem{padding:0 16px 14px}
+.chip-tracker{font:600 .68rem var(--mono);border:1px solid var(--linha-forte);padding:.2em .55em;border-radius:3px;white-space:nowrap}
+.chip-neutro{font:400 .68rem var(--mono);border:1px solid var(--linha);color:var(--tinta-2);padding:.2em .55em;border-radius:3px;white-space:nowrap}
+
+/* painel de estabilidade */
+.historia{margin:16px 0 0;font:400 1.05rem/1.65 var(--serif);max-width:72ch;text-wrap:pretty}
+.progresso{display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap;margin-top:22px}
+.prog-num{font:700 3.1rem/1 var(--sans);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.prog-num small{font:600 1.5rem var(--sans);color:var(--tinta-2)}
+.prog-rot{font:600 .66rem var(--mono);text-transform:uppercase;letter-spacing:.11em;color:var(--tinta-2);margin-top:6px}
+.slots{display:flex;gap:7px;padding-bottom:10px}
+.slot{width:36px;height:15px;border:1px solid var(--linha);border-radius:2px}
+.slot.ok{background:var(--cor-passed);border-color:var(--cor-passed)}
+.slot.meta-slot{border-style:dashed}
+.regras{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+.regra{border:1px solid var(--linha);border-radius:3px;padding:13px 15px}
+.regra h3{margin:0 0 7px;display:flex;align-items:center;gap:7px}
+.regra p{margin:0;font-size:.82rem;line-height:1.55;color:var(--tinta-2)}
+.regra.zera h3{color:var(--cor-failed)}
+.regra.avanca h3{color:var(--cor-passed)}
+.regra.neutra h3{color:var(--cor-skipped)}
+td.t-efeito{white-space:nowrap}
+.origem{font:600 .68rem var(--mono);border:1px solid var(--linha-forte);padding:.2em .55em;border-radius:3px;white-space:nowrap}
+.origem.nao-conta{border:1px dashed var(--linha);color:var(--tinta-2);font-weight:400}
+.marco{border:1px solid var(--linha-forte);padding:16px 20px;margin-top:26px;max-width:80ch}
+.marco p{margin:0;font-size:.9rem;line-height:1.6}
+.marco .marco-k{font:700 .64rem var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--tinta-2);display:block;margin-bottom:6px}
+
+/* spec de componentes */
+.spec{margin:22px 0 0;border:1px dashed var(--linha);padding:20px 22px}
+.spec figcaption{font:400 .74rem/1.7 var(--mono);color:var(--tinta-2);margin-top:14px;border-top:1px solid var(--linha);padding-top:10px;max-width:90ch}
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.sw{border:1px solid var(--linha);border-radius:3px;overflow:hidden}
+.sw .cor{height:44px}
+.sw .rot{padding:7px 9px;font:400 .68rem/1.6 var(--mono)}
+.tipo-linha{border-top:1px solid var(--linha);padding:12px 0;display:grid;grid-template-columns:210px 1fr;gap:20px;align-items:baseline}
+.tipo-linha .uso{font:400 .72rem/1.6 var(--mono);color:var(--tinta-2)}
+
+/* rodapé */
+footer{margin-top:60px;border-top:2px solid var(--linha-forte);padding-top:16px;font-size:.78rem;line-height:1.7;color:var(--tinta-2)}
+footer .sha{font:400 .72rem var(--mono);overflow-wrap:anywhere}
+.so-impressao{display:none}
+
+/* móvel (~380px) */
+@media (max-width:700px){
+  .folha{margin:0;border:none;padding:24px 18px 40px}
+  h1{font-size:1.25rem}
+  .meta{grid-template-columns:1fr 1fr;gap:12px 20px}
+  .resumo{gap:10px 18px;padding:13px 14px}
+  .resumo-item b{font-size:1.1rem}
+  .resumo-total{margin-left:0;text-align:left;flex-basis:100%}
+  .dims{grid-template-columns:1fr 1fr}
+  .dim-lgpd{grid-template-columns:1fr;padding:14px}
+  .achado,.alerta{grid-template-columns:1fr;gap:9px}
+  .achado-margem{flex-direction:row;align-items:center;gap:12px}
+  .regras{grid-template-columns:1fr}
+  .progresso{gap:18px}
+  .tipo-linha{grid-template-columns:1fr;gap:6px}
+}
+/* impressão — cenário de primeira classe (DPO) */
+@media print{
+  @page{margin:15mm}
+  body{background:#fff;font-size:10.5pt}
+  .folha{max-width:none;margin:0;border:none;padding:0}
+  .pular,.indice{display:none}
+  .so-impressao{display:block}
+  a{color:inherit;text-decoration:none}
+  .indice a,.t-det a{text-decoration:none}
+  section{margin-top:30px}
+  .achado,.alerta,.dim,tr,.regra,.marco,.nota-epistemica{break-inside:avoid}
+  .resumo{background:none}
+  details.tabela-wrap summary{list-style:none}
+  details.tabela-wrap summary::-webkit-details-marker{display:none}
+}
+</style>
+</head>
+<body>
+<a class="pular" href="#tokens">Ir direto aos tokens</a>
+<div class="folha">
+<header>
+  <div class="marca-linha">
+    <span class="marca">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M2 6V3.5A1.5 1.5 0 0 1 3.5 2H6M14 2h2.5A1.5 1.5 0 0 1 18 3.5V6M18 14v2.5a1.5 1.5 0 0 1-1.5 1.5H14M6 18H3.5A1.5 1.5 0 0 1 2 16.5V14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="10" r="2.6" fill="currentColor"/></svg>
+      <span class="marca-nome"><b>WebQA</b> Suite</span>
+    </span>
+    <span class="doc-tipo">Especificação · referência para webqa/report.py</span>
+  </div>
+  <h1>Especificação de componentes</h1>
+  <p class="alvo-sub">Tokens, tipografia e componentes anotados — este arquivo usa a MESMA folha de estilo dos relatórios de referência; copiar daqui é copiar do produto final.</p>
+  <nav class="indice" aria-label="Seções">
+    <a href="#tokens"><span class="n">1</span>Tokens</a>
+    <a href="#tipografia"><span class="n">2</span>Tipografia</a>
+    <a href="#estados"><span class="n">3</span>Estados</a>
+    <a href="#cards"><span class="n">4</span>Cards</a>
+    <a href="#achado-spec"><span class="n">5</span>Achado/alerta</a>
+    <a href="#tabelas-spec"><span class="n">6</span>Tabelas</a>
+    <a href="#ledger-spec"><span class="n">7</span>Ledger</a>
+    <a href="#implementacao"><span class="n">8</span>Implementação</a>
+  </nav>
+</header>
+<main>
+
+<section id="tokens" aria-labelledby="h-tokens">
+<div class="sec-h"><h2 id="h-tokens"><span class="n">1</span>Tokens de cor</h2><span class="sec-sub">custom properties · claro e escuro · contraste sobre --papel</span></div>
+<p class="intro-sec">Mínimo exigido: AA (4,5:1 para texto). Todos os pares abaixo ficam em ou acima de 5:1 nos dois temas; o texto de cada estado sobre o próprio <code>--fundo-*</code> também (≥ 5:1). Cor nunca é o único canal: forma + rótulo sempre acompanham.</p>
+<div class="rolagem">
+<table>
+<caption class="sr">Tokens de cor nos dois temas</caption>
+<thead><tr><th scope="col">Token</th><th scope="col">Tema claro</th><th scope="col">Tema escuro</th><th scope="col">Contraste</th><th scope="col">Uso</th></tr></thead>
+<tbody>
+<tr><td class="t-teste">--tinta</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#1C2228"></span> #1C2228</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#E6E9EC"></span> #E6E9EC</td><td class="t-dur">15,9 / 13,3</td><td class="t-det">texto padrão</td></tr>
+<tr><td class="t-teste">--tinta-2</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#4A5560"></span> #4A5560</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#A9B2BC"></span> #A9B2BC</td><td class="t-dur">7,6 / 7,5</td><td class="t-det">metadados, contagens, ids</td></tr>
+<tr><td class="t-teste">--fundo</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#F5F3EF"></span> #F5F3EF</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#12161A"></span> #12161A</td><td class="t-dur">—</td><td class="t-det">mesa do documento; faixas internas</td></tr>
+<tr><td class="t-teste">--papel</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#FFFFFF"></span> #FFFFFF</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#1A2026"></span> #1A2026</td><td class="t-dur">—</td><td class="t-det">a folha</td></tr>
+<tr><td class="t-teste">--linha</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#DED9D1"></span> #DED9D1</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#323B43"></span> #323B43</td><td class="t-dur">—</td><td class="t-det">fios de 1px</td></tr>
+<tr><td class="t-teste">--linha-forte</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#1C2228"></span> #1C2228</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#DEE3E8"></span> #DEE3E8</td><td class="t-dur">—</td><td class="t-det">réguas de seção (2px) e bordas de destaque</td></tr>
+<tr><td class="t-teste">--acento</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#1E5A8A"></span> #1E5A8A</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#82B5DD"></span> #82B5DD</td><td class="t-dur">7,3 / 7,5</td><td class="t-det">links, foco visível</td></tr>
+<tr><td class="t-teste">--cor-failed</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#9E2222"></span> #9E2222</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#E98D82"></span> #E98D82</td><td class="t-dur">7,8 / 6,6</td><td class="t-det">achado (failed) — o conteúdo nobre</td></tr>
+<tr><td class="t-teste">--cor-xfail</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#8A5800"></span> #8A5800</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#DCA845"></span> #DCA845</td><td class="t-dur">6,0 / 7,6</td><td class="t-det">alerta (xfail) — terceira cor, nem verde nem vermelha</td></tr>
+<tr><td class="t-teste">--cor-passed</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#2F6B4F"></span> #2F6B4F</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#7CBA90"></span> #7CBA90</td><td class="t-dur">6,3 / 7,2</td><td class="t-det">passou (passed) — positivo e discreto</td></tr>
+<tr><td class="t-teste">--cor-skipped</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#5C6670"></span> #5C6670</td><td class="t-teste"><span style="display:inline-block;width:13px;height:13px;border:1px solid var(--linha);vertical-align:-2px;background:#9AA4AE"></span> #9AA4AE</td><td class="t-dur">5,8 / 6,5</td><td class="t-det">pulado (skipped) — neutro, motivo sempre legível</td></tr>
+</tbody>
+</table>
+</div>
+<p class="intro-sec">Cada estado tem o trio <code>--cor-*</code> / <code>--fundo-*</code> / <code>--borda-*</code>. Os nomes casam 1:1 com os outcomes do pytest — as classes CSS são os outcomes verbatim (<code>.failed</code>, <code>.xfail</code>, <code>.passed</code>, <code>.skipped</code>), como o <code>report.py</code> já emite.</p>
+</section>
+
+<section id="tipografia" aria-labelledby="h-tipografia">
+<div class="sec-h"><h2 id="h-tipografia"><span class="n">2</span>Tipografia</h2><span class="sec-sub">system font stack · zero rede · três vozes</span></div>
+<p class="intro-sec"><strong>Sans</strong> (estrutura): <code>system-ui, "Segoe UI", Roboto, …</code> · <strong>Serif</strong> (a voz que explica — mensagens <code>detail</code>): <code>Charter, "Sitka Text", Cambria, Georgia, …</code> · <strong>Mono</strong> (a máquina — ids, hashes, contagens): <code>ui-monospace, Menlo, Consolas, …</code></p>
+<figure class="spec">
+<div class="tipo-linha"><span style="font:650 1.5rem/1.25 var(--sans);letter-spacing:-.01em">Relatório de Qualidade</span><span class="uso">h1 · 1.5rem/650 sans · um único por documento</span></div>
+<div class="tipo-linha"><span style="font:700 .9rem var(--sans);text-transform:uppercase;letter-spacing:.09em"><span style="font:600 .8rem var(--mono);color:var(--tinta-2)">2</span> Achados</span><span class="uso">h2 · .9rem caps ls .09em · precedido de régua 2px --linha-forte</span></div>
+<div class="tipo-linha"><span style="font:600 .8rem var(--mono)">lgpd <span style="color:var(--tinta-2);font-weight:400">— 6 achados</span></span><span class="uso">h3 (grupos) · .8rem mono</span></div>
+<div class="tipo-linha"><span class="detalhe" style="max-width:56ch">Cookie <code>_ga</code> declara <code>Max-Age</code> de 730 dias — teto: 400. Vida útil declarada é política de retenção publicada — <strong class="lei">Art. 15</strong>.</span><span class="uso">detail · serif 1.03rem/1.62 · máx 72ch · referência legal em strong.lei (negrito + sublinhado pontilhado)</span></div>
+<div class="tipo-linha"><span style="font:400 .74rem var(--mono);color:var(--tinta-2)">checks/lgpd/test_consentimento.py::test_sem_trackers…</span><span class="uso">id de teste · mono .74rem --tinta-2 · overflow-wrap anywhere</span></div>
+<div class="tipo-linha"><span style="font:650 1.3rem var(--sans);font-variant-numeric:tabular-nums">8 <span style="font:400 .82rem var(--sans);color:var(--tinta-2)">achados</span></span><span class="uso">número do resumo · 1.3rem/650 tabular-nums</span></div>
+<figcaption>Corpo base .95rem/1.55 sans. Números sempre com font-variant-numeric: tabular-nums. Datas e durações formatadas pt-BR (vírgula decimal) pelo template. Impressão: base 10,5pt.</figcaption></figure>
+</section>
+
+<section id="estados" aria-labelledby="h-estados">
+<div class="sec-h"><h2 id="h-estados"><span class="n">3</span>Os quatro estados</h2><span class="sec-sub">forma + rótulo + cor — nunca cor sozinha</span></div>
+<figure class="spec">
+<p style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 14px"><span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span><span class="estado xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>alerta</span><span class="estado passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passou</span><span class="estado skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>pulado</span></p>
+<p style="display:flex;gap:22px;flex-wrap:wrap;margin:0"><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span><span class="estado-min xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>xfail</span><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span><span class="estado-min skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>skipped</span></p>
+<figcaption>Chip: 700 .66rem caps ls .07em · padding 4px 8px · raio 3px · fundo --fundo-* · borda 1px --borda-* · texto --cor-*. Versão mínima (tabelas): sem fundo, termo técnico verbatim. Formas: ✕ achado · △ alerta · ✓ passou · ◌ tracejado pulado — distinguíveis em P&amp;B e para daltonismo; rótulo textual sempre presente. Regras duras: xfail nunca soma em contagem de falha; skipped sempre com motivo legível; passed discreto (passar é o esperado).</figcaption></figure>
+</section>
+
+<section id="cards" aria-labelledby="h-cards">
+<div class="sec-h"><h2 id="h-cards"><span class="n">4</span>Cards de dimensão</h2><span class="sec-sub">o veredito herda a cor do pior estado presente</span></div>
+<figure class="spec">
+<div class="dims" style="grid-template-columns:repeat(3,1fr)">
+<div class="dim"><span class="dim-nome">frontend</span><p class="dim-veredito passed">sem achados</p><p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>5</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p></div>
+<div class="dim"><span class="dim-nome">ux</span><p class="dim-veredito failed">2 achados</p><p class="cts"><span class="ct failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>2</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>2</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p><p class="dim-obs">Acessibilidade conta aqui e em lgpd.</p></div>
+<div class="dim"><span class="dim-nome">load</span><p class="dim-veredito skipped">não avaliada</p><p class="cts"><span class="ct failed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>0</span><span class="ct xfail zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>0</span><span class="ct passed zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>0</span><span class="ct skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>2</span></p><p class="dim-obs">Gate de carga fechado (<code>WEBQA_LOAD_AUTHORIZED</code>).</p></div>
+</div><figcaption>Card: padding 13px 15px · borda 1px --linha · raio 3px. Nome da dimensão em mono, minúsculas, verbatim. Veredito: "N achados" (failed) &gt; "N alertas" (xfail) &gt; "não avaliada" (skipped, tudo pulado) &gt; "sem achados" (passed). Contagens na ordem fixa ✕ △ ✓ ◌; valor zero a 38% de opacidade. Grade: 4 colunas no desktop, 2 no móvel.</figcaption></figure>
+<figure class="spec">
+<div class="dims" style="grid-template-columns:1fr">
+<div class="dim dim-lgpd"><div><span class="dim-nome">lgpd</span><p class="dim-veredito failed">8 achados · 3 alertas</p><p class="cts"><span class="ct failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>8</span><span class="ct xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>3</span><span class="ct passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>7</span><span class="ct skipped zero"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>0</span></p><p class="dim-obs">Conformidade LGPD observável de fora (caixa-preta).</p></div>
+<div class="nota-epistemica"><p class="nota-k">Nota epistêmica — vale para toda a dimensão</p><p>Verificação caixa-preta do que é observável de fora. Falha PROVA não conformidade; passar NÃO certifica conformidade — base legal, contrato com operador, ROPA e governança interna não são observáveis por HTTP.</p><p class="sem-selo">Nenhum elemento deste relatório constitui selo, certificação ou aprovação.</p></div></div>
+</div><figcaption>Card lgpd: largura total da grade · borda 1px --linha-forte (único card com borda de tinta) · duas colunas 230px + 1fr. A nota epistêmica é INSEPARÁVEL do card: serif itálico .95rem sobre --fundo, kicker mono caps, texto vindo de DIMENSION_NOTES (código — o design não o reescreve). Proibido: qualquer selo, escudo, medalha, carimbo "aprovado" ou variação. A nota sobrevive à impressão (break-inside: avoid).</figcaption></figure>
+</section>
+
+<section id="achado-spec" aria-labelledby="h-achado-spec">
+<div class="sec-h"><h2 id="h-achado-spec"><span class="n">5</span>Linha de achado e de alerta</h2><span class="sec-sub">a mensagem detail é o item mais importante da linha</span></div>
+<figure class="spec">
+<article class="achado" style="border-top:1px solid var(--linha)">
+<div class="achado-margem"><span class="achado-id">A1</span><span class="estado failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>achado</span></div>
+<div><p class="detalhe">Tracker de terceiro contactado <strong>antes</strong> de qualquer interação de consentimento: <code>www.googletagmanager.com</code> (1 requisição de script no carregamento). Consentimento precisa ser prévio, livre e específico — <strong class="lei">Art. 7º, I</strong> e <strong class="lei">Art. 8º, §4</strong>.</p>
+<p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento</code><span class="num">2,14 s</span><span>navegador</span></p></div>
+</article><figcaption>Grade 118px + 1fr, gap 26px · separador 1px --linha entre itens · break-inside: avoid. Margem: número Ax (mono 700 1rem) + chip de estado — o número é citável em ticket. Corpo: detail em serif 1.03rem/1.62 máx 72ch (texto vem sanitizado do código; o template só destaca refs legais com strong.lei); linha meta em mono .74rem --tinta-2: chip da(s) dimensão(ões) + id completo do teste + duração + marcador navegador. Ordem dos grupos: lgpd primeiro; testes de dupla dimensão aparecem uma vez, no grupo da primeira dimensão declarada, com chip "ux + lgpd".</figcaption></figure>
+<figure class="spec">
+<article class="alerta" style="border-top:1px solid var(--linha)">
+<div class="achado-margem"><span class="estado xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>alerta</span></div>
+<div><p class="detalhe"><code>Referrer-Policy</code> ausente. Declarar <code>strict-origin-when-cross-origin</code> evita vazar URLs completas a terceiros.</p>
+<p class="achado-meta"><span class="chip-dim">lgpd</span><code>checks/lgpd/test_pii_transito.py::test_referrer_policy_declarada</code><span class="num">0,020 s</span></p></div>
+</article><figcaption>Alerta = mesma anatomia, subordinada: sem número, detail .96rem. Bloco de alertas sempre DEPOIS dos achados, nunca misturado.</figcaption></figure>
+</section>
+
+<section id="tabelas-spec" aria-labelledby="h-tabelas-spec">
+<div class="sec-h"><h2 id="h-tabelas-spec"><span class="n">6</span>Tabelas</h2><span class="sec-sub">registro completo e inventário de terceiros</span></div>
+<figure class="spec">
+<div class="rolagem">
+<table>
+<caption class="sr">Exemplo de linhas da tabela de resultados</caption>
+<thead><tr><th scope="col">Estado</th><th scope="col">Dimensão</th><th scope="col">Teste</th><th scope="col">Duração</th><th scope="col">Motivo / referência</th></tr></thead>
+<tbody>
+<tr class="failed"><td><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>failed</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_pii_transito.py::test_pii_em_query_string</td><td class="t-dur">0,35 s</td><td class="t-det">ver <a href="#achado-spec">A3</a></td></tr>
+<tr class="xfail"><td><span class="estado-min xfail"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M6 1.6 11.1 10.6H.9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 4.6v2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="6" cy="8.9" r=".8" fill="currentColor"/></svg>xfail</span></td><td class="t-teste">lgpd</td><td class="t-teste">checks/lgpd/test_retencao_observavel.py::test_security_txt</td><td class="t-dur">0,040 s</td><td class="t-det">security.txt ausente (404) — sinal de maturidade</td></tr>
+<tr><td><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>passed</span></td><td class="t-teste">backend</td><td class="t-teste">checks/backend/test_latencia.py::test_ttfb_dentro_do_orcamento</td><td class="t-dur">0,31 s</td><td class="t-det">—</td></tr>
+<tr class="skipped"><td><span class="estado-min skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>skipped</span></td><td class="t-teste">load</td><td class="t-teste">checks/backend/test_carga.py::test_rajada_leve</td><td class="t-dur">0,001 s</td><td class="t-det">Gate de carga fechado: defina WEBQA_LOAD_AUTHORIZED=1 — RISCOS.md R1</td></tr>
+</tbody>
+</table>
+</div><figcaption>Fundo tintado só para failed e xfail; passed fica no papel (discreto); skipped rebaixa o texto para --tinta-2 mas mantém o MOTIVO por extenso — é ele que distingue "não se aplica" de "infra ausente". Linha failed referencia o achado (ver Ax) em vez de repetir a mensagem. Tabela completa vive num details recolhido (fora do caminho, presente no documento); no inventário de terceiros os chips são neutros: "consta em TRACKER_DOMAINS" (borda --linha-forte) vs "não classificado" (borda --linha) — registra, não julga.</figcaption></figure>
+</section>
+
+<section id="ledger-spec" aria-labelledby="h-ledger-spec">
+<div class="sec-h"><h2 id="h-ledger-spec"><span class="n">7</span>Ledger de estabilidade</h2><span class="sec-sub">progresso, noites e origem</span></div>
+<figure class="spec">
+<div class="progresso" style="margin-top:0">
+<div><p class="prog-num num">3<small>/10</small></p><p class="prog-rot">noites limpas consecutivas · origem vps</p></div>
+<div class="slots" role="img" aria-label="3 de 10 noites limpas"><span class="slot ok"></span><span class="slot ok"></span><span class="slot ok"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot meta-slot"></span></div>
+</div>
+<div class="rolagem" style="margin-top:18px">
+<table>
+<caption class="sr">Exemplo de linhas do ledger</caption>
+<thead><tr><th scope="col">Noite (UTC)</th><th scope="col">Origem</th><th scope="col">Navegador</th><th scope="col">Flakes</th><th scope="col">Efeito na sequência</th></tr></thead>
+<tbody>
+<tr><td class="t-teste num">2026-08-04 03:14</td><td><span class="origem">vps</span></td><td class="t-dur">7</td><td class="t-det">0</td><td class="t-efeito"><span class="estado-min passed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 6.6l2.6 2.6L10 3.4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>limpa · sequência: 1</span></td></tr>
+<tr class="failed"><td class="t-teste num">2026-08-03 03:14</td><td><span class="origem">vps</span></td><td class="t-dur">7</td><td class="t-det">1 — TimeoutError ao iniciar o Chromium</td><td class="t-efeito"><span class="estado-min failed"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2.6 2.6l6.8 6.8M9.4 2.6l-6.8 6.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>flake · sequência zerada</span></td></tr>
+<tr class="skipped"><td class="t-teste num">2026-08-03 11:02</td><td><span class="origem nao-conta">local</span></td><td class="t-dur">7</td><td class="t-det">0</td><td class="t-efeito"><span class="estado-min skipped"><svg class="ic" viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><circle cx="6" cy="6" r="4.7" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.5 2.1"/><path d="M3.9 6h4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>informativa · não conta</span></td></tr>
+</tbody>
+</table>
+</div><figcaption>Slots: 36×15px, raio 2 · preenchido = --cor-passed · vazio = borda --linha · 10º slot tracejado (o marco). Origem: chip mono; vps com borda --linha-forte (pontua), ci/local tracejado e rebaixado (informam). A noite com flake usa o vocabulário de failed e a noite limpa o de passed — mas o rótulo diz "sequência", nunca "conformidade": os 7 achados do alvo não aparecem como falha aqui. Sem troféus nem confete no 10/10 — o marco é um bloco de texto com borda de tinta.</figcaption></figure>
+</section>
+
+<section id="implementacao" aria-labelledby="h-implementacao">
+<div class="sec-h"><h2 id="h-implementacao"><span class="n">8</span>Regras de implementação</h2><span class="sec-sub">o relatório passa na própria bateria</span></div>
+<div class="intro-sec" style="max-width:86ch">
+<ol style="margin:8px 0 0;padding-left:20px;line-height:1.8">
+<li><strong>Arquivo único, zero requisições externas.</strong> CSS embutido, ícones SVG inline, favicon em data-URI, system fonts. Nada de CDN, webfont ou analytics. Esta referência: ~68 KB (orçamento: &lt; 300 KB de HTML).</li>
+<li><strong>Classes de estado = outcomes verbatim</strong> (<code>.passed .failed .xfail .skipped</code>), como o <code>report.py</code> já emite — o template Python interpola direto.</li>
+<li><strong>Tema escuro:</strong> o mesmo bloco de tokens aparece 2× — sob <code>@media (prefers-color-scheme: dark)</code> e sob <code>:root[data-tema="escuro"]</code> (forçável p/ depuração). No template, uma string interpolada duas vezes. Blocos escuros são <code>@media screen</code>: impressão sai sempre clara.</li>
+<li><strong>Sem JavaScript obrigatório:</strong> a única interação é <code>&lt;details&gt;</code> nativo. O único script (8 linhas) expande a tabela em <code>beforeprint</code> — progressivo; sem JS o documento continua íntegro.</li>
+<li><strong>Impressão é primeira classe:</strong> <code>@page margin 15mm</code> · <code>break-inside: avoid</code> em achado, card, nota e linha · âncoras viram texto sem sublinhado · bloco <code>.so-impressao</code> aponta para o <code>summary.json</code>.</li>
+<li><strong>Acessibilidade:</strong> <code>lang="pt-BR"</code>, um único h1, headings sem saltos, landmarks (<code>header/main/nav/footer/section</code>), skip-link "Ir direto aos achados", ícones <code>aria-hidden</code> sempre pareados com rótulo textual, foco visível 2px <code>--acento</code>, tabelas com <code>caption</code> + <code>scope</code>.</li>
+<li><strong>Conteúdo vem do código:</strong> mensagens <code>detail</code> e a nota epistêmica não são reescritas pelo design — o template as apresenta (serif, 72ch) e apenas destaca referências legais (<code>strong.lei</code>) via regex no gerador. Números pt-BR (vírgula decimal); id de teste nunca truncado.</li>
+<li><strong>Pontos de interpolação:</strong> <code>{generated_at}</code> <code>{duration_s}</code> <code>{alvo}</code> <code>{comando}</code> · cards de <code>{by_dimension}</code> · achados/alertas/tabela de <code>{results}</code> · inventário de <code>terceiros.json</code> · nota de <code>DIMENSION_NOTES</code>.</li>
+</ol>
+</div>
+</section>
+</main>
+<footer>
+<p><strong>WebQA Suite</strong> · especificação de design · a folha de estilo desta página é a folha de estilo do produto (bloco &lt;style&gt; de referencia/summary.html)</p>
+<p>Nenhum elemento visual do sistema sugere certificação, selo ou aprovação legal — por regra, não por acaso.</p>
+</footer>
+</div>
+</body>
+</html>

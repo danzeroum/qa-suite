@@ -1,0 +1,44 @@
+WebQA Suite — pacote de design (referencia/)
+=============================================
+
+Entregáveis (HTML estático, arquivo único, zero requisição externa):
+
+  summary.html                P0 — relatório com achados (execução completa contra fixture_target/)
+  summary-verde.html          estado: 100% verde (0 achados, 0 alertas)
+  summary-sem-navegador.html  estado: Chromium ausente (skips em massa, motivo em cada linha)
+  summary-parcial.html        estado: pytest -m lgpd offline — 7 achados, 1:1 com esperado.json
+  estabilidade.html           painel de estabilidade (P1) — ledger docs/lgpd-estabilidade.json
+  componentes.html            especificação p/ dev (§11.5): tokens, contrastes, anatomia, regras
+
+Fonte da verdade da especificação
+  O bloco <style> de summary.html é a folha de estilo canônica — as seis páginas
+  usam o MESMO bloco, byte a byte. componentes.html o documenta: tokens em CSS
+  custom properties nomeados (--cor-failed, --fundo-xfail, ...), pares de
+  contraste nos dois temas e as 8 regras de implementação (§8), com os pontos de
+  interpolação para o template Python.
+
+Versão impressa
+  Embutida via @media print em todos os arquivos: @page margin 15mm,
+  break-inside:avoid em achado/card/nota/linha, âncoras sem sublinhado, tema
+  sempre claro na impressão (os tokens escuros vivem sob @media screen).
+  Único JS (8 linhas, opcional): expandir <details> no beforeprint; sem JS o
+  documento permanece íntegro e a tabela recolhida aponta para summary.json.
+
+Tema escuro
+  Automático via prefers-color-scheme; forçável com <html data-tema="claro|escuro">
+  (gancho estático em CSS, para depuração — sem JS).
+
+Como auditar com a própria suíte
+  cd referencia && python -m http.server 8080
+  WEBQA_TARGET_URL=http://127.0.0.1:8080/summary.html pytest -m "frontend or ux"
+
+Nota sobre a capa (Proposta de Design.dc.html)
+  Documento de trabalho do estúdio (roda no ambiente de design, com runtime
+  próprio) — não é entregável do §12 e nenhum dos padrões dela existe nestes
+  arquivos: lang="pt-BR", h1 único, headings sem saltos, CSS embutido, zero
+  requisição externa, dark por media query, impressão de primeira classe.
+
+Dados
+  Execução de demonstração derivada de fixture_target/servir.py e esperado.json;
+  nenhuma métrica inventada além dos campos de summary.json / terceiros.json /
+  lgpd-estabilidade.json.
