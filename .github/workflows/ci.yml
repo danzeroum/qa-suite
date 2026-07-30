@@ -49,10 +49,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Lint (ruff)
-        run: ruff check webqa checks tests scripts
+        run: ruff check webqa checks tests scripts fixture_target
 
       - name: SAST — biblioteca (rigor total)
-        run: bandit -q -c pyproject.toml -r webqa scripts
+        run: bandit -q -c pyproject.toml -r webqa scripts fixture_target
 
       # Nos checks, capturar Exception é intencional: falha de rede num sinal
       # opcional vira skip/xfail explicado, não derruba a suíte. Mesma decisão

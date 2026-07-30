@@ -140,7 +140,14 @@ def registrar(ledger: dict, classificacao: Classificacao, alvo_sha256: str) -> R
     return Registro(streak=streak, entrada=entrada, alvo_mudou=alvo_mudou)
 
 
-def _resolver_alvo(explicito: str | None) -> str:
+def _resolver_alvo(explicito: str | None, usar_fixture: bool = False) -> str:
+    if usar_fixture:
+        # A identidade do fixture vem do que ele SERVE, não da URL: a porta é
+        # efêmera e mudaria a cada noite, zerando a sequência para sempre.
+        sys.path.insert(0, str(ROOT))
+        from fixture_target.servir import identidade
+
+        return identidade()
     if explicito:
         return explicito
     import os
@@ -161,6 +168,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("summary", nargs="?", type=Path, default=SUMMARY_PADRAO)
     parser.add_argument("--ledger", type=Path, default=LEDGER_PADRAO)
     parser.add_argument("--alvo", default=None, help="URL do alvo (só o sha256 é gravado)")
+    parser.add_argument("--alvo-fixture", action="store_true",
+                        help="usa a identidade do alvo fixture (estável entre execuções, "
+                             "ao contrário da porta efêmera)")
     parser.add_argument("--meta", type=int, default=META_PADRAO)
     parser.add_argument("--dry-run", action="store_true",
                         help="classifica e imprime sem gravar (uso em CI, que não commita)")
@@ -171,9 +181,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     classificacao = classificar(json.loads(args.summary.read_text(encoding="utf-8")))
-    alvo = _resolver_alvo(args.alvo)
+    alvo = _resolver_alvo(args.alvo, usar_fixture=args.alvo_fixture)
     if not alvo:
-        print("alvo indeterminado: defina WEBQA_TARGET_URL ou use --alvo.", file=sys.stderr)
+        print("alvo indeterminado: defina WEBQA_TARGET_URL, use --alvo ou --alvo-fixture.",
+              file=sys.stderr)
         return 2
 
     ledger = carregar_ledger(args.ledger)

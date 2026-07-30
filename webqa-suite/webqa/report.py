@@ -11,6 +11,7 @@ as dimensões marcadas e é agrupado na primeira declarada.
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -34,14 +35,18 @@ DIMENSION_NOTES = {
     ),
 }
 
-REPORT_DIR = Path(__file__).resolve().parent.parent / "report"
+# Redirecionável por ambiente (12-Factor): o teste de sistema do alvo fixture
+# roda um pytest interno, que sobrescreveria o relatório da execução externa.
+REPORT_DIR = Path(
+    os.environ.get("WEBQA_REPORT_DIR") or Path(__file__).resolve().parent.parent / "report"
+)
 _RESULTS: list[dict] = []
 _START = time.time()
 
 
 def report_dir() -> Path:
     """Diretório de artefatos, criado sob demanda (usado também pelos checks)."""
-    REPORT_DIR.mkdir(exist_ok=True)
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
     return REPORT_DIR
 
 
