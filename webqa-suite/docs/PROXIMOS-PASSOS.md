@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **524 testes coletados**; num ambiente
-limpo o resultado é **521 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **558 testes coletados**; num ambiente
+limpo o resultado é **555 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -385,7 +385,7 @@ verificação com modelo fake, sem rede. Rodar `make sumario` contra o alvo
 fixture com um Ollama de pé continua pendente — é o análogo, nesta trilha, do
 §3.2: exercitado com dublê, não confirmado no ambiente real.
 
-### 4.3 `seguranca` Fase C — sondagem ativa
+### 4.3 `seguranca` Fase C — sondagem ativa (TRAVADA, e a trava é testada)
 
 Desenhada em `SEGURANCA.md §7`, **não implementada de propósito**. Sondar
 `/.git/HEAD`, `/.env`, o `.map` da Fase B; seguir sublinks; baixar arquivos
@@ -394,6 +394,26 @@ identificável e **audit log** ao acionar o gate.
 
 Construir capacidade intrusiva antes de haver alvo autorizado é YAGNI com peso
 ético. **Não comece isto sem autorização escrita do dono de um alvo.**
+
+**A trava deixou de ser promessa** (OS-36, `tests/test_fase_c_travada.py`). O que
+se testa ali é a **recusa**, nunca a ação — nenhuma linha de sondagem foi escrita
+e nenhuma requisição sai:
+
+* um detector varre o `ast` de `checks/` inteiro e reprova literal de caminho
+  sensível (`/.git`, `/.env`, `/backup.zip`, `/.DS_Store`, `/wp-config`,
+  `/.htpasswd`) fora de docstring — comentário e documentação seguem livres,
+  porque explicar não é fazer;
+* os símbolos da Fase C (`follow_sublinks`, `probe_path`, `fetch_map`…) são
+  verificados como **ausentes**: a ausência é intencional, e se um aparecer,
+  alguém começou;
+* nenhum check consome `require_active_probes()` hoje, e isso também é teste — o
+  dia em que consumir, o teste muda junto, num PR que diga isso;
+* matriz 2×2 dos gates: autorizar carga **nunca** autoriza sondagem.
+
+Os três detectores foram provados contra violação plantada. Um detector que
+nunca detectou nada não está provado — e a trava, sem isso, dependeria de
+vigilância humana, que é justamente o que este projeto substitui por invariante
+estrutural.
 
 ### 4.4 LGPD Fase 2 — travada por decisão de arquitetura
 
