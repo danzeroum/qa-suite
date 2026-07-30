@@ -59,8 +59,12 @@ def load_settings(path: Path | None = None) -> Settings:
     return Settings(
         target_url=str(_env_override("target_url", raw.get("target_url", ""))).rstrip("/"),
         timeout_s=float(http.get("timeout_s", 15)),
-        user_agent=str(http.get("user_agent", "WebQA-Suite/1.0")),
-        crawl_max_pages=int(crawl.get("max_pages", 15)),
+        # Sobreponíveis por ambiente porque a campanha (scripts/campanha.py) roda
+        # vários alvos numa execução e cada um tem sua própria política: o crawl
+        # é reduzido para não martelar alvo de terceiro, e há alvo que EXIGE
+        # User-Agent com contato para atender (robot policy da Wikimedia).
+        user_agent=str(_env_override("user_agent", http.get("user_agent", "WebQA-Suite/1.0"))),
+        crawl_max_pages=int(_env_override("crawl_max_pages", crawl.get("max_pages", 15))),
         crawl_same_host_only=bool(crawl.get("same_host_only", True)),
         load_requests=int(burst.get("requests", 30)),
         load_concurrency=int(burst.get("concurrency", 10)),

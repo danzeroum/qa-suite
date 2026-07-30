@@ -8,6 +8,7 @@ import json
 
 import pytest
 
+from webqa import metricas
 from webqa.sanitize import sanitize_text
 
 pytestmark = [pytest.mark.frontend, pytest.mark.browser]
@@ -64,6 +65,14 @@ def render(browser_page, settings):
     browser_page.on("response", on_response)
     browser_page.goto(settings.target_url, wait_until="load", timeout=60_000)
     vitals = browser_page.evaluate(VITALS_JS)
+    # Registra a MEDIDA (o veredito segue sendo dos testes abaixo). `fcp` e `lcp`
+    # podem vir None — o registrador descarta, porque ausência de pintura não é
+    # pintura instantânea.
+    metricas.registrar("fcp_ms", vitals["fcp"])
+    metricas.registrar("lcp_ms", vitals["lcp"])
+    metricas.registrar("cls", vitals["cls"])
+    metricas.registrar("dcl_ms", vitals["dcl"])
+    metricas.registrar("page_kb", total_bytes / 1024)
     return {"vitals": vitals, "errors": errors, "kb": total_bytes / 1024}
 
 

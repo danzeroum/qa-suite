@@ -37,7 +37,20 @@ pytest -m "lgpd and not browser"   # bateria de privacidade só por HTTP
 ```
 
 Ao final, um relatório consolidado é gravado em `report/summary.json` e
-`report/summary.html` (plugin próprio em `webqa/report.py`).
+`report/summary.html` (plugin próprio em `webqa/report.py`). O JSON registra
+também as **medidas do alvo** (TTFB, total, FCP, LCP, CLS) sob `metricas` —
+gravadas passem ou falhem os testes, porque veredito binário não distingue TTFB
+de 90ms de TTFB de 790ms contra um orçamento de 800ms.
+
+### Campanha contra alvos reais
+
+```bash
+make campanha        # 3 alvos × 3 repetições, consolidado em report/campanha/
+```
+
+Roda a suíte passiva contra vários alvos, N vezes, e consolida em duas seções de
+tempo (do alvo × da suíte) marcando veredito que oscila entre repetições. É o
+nível sistema da própria suíte — ver `docs/CAMPANHA.md`.
 
 ### Pipeline (GitHub Actions)
 
@@ -84,6 +97,7 @@ Seguindo a separação clássica **Verificação × Validação**:
 | Integração | `checks/backend`, `checks/frontend` | O alvo integra HTTP, cache, assets corretamente? |
 | Sistema | `checks/ux`, `checks/functional`, `checks/lgpd` | O sistema, ponta a ponta, se comporta bem no navegador? |
 | Aceitação | `checks/acceptance` (BDD Given/When/Then) | **Validação** — é o que o usuário precisa? |
+| Sistema **da suíte** | `scripts/campanha.py` (`make campanha`) | **Validação** — a suíte se comporta contra alvos reais, repetidamente? Ver `docs/CAMPANHA.md` |
 
 Cada nível foca **limites, riscos e áreas de maior complexidade**: percentis de
 latência (não médias), orçamentos de peso de página, hierarquia de headings,

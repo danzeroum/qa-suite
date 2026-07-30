@@ -1,0 +1,32 @@
+# Campanha: a suíte inteira (passiva) contra alvos reais, N vezes.
+# Runner: scripts/campanha.py — consolida em report/campanha/.
+#
+# Alvos de TERCEIROS. Nada aqui autoriza carga: a campanha aborta se
+# WEBQA_LOAD_AUTHORIZED estiver setado no ambiente. Medir de fora, uma vez por
+# repetição, com pausa entre execuções — é o contrato de respeito ao alvo.
+
+repeticoes: 3        # 1 execução não distingue veredito de flake; 3 já mostra 2×1
+pausa_s: 10          # intervalo MÍNIMO entre execuções (o runner nunca reduz)
+
+alvos:
+  - url: "https://example.com"
+    papel: "controle"
+    # Página mínima e estável: se ela oscilar, o problema é da suíte ou da rede
+    # daqui — não do alvo. É a régua contra a qual os outros dois são lidos.
+    crawl_max_pages: 5
+
+  - url: "https://www.wikipedia.org"
+    papel: "real pesado"
+    crawl_max_pages: 5
+    # A Wikimedia responde 403 a User-Agent genérico e documenta a exigência de
+    # identificação com contato (https://w.wiki/4wJS). Cumprir a robot policy do
+    # alvo é o comportamento correto de uma suíte que prega respeito ao sistema
+    # sob teste — o contrário seria mascarar o cliente para furar a política.
+    user_agent: "WebQA-Suite/1.0 (+https://github.com/danzeroum/qa-suite; automated quality checks)"
+
+  - url: "https://www.mozilla.org"
+    papel: "falso-positivo"
+    # Alvo maduro, com CSP, i18n e consentimento próprios: o que ele reprovar é
+    # candidato a falso-positivo da suíte, não a não conformidade do alvo. É aqui
+    # que a campanha critica a própria régua.
+    crawl_max_pages: 5
