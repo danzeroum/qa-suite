@@ -12,6 +12,13 @@ Na Fase 1 toda a bateria LGPD é PASSIVA (só carrega e observa), então o gate 
 sondagem ativa é criado e documentado, mas nenhum teste o consome ainda. O gate
 vem antes do primeiro teste ativo de propósito: guarda que nasce junto com a
 funcionalidade costuma nascer frouxa.
+
+O terceiro gate é de outra natureza e por isso é separado dos dois:
+
+* `WEBQA_LLM_ENABLED=1` — ligar a camada de sumário por LLM local (docs/LLM.md).
+  Os outros dois autorizam agir CONTRA o alvo; este autoriza processar achados
+  já produzidos. Juntá-los faria autorizar carga ligar IA — e cada mistura
+  desse tipo é uma autorização que ninguém deu.
 """
 from __future__ import annotations
 
@@ -19,6 +26,7 @@ import os
 
 LOAD_ENV = "WEBQA_LOAD_AUTHORIZED"
 ACTIVE_PROBES_ENV = "WEBQA_ACTIVE_PROBES_AUTHORIZED"
+LLM_ENV = "WEBQA_LLM_ENABLED"
 
 
 def _enabled(name: str) -> bool:
@@ -33,6 +41,16 @@ def load_authorized() -> bool:
 def active_probes_authorized() -> bool:
     """Dono do alvo autorizou sondagem ativa (escrita/interação)?"""
     return _enabled(ACTIVE_PROBES_ENV)
+
+
+def llm_enabled() -> bool:
+    """O operador ligou a camada de sumário por LLM local?
+
+    Desligada por padrão (docs/LLM.md §2.5). Com o gate fechado nada é
+    instanciado e nenhum endpoint é resolvido — a suíte roda sem IA a menos que
+    alguém peça, e o laudo determinístico não muda de forma por causa disto.
+    """
+    return _enabled(LLM_ENV)
 
 
 def require_active_probes() -> None:
