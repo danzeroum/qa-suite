@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **338 testes coletados**; num ambiente
-limpo o resultado é **335 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **369 testes coletados**; num ambiente
+limpo o resultado é **366 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -48,6 +48,7 @@ Consulta, não leitura de entrada:
 
 | Doc | Quando abrir |
 |---|---|
+| [`LLM.md`](LLM.md) | contrato da camada de sumário por LLM local — leia antes de tocar em `webqa/llm.py` |
 | [`RECOMENDACOES.md`](RECOMENDACOES.md) | rastrear uma prática de engenharia até onde ela é coberta |
 | [`dimensao-seguranca-consolidado.md`](dimensao-seguranca-consolidado.md) | histórico da consolidação da dimensão `seguranca` |
 | [`handoff/`](handoff/) | material da passagem original (brief de design, ordens de serviço abertas) |
@@ -233,6 +234,26 @@ Há teste lendo o corpo dessas funções e reprovando se alguma construir `Findi
 O caminho de retrocompatibilidade do template **permanece** — agora só para
 summary histórico, e há teste que o exercita com dado sintético. Removê-lo faria
 todo relatório antigo mudar de forma.
+
+### 4.2b Sumário por LLM local — `webqa/llm.py` pronto (OS-23 v2)
+
+Contrato em [`LLM.md`](LLM.md). A abstração, o gate `WEBQA_LLM_ENABLED` e o veto
+de endpoint existem; **falta a etapa que os usa**.
+
+Duas coisas que é fácil errar aqui e que já estão resolvidas no módulo — não as
+desfaça ao escrever o consumidor:
+
+- **o veto é por IP resolvido**, nunca por string. `localhost.qualquercoisa.com`
+  resolve para IP público e passaria por qualquer verificação textual;
+- **`passed` não entra no prompt**, e `detail` **não** é re-sanitizado — ele já
+  nasce sanitizado no `report.py`, e duplicar a borda cria a ilusão de duas
+  defesas onde há uma só.
+
+**Próximo: OS-24 v2** — `scripts/sumario.py`, em **processo separado** do pytest.
+Nunca dentro de `pytest_sessionfinish`: um `try/except` amplo no hook que escreve
+o laudo reencena o pior defeito deste projeto (erro de setup engolido virando
+"noite limpa" com navegador morto). Separação de processo é a lição, não
+preferência de estilo.
 
 ### 4.3 `seguranca` Fase C — sondagem ativa
 
