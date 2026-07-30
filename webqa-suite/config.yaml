@@ -14,6 +14,12 @@ load_burst:            # rajada leve embutida (pytest -m load)
   requests: 30
   concurrency: 10
 
+lgpd:
+  # Terceiros liberados pelo controlador (host ou domínio; subdomínios incluídos).
+  # Preencher só com decisão documentada — a allowlist SILENCIA o teste.
+  # Ex.: ["googletagmanager.com"] quando a tag só dispara após consentimento.
+  allowed_third_parties: []
+
 thresholds:
   ttfb_ms: 800
   p50_ms: 800

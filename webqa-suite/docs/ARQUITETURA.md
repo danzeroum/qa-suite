@@ -27,7 +27,14 @@ aplicação web apenas pelo que ela expõe via HTTP e pelo que renderiza no nave
 
 - `config.py` — `Settings` imutável; thresholds = orçamentos de qualidade.
 - `http_utils.py` — `timed_get` (TTFB por streaming), `percentiles`, `burst` assíncrono.
-- `report.py` — hooks pytest que consolidam resultados por dimensão.
+- `report.py` — hooks pytest que consolidam resultados por dimensão (um teste pode
+  contar em mais de uma; agrupa na primeira declarada) e publicam as notas
+  epistêmicas de cada dimensão no artefato.
+- `sanitize.py` — ponto único de verdade sobre PII: as mesmas regexes **mascaram**
+  (`sanitize_text`) e **detectam** (`find_pii`).
+- `trackers.py` — `TRACKER_DOMAINS`, `is_tracker` e o contrato `NetworkLog`
+  (requisições + cookies observados num contexto de navegador virgem).
+- `gates.py` — guardas de autorização independentes: carga × sondagem ativa.
 
 ## Atributos de qualidade (-ilities) da própria suíte
 
@@ -49,6 +56,9 @@ aplicação web apenas pelo que ela expõe via HTTP e pelo que renderiza no nave
 | Playwright opcional (skip) | roda em ambientes sem navegador | cobertura menor quando ausente |
 | Thresholds em YAML | ajustável por contexto | exige calibração consciente por produto |
 | axe-core via CDN | sempre atualizado, repo leve | requer rede; falha vira skip explicado |
+| `network_log` em contexto virgem por módulo | consentimento medido sem herança de estado | um carregamento a mais do alvo por módulo |
+| Bateria LGPD 100% passiva na Fase 1 | zero risco jurídico de intrusão | não verifica se "recusar" recusa de fato (Fase 2) |
+| Allowlist de terceiros em config | decisão documentada do controlador vence a heurística | allowlist mal preenchida silencia o teste |
 
 "Uma decisão só pode ser avaliada em relação ao seu contexto": os limiares
 padrão seguem Web Vitals/indústria, mas **devem** ser recalibrados para o seu produto.

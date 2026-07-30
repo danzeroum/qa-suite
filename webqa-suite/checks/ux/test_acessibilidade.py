@@ -3,12 +3,18 @@
 Foco em risco: violações 'critical' e 'serious' primeiro (limiar em config).
 Complementa — não substitui — testes com usuários reais (design centrado
 no usuário: empatizar → testar).
+
+Dimensão dupla `ux + lgpd`: no Brasil acessibilidade em site NÃO é só UX, é
+obrigação legal — Lei Brasileira de Inclusão (13.146/2015), Art. 63: sítios
+devem ser acessíveis ao uso da pessoa com deficiência. Por isso estes testes
+contam nas duas dimensões do relatório; o agrupamento fica em `ux` (primeiro
+marker declarado), a contagem aparece também em `lgpd`.
 """
 import json
 
 import pytest
 
-pytestmark = [pytest.mark.ux, pytest.mark.browser]
+pytestmark = [pytest.mark.ux, pytest.mark.lgpd, pytest.mark.browser]
 
 # Versão FIXADA + hash SHA-384 verificado antes de injetar (SRI manual):
 # CDN comprometido não roda script arbitrário no DOM da página sob teste.

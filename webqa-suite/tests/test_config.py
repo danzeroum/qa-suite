@@ -28,6 +28,15 @@ def test_target_url_sem_barra_final(monkeypatch):
     assert load_settings().target_url == "https://x.example"
 
 
+def test_allowlist_lgpd_default_vazia():
+    assert load_settings().lgpd_allowed_third_parties == []
+
+
+def test_allowlist_lgpd_por_variavel_de_ambiente(monkeypatch):
+    monkeypatch.setenv("WEBQA_LGPD_ALLOWED_THIRD_PARTIES", "googletagmanager.com, hotjar.com ,")
+    assert load_settings().lgpd_allowed_third_parties == ["googletagmanager.com", "hotjar.com"]
+
+
 def test_settings_e_imutavel():
     s = Settings("u", 1, "ua", 1, True, 1, 1, {"a": 1})
     with pytest.raises((AttributeError, TypeError)):
