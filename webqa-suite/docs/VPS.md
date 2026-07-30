@@ -38,8 +38,13 @@ este repositório.
 ```bash
 mkdir -p docker/secrets && chmod 700 docker/secrets
 ssh-keygen -t ed25519 -N '' -C 'webqa-vps-bot' -f docker/secrets/deploy_key
-chmod 600 docker/secrets/deploy_key
 cat docker/secrets/deploy_key.pub    # cole em Settings → Deploy keys → Allow write access
+
+# Permissão e DONO importam: a montagem preserva o uid do host, e o container
+# roda como uid 1000 (pwuser). Uma chave 0400 de outro dono é ilegível lá
+# dentro — o noturno morreria ao copiá-la, com erro obscuro.
+sudo chown 1000 docker/secrets/deploy_key docker/secrets/known_hosts
+chmod 400 docker/secrets/deploy_key docker/secrets/known_hosts
 ```
 
 A chave **privada** fica só no disco da VPS e é montada somente-leitura no
@@ -58,6 +63,9 @@ ssh-keyscan -t ed25519 github.com > docker/secrets/known_hosts
 ssh-keygen -lf docker/secrets/known_hosts     # compare com o fingerprint publicado
 ```
 
+Depois de gerar os dois arquivos, aplique dono e permissão como na seção
+anterior (`chown 1000` + `chmod 400`).
+
 O container roda com `StrictHostKeyChecking=yes`: se o fingerprint não casar, o
 push falha em vez de confiar em quem responder.
 
@@ -71,6 +79,31 @@ Rebuild é necessário só quando mudam **dependências** ou o Dockerfile: o
 entrypoint faz `git pull --ff-only` a cada noite, então check novo entra sem
 rebuild. O container é `--rm`: o pull vive só naquela execução, e não há deriva
 de estado entre noites.
+
+## Antes do cron: o smoke (`make vps-smoke`)
+
+Não agende o cron sem passar por aqui. O smoke roda **os mesmos comandos do
+cron**, apenas sem a caneta, e para no primeiro problema citando a seção que
+corrige:
+
+```bash
+cd /opt/webqa-suite/webqa-suite
+make vps-smoke        # ou: scripts/vps_smoke.sh
+```
+
+| Passo | O que valida |
+|---|---|
+| 1 | daemon do Docker responde e a imagem constrói |
+| 2 | `docker history` sem `deploy_key`/`BEGIN OPENSSH`/`id_rsa`/`id_ed25519` |
+| 3 | deploy key e `known_hosts` presentes, `0400` e legíveis pelo uid do container |
+| 4 | `ssh -T git@github.com` autentica pela deploy key |
+| 5 | pipeline completo com `WEBQA_DRY_RUN=1`: sai com `streak`, e HEAD local e remoto ficam intactos |
+
+Em `5/5 PASS` ele imprime `Pronto: agende o cron`. Em qualquer FAIL, sai com
+código ≠ 0 — e o log **nunca** ecoa bytes de segredo, só caminhos.
+
+`WEBQA_DRY_RUN=1` executa fixture, contrato, dimensão e classificador; pula
+somente commit e push. É o modo de exercitar o noturno sem mexer no ledger.
 
 ## Execução manual
 

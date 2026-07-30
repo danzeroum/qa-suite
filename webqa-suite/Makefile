@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd lgpd-passivo load verify lint sast estabilidade fixture
+.PHONY: all backend frontend ux functional acceptance lgpd lgpd-passivo load verify lint sast estabilidade fixture vps-smoke
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -11,6 +11,7 @@ lgpd-passivo: ; pytest -m "lgpd and not browser"   # só HTTP, sem navegador
 load: ; pytest -m load
 estabilidade: ; python scripts/estabilidade.py
 fixture: ; python fixture_target/servir.py   # alvo fabricado, porta efemera
+vps-smoke: ; scripts/vps_smoke.sh   # valida VPS antes de agendar o cron
 verify: ; pytest -m verification tests
 lint: ; ruff check webqa checks tests scripts fixture_target
 # Mesmos comandos do CI (.github/workflows/ci.yml): rigor total na biblioteca;
