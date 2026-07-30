@@ -16,7 +16,12 @@ via HTTP, produzindo relatório consolidado e executável em CI/CD.
 
 **Fora do escopo (anti-scope-creep — mudanças exigem decisão explícita)**
 - Testes caixa-branca/unitários do código do alvo.
-- Autenticação em fluxos logados (extensível, mas não incluso).
+- Autenticação em **fluxo logado** (formulário de login, sessão, CSRF, MFA).
+  A extensão prevista aqui foi exercida em parte pela OS-37: **HTTP Basic Auth
+  na entrada** passou para DENTRO do escopo (`webqa/auth.py`, credencial só por
+  ambiente). Basic Auth é um cabeçalho, não um fluxo — não há formulário a
+  preencher nem sessão a manter, e por isso cabe na natureza caixa-preta da
+  suíte sem torná-la um robô de navegação. Fluxo logado segue fora.
 - Pentest ofensivo (fuzzing, injeção ativa) — apenas verificações passivas.
 - Avaliação subjetiva de estética/conteúdo (exige humano).
 
@@ -26,7 +31,7 @@ A EAP está **alinhada 1:1 com as entregas reais do código** (pastas do reposit
 
 ```
 1. WebQA Suite
-├── 1.1 Fundação ................. webqa/ (config, http_utils, report), conftest.py
+├── 1.1 Fundação ................. webqa/ (config, http_utils, auth, report), conftest.py
 ├── 1.2 Backend .................. checks/backend/ (5 módulos)
 ├── 1.3 Frontend ................. checks/frontend/ (3 módulos)
 ├── 1.4 UX ....................... checks/ux/ (3 módulos)

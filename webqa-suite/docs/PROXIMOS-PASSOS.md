@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **558 testes coletados**; num ambiente
-limpo o resultado é **555 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **607 testes coletados**; num ambiente
+limpo o resultado é **604 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -414,6 +414,31 @@ Os três detectores foram provados contra violação plantada. Um detector que
 nunca detectou nada não está provado — e a trava, sem isso, dependeria de
 vigilância humana, que é justamente o que este projeto substitui por invariante
 estrutural.
+
+### 4.3-bis Acesso autenticado — a porta abriu, a sondagem não (OS-37)
+
+`WEBQA_BASIC_AUTH_USER`/`_PASS` fazem a suíte passar por um Basic Auth de nginx,
+no cliente HTTP e no navegador. Três coisas que quem for mexer aqui precisa saber
+antes de tocar no código, porque nenhuma delas é dedutível lendo só as chamadas:
+
+* **a autenticação é presa a origem + esquema, não ao cliente.** Parece
+  burocracia até lembrar que o mesmo `client` de sessão busca o axe-core na
+  Cloudflare e segue o link da política de privacidade. Um `httpx.BasicAuth`
+  comum mandaria a senha do operador para os dois — e para o `http://` puro do
+  `test_http_redireciona_para_https`. Ver `webqa/auth.py::pode_enviar_credencial`.
+* **a senha é mascarada por VALOR, e em todas as formas escapadas.** Varrer o
+  `summary.json` procurando o valor cru falharia justamente com as senhas boas:
+  `json.dumps` escapa aspas, `html.escape` escapa `&<>`. Por isso
+  `variantes_da_senha` registra seis formas, e a varredura acontece sobre a
+  string já serializada — o que faz um campo novo nascer coberto.
+* **o aceite é grep na saída**, não inspeção de chamada
+  (`tests/test_vazamento_de_credencial.py`), com um teste que prova que a
+  varredura tem dentes e uma guarda AST sobre toda escrita do relatório.
+
+O próximo passo é a **OS-38** (passivo autenticado): explorar a área logada
+seguindo só o que a aplicação oferece. A Fase C segue desligada — e agora por
+escolha, não por falta de autorização, o que é uma distinção que o registro de OS
+guarda explicitamente.
 
 ### 4.4 LGPD Fase 2 — travada por decisão de arquitetura
 

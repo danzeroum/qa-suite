@@ -6,10 +6,18 @@ testabilidade da própria suíte (verificação em tests/).
 """
 from __future__ import annotations
 
+import warnings
+
 import pytest
 from bs4 import BeautifulSoup
 
 from webqa import metricas
+from webqa.auth import (
+    aviso_de_senha_curta,
+    credencial_do_ambiente,
+    credenciais_para_playwright,
+    verificar_desafio_de_autenticacao,
+)
 from webqa.config import Settings, load_settings
 from webqa.dominio import Recurso
 from webqa.http_utils import Timing, make_client, timed_get
@@ -25,18 +33,49 @@ def settings() -> Settings:
 
 
 @pytest.fixture(scope="session")
-def client(settings):
+def alvo_alcancavel(settings, credencial):
+    """O primeiro GET do alvo, e o preflight que o interpreta.
+
+    Uma porta fechada precisa de UMA linha explicando o que fazer, não de
+    dezenas de falhas sobre a página de 401. O 401 é tratado aqui, antes de
+    qualquer check, e distingue "não há credencial" de "a credencial foi
+    recusada" — dois problemas com duas soluções diferentes.
+
+    Vem ANTES do `client` (e não a partir dele) porque há checks que usam o
+    cliente sem passar pela `home_response`: se o preflight pendesse da home, o
+    primeiro deles ainda reprovaria medindo a página de 401 — que é exatamente a
+    cascata confusa que esta fixture existe para eliminar.
+
+    A resposta é devolvida para a `home_response` reaproveitar: preflight que
+    gasta um GET a mais contradiz o respeito ao sistema sob teste.
+    """
+    with make_client(settings) as cliente_de_sondagem:
+        resposta = cliente_de_sondagem.get(settings.target_url)
+    verificar_desafio_de_autenticacao(resposta.status_code, credencial, settings.target_url)
+    return resposta
+
+
+@pytest.fixture(scope="session")
+def client(settings, alvo_alcancavel):
     with make_client(settings) as c:
         yield c
 
 
 @pytest.fixture(scope="session")
-def home_response(client, settings):
+def credencial():
+    """Credencial de Basic Auth do ambiente, ou None (alvo anônimo)."""
+    cred = credencial_do_ambiente()
+    if cred is not None and cred.senha_curta:
+        warnings.warn(aviso_de_senha_curta(), stacklevel=1)
+    return cred
+
+
+@pytest.fixture(scope="session")
+def home_response(alvo_alcancavel):
     """Resposta da página inicial — reutilizada por dezenas de testes
     para não martelar o alvo (respeito ao sistema sob teste)."""
-    resp = client.get(settings.target_url)
-    resp.raise_for_status()
-    return resp
+    alvo_alcancavel.raise_for_status()
+    return alvo_alcancavel
 
 
 @pytest.fixture(scope="session")
@@ -79,15 +118,27 @@ def browser(settings):
 
 
 @pytest.fixture(scope="session")
-def browser_page(browser):
+def credenciais_navegador(settings, credencial):
+    """`http_credentials` do contexto Playwright — None quando o acesso é anônimo.
+
+    Kwarg desempacotado (e não `http_credentials=None`) para que a chamada sem
+    credencial fique IDÊNTICA à de antes desta OS: alvo anônimo não muda de
+    comportamento por causa de um recurso que ele não usa.
+    """
+    creds = credenciais_para_playwright(credencial, settings.target_url)
+    return {"http_credentials": creds} if creds else {}
+
+
+@pytest.fixture(scope="session")
+def browser_page(browser, credenciais_navegador, alvo_alcancavel):
     """Página Chromium real para medir renderização e acessibilidade."""
-    page = browser.new_page()
+    page = browser.new_page(**credenciais_navegador)
     yield page
     page.close()
 
 
 @pytest.fixture(scope="module")
-def network_log(browser, settings) -> NetworkLog:
+def network_log(browser, settings, credenciais_navegador, alvo_alcancavel) -> NetworkLog:
     """Carrega o alvo em contexto NOVO E VIRGEM e devolve o que a rede revelou.
 
     Contrato (webqa/trackers.py::NetworkLog): `.requests` (url, resource_type de
@@ -98,7 +149,7 @@ def network_log(browser, settings) -> NetworkLog:
     um teste anterior faria o alvo parecer conforme ("já consentiu antes") —
     o pior falso negativo possível numa bateria de consentimento prévio.
     """
-    context = browser.new_context(user_agent=settings.user_agent)
+    context = browser.new_context(user_agent=settings.user_agent, **credenciais_navegador)
     requests: list[LoggedRequest] = []
     recursos: list[Recurso] = []
     context.on("request", lambda r: requests.append(LoggedRequest(r.url, r.resource_type)))

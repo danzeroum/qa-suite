@@ -31,6 +31,11 @@ python -m playwright install chromium   # para os testes de renderização/acess
 # alvo por variável de ambiente (ou edite config.yaml)
 export WEBQA_TARGET_URL="https://example.com"
 
+# alvo atrás de HTTP Basic Auth (nginx na entrada): credencial SÓ por ambiente,
+# nunca em config.yaml — o YAML é versionado. Ausentes: acesso anônimo, como antes.
+export WEBQA_BASIC_AUTH_USER="usuario-de-teste"
+export WEBQA_BASIC_AUTH_PASS="..."
+
 pytest                          # tudo
 pytest -m backend               # só backend
 pytest -m "frontend or ux"      # frontend + UX
@@ -45,6 +50,35 @@ Ao final, um relatório consolidado é gravado em `report/summary.json` e
 também as **medidas do alvo** (TTFB, total, FCP, LCP, CLS) sob `metricas` —
 gravadas passem ou falhem os testes, porque veredito binário não distingue TTFB
 de 90ms de TTFB de 790ms contra um orçamento de 800ms.
+
+### Alvo protegido por HTTP Basic Auth
+
+`WEBQA_BASIC_AUTH_USER` e `WEBQA_BASIC_AUTH_PASS` fazem a suíte passar da porta —
+no cliente HTTP e no navegador. Sem elas, nada muda: o acesso segue anônimo.
+Definir **só uma das duas** é erro de configuração e aborta com mensagem, em vez
+de cair para anônimo em silêncio e reencenar o 401. Alvo que responde 401 sem
+credencial também para com uma linha dizendo o que fazer, em vez de transformar a
+bateria inteira em erro de infraestrutura.
+
+Três garantias, e as três são teste, não promessa:
+
+- **a senha nunca sai no laudo.** Ela é mascarada por VALOR — não por nome de
+  parâmetro nem por formato de emissor, que é o que `sanitize.py` já sabia fazer
+  e que não alcança a senha arbitrária de um nginx. O registro acontece no
+  construtor da `Credencial`, e a varredura, na string já serializada do
+  `summary.json`/`summary.html`. `tests/test_vazamento_de_credencial.py` faz o
+  grep na saída e ainda exige, por AST, que toda escrita do relatório passe pela
+  varredura.
+- **a senha não vai para terceiro.** O cliente HTTP é de sessão e o mesmo objeto
+  busca o axe-core num CDN e segue o link da política de privacidade. A
+  autenticação é presa a **origem + esquema**, não ao cliente.
+- **a senha não trafega em claro.** Só sob `https`, com uma exceção para host da
+  própria máquina/rede (o alvo fixture roda em `http://127.0.0.1`), decidida por
+  IP resolvido — nunca por casar o texto "localhost".
+
+Senha curta funciona, mas sai um aviso: mascarar por valor um segredo de três
+caracteres também mascara trechos legítimos do laudo. Prefira senha longa e
+aleatória, e um **usuário de teste descartável** — mesmo em ambiente próprio.
 
 ### Campanha contra alvos reais
 
