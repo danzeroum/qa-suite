@@ -447,14 +447,46 @@ def _sha_do_alvo_de_hoje() -> str:
         return ""
 
 
-def escrever_painel(ledger: dict, destino: Path, meta: int = META_PADRAO,
-                    ledger_path: str = "docs/lgpd-estabilidade.json") -> Path:
-    """Renderiza o painel. NUNCA escreve no ledger — só lê e desenha."""
+def ler_ledger_para_painel(caminho: Path) -> dict:
+    """Ledger lido com descritor SOMENTE-LEITURA, para o painel consumir.
+
+    `os.O_RDONLY` explícito em vez de `Path.read_text` não muda o resultado —
+    muda o que o código PEDE ao sistema operacional. O caminho do painel nunca
+    solicita permissão de escrita sobre a fonte de verdade, e isso é legível na
+    própria linha.
+
+    A honestidade que acompanha: isto **reduz capacidade, não a elimina**. Em
+    Python não existe ponto único de estrangulamento para escrita em arquivo,
+    então nada impede uma linha futura de abrir o mesmo caminho em modo `w`. É
+    diferente do `Finding`, cuja invariante é real porque só há um construtor.
+    O que fecha a diferença é o teste-fronteira em `tests/test_painel_leitura.py`,
+    que lê o fonte deste caminho e reprova qualquer escrita.
+    """
+    descritor = os.open(caminho, os.O_RDONLY)
+    try:
+        with os.fdopen(descritor, encoding="utf-8") as arquivo:
+            dados = json.load(arquivo)
+    except (ValueError, OSError):
+        return {"schema": SCHEMA, "execucoes": []}
+    execucoes = dados.get("execucoes") if isinstance(dados, dict) else None
+    return {"schema": dados.get("schema", SCHEMA) if isinstance(dados, dict) else SCHEMA,
+            "execucoes": list(execucoes or [])}
+
+
+def escrever_painel(ledger: dict, destino: Path, *, meta: int = META_PADRAO,
+                    rotulo_do_ledger: str = "docs/lgpd-estabilidade.json") -> Path:
+    """Renderiza o painel. Escreve em `destino` e em MAIS NADA.
+
+    Recebe o ledger já lido (`dict`), nunca o caminho dele: `rotulo_do_ledger` é
+    texto para a página exibir, não destino de escrita. Argumentos por palavra-
+    chave de propósito — assim ninguém passa um `Path` na posição do rótulo por
+    engano de ordem.
+    """
     sys.path.insert(0, str(ROOT))       # execução direta: python scripts/estabilidade.py
     from webqa.estabilidade_html import montar
 
     html = montar(ledger, caminhada(ledger.get("execucoes") or []),
-                  violacoes_do_contrato(), meta=meta, ledger_path=ledger_path,
+                  violacoes_do_contrato(), meta=meta, ledger_path=rotulo_do_ledger,
                   sha_do_alvo_atual=_sha_do_alvo_de_hoje())
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_text(html, encoding="utf-8")
@@ -484,8 +516,13 @@ def main(argv: list[str] | None = None) -> int:
         # Gerar o painel nunca escreve no ledger, em nenhuma combinação de
         # flags: é leitura mais renderização. Assim `--painel` é seguro no
         # GitHub, onde nada pode tocar o arquivo (docs/VPS.md).
-        destino = escrever_painel(carregar_ledger(args.ledger), args.painel,
-                                  meta=args.meta, ledger_path=str(args.ledger))
+        #
+        # `ler_ledger_para_painel` em vez de `carregar_ledger`: aquele abre com
+        # O_RDONLY e não migra nada. `carregar_ledger` normaliza o schema na
+        # carga, e normalização é trabalho de quem vai gravar — não de quem
+        # desenha uma página.
+        destino = escrever_painel(ler_ledger_para_painel(args.ledger), args.painel,
+                                  meta=args.meta, rotulo_do_ledger=str(args.ledger))
         print(f"painel: {destino}")
         if not args.recompute:
             return 0
