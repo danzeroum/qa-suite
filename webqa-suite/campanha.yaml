@@ -4,6 +4,15 @@
 # Alvos de TERCEIROS. Nada aqui autoriza carga: a campanha aborta se
 # WEBQA_LOAD_AUTHORIZED estiver setado no ambiente. Medir de fora, uma vez por
 # repetição, com pausa entre execuções — é o contrato de respeito ao alvo.
+#
+# A etiqueta (docs/CAMPANHA.md §etiqueta) é automática e NAO precisa ser
+# declarada por alvo: robots.txt consultado antes do primeiro acesso, caminho
+# proibido pulado com motivo, Crawl-delay respeitado, 429/503 encerram o alvo
+# sem reinsistencia, crawl sequencial entre paginas e User-Agent sempre
+# identificavel. Alvo de rede local (o fixture) e isento por ser controlado.
+#
+# Ao acrescentar alvo aqui: nunca banco, gov ou servico com anti-automacao — a
+# campanha nao existe para testar quem nao quer ser testado.
 
 repeticoes: 3        # 1 execução não distingue veredito de flake; 3 já mostra 2×1
 pausa_s: 10          # intervalo MÍNIMO entre execuções (o runner nunca reduz)

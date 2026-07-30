@@ -18,13 +18,13 @@ Só `httpx`, que já existe no projeto. Nenhum SDK proprietário.
 """
 from __future__ import annotations
 
-import ipaddress
 import os
 import re
-import socket
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 from urllib.parse import urlsplit
+
+from webqa.rede import METADADOS_DE_NUVEM, PORTA_PADRAO, ips_de
 
 ENDPOINT_ENV = "WEBQA_LLM_ENDPOINT"
 MODELO_ENV = "WEBQA_LLM_MODEL"
@@ -59,28 +59,6 @@ _CERTIFICACAO = (
     ("certificado", re.compile(r"\bcertificad[oa]s?\b", re.I)),
 )
 
-# Endereço do serviço de metadados das nuvens (AWS, GCP, Azure, DigitalOcean).
-# É link-local — logo passaria pelo teste de "rede local" — mas NÃO é a máquina:
-# é um serviço do provedor. Aceitá-lo contradiria a invariante 1 pela letra
-# enquanto a viola pelo propósito.
-_METADADOS_DE_NUVEM = frozenset({
-    ipaddress.ip_address("169.254.169.254"),
-    ipaddress.ip_address("fd00:ec2::254"),
-})
-
-_PORTA_PADRAO = {"http": 80, "https": 443}
-
-
-def _ips_de(host: str, porta: int) -> list:
-    """IPs que o host resolve, via `getaddrinfo`. Lista vazia é erro de quem chama."""
-    infos = socket.getaddrinfo(host, porta, proto=socket.IPPROTO_TCP)
-    vistos = []
-    for info in infos:
-        endereco = info[4][0]
-        ip = ipaddress.ip_address(endereco.split("%")[0])   # tira zona de link-local
-        if ip not in vistos:
-            vistos.append(ip)
-    return vistos
 
 
 def validar_endpoint(url: str) -> str:
@@ -102,9 +80,9 @@ def validar_endpoint(url: str) -> str:
         raise ValueError(
             f"endpoint de LLM sem host: {url!r}. Esperado algo como {ENDPOINT_PADRAO}")
 
-    porta = partes.port or _PORTA_PADRAO.get(partes.scheme, 80)
+    porta = partes.port or PORTA_PADRAO.get(partes.scheme, 80)
     try:
-        ips = _ips_de(host, porta)
+        ips = ips_de(host, porta)
     except OSError as erro:
         raise ValueError(
             f"endpoint de LLM não resolve: {host!r} ({type(erro).__name__}). "
@@ -121,7 +99,7 @@ def validar_endpoint(url: str) -> str:
             raise ValueError(
                 f"endpoint de LLM aponta para endereço não especificado ({ip}): {url!r}. "
                 "0.0.0.0 não é destino, é curinga de escuta.")
-        if ip in _METADADOS_DE_NUVEM:
+        if ip in METADADOS_DE_NUVEM:
             raise ValueError(
                 f"envio para nuvem fora de escopo: {host!r} resolve para {ip}, o "
                 "serviço de metadados do provedor. É link-local, mas não é esta máquina.")

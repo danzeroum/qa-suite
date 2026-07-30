@@ -47,8 +47,19 @@ from urllib.parse import urlparse
 import yaml
 
 RAIZ = Path(__file__).resolve().parent.parent
+if str(RAIZ) not in sys.path:          # execução direta: python scripts/campanha.py
+    sys.path.insert(0, str(RAIZ))
+
+from webqa.etiqueta import PoliteFetcher, motivo_do_recuo, resposta_pede_recuo  # noqa: E402
+
 CAMPANHA_PADRAO = RAIZ / "campanha.yaml"
 SAIDA_PADRAO = RAIZ / "report" / "campanha"
+
+# User-agent identificável, com contato. Mascarar o cliente como navegador para
+# furar a política de um alvo seria o oposto do que esta suíte prega — e ela
+# perderia a autoridade moral de cobrar conformidade de quem mede.
+UA_PADRAO = ("WebQA-Suite/1.0 (+https://github.com/danzeroum/qa-suite; "
+             "automated quality checks)")
 
 # A campanha é PASSIVA por definição. Não basta não pedir carga: se o ambiente
 # já traz a autorização de carga, alguma outra intenção está em jogo, e testes
@@ -162,23 +173,42 @@ def carregar_campanha(caminho: Path) -> Campanha:
 
 # ---------------------------------------------------------------- execução
 
-def preflight_http(alvo: Alvo, timeout_s: float = 20.0) -> tuple[bool, str]:
+def preflight_http(alvo: Alvo, timeout_s: float = 20.0, fetcher=None) -> tuple[bool, str]:
     """Uma requisição para saber se vale gastar uma execução inteira no alvo.
 
     Alvo fora do ar (ou que recusa o cliente) faria as ~90 asserções da suíte
     falharem em cascata por um motivo só, produzindo um relatório que fala do
     alvo quando deveria falar da rede. Melhor uma pergunta antes.
+
+    A ETIQUETA vem antes da pergunta (docs/CAMPANHA.md §etiqueta): contra host
+    de terceiro, o `robots.txt` é consultado primeiro. Perguntar depois de já
+    ter batido na home inverteria a ordem que a cortesia exige.
     """
     import httpx
 
-    cabecalhos = {"User-Agent": alvo.user_agent} if alvo.user_agent else None
+    fetcher = fetcher or PoliteFetcher(alvo.user_agent or UA_PADRAO, timeout_s)
+    veredito = fetcher.preparar(alvo.url)
+    if veredito.bloqueado:
+        return False, veredito.motivo
+    if not fetcher.pode_acessar(alvo.url):
+        return False, fetcher.motivo_do_bloqueio(alvo.url)
+
+    cabecalhos = {"User-Agent": alvo.user_agent or UA_PADRAO}
     try:
         resposta = httpx.get(alvo.url, timeout=timeout_s, follow_redirects=True,
                              headers=cabecalhos)
     except Exception as erro:      # rede, DNS, TLS, proxy: tudo é inacessível
         return False, f"{type(erro).__name__}: {str(erro)[:160]}"
+    if resposta_pede_recuo(resposta.status_code):
+        # NUNCA reinsistir no mesmo alvo nesta execução. Um 429 respondido com
+        # nova tentativa é cortesia virando ataque lento.
+        return False, motivo_do_recuo(resposta.status_code)
     if resposta.status_code >= 400:
         return False, f"HTTP {resposta.status_code} na home"
+
+    espera = veredito.crawl_delay_s
+    if espera:
+        return True, f"HTTP {resposta.status_code} · crawl-delay {espera:g}s"
     return True, f"HTTP {resposta.status_code}"
 
 
@@ -196,8 +226,10 @@ def env_da_execucao(alvo: Alvo, destino: Path,
         "WEBQA_REPORT_DIR": str(destino),
         "WEBQA_CRAWL_MAX_PAGES": str(alvo.crawl_max_pages),
     })
-    if alvo.user_agent:
-        ambiente["WEBQA_USER_AGENT"] = alvo.user_agent
+    # SEMPRE identificável, mesmo sem `user_agent` no yaml: o dono do alvo tem
+    # de conseguir descobrir quem o mediu e como pedir para parar. Cliente
+    # anônimo contra sistema de terceiro é o comportamento que esta suíte critica.
+    ambiente["WEBQA_USER_AGENT"] = alvo.user_agent or UA_PADRAO
     ambiente.pop(ENV_CARGA, None)   # cinto e suspensório: nunca propagar carga
     return ambiente
 
@@ -521,18 +553,25 @@ def render_markdown(dados: dict) -> str:
     L.append("## Tempo do alvo (o que o usuário do alvo sente)")
     L.append("")
     medidos = [a for a in dados["alvos"] if a["acessivel"] and a.get("metricas")]
-    if not medidos:
+    # Alvo que recuou, foi bloqueado por robots ou ficou inacessível ENTRA na
+    # tabela com "não medido" em toda a linha. Omiti-lo faria alvo que pediu
+    # recuo e alvo que passou ficarem indistinguíveis para quem lê a tabela — e
+    # um alvo ausente é lido como alvo sem problema, que é o pior engano
+    # possível num consolidado.
+    nao_medidos = [a for a in dados["alvos"] if a not in medidos]
+    colunas = medidos + nao_medidos
+    if not colunas:
         L.append("Nenhum alvo rendeu métrica nesta campanha.")
         L.append("")
     else:
         cabecalho = "| Métrica | " + " | ".join(
-            f"{a['host']} (mediana / pior)" for a in medidos) + " |"
+            f"{a['host']} (mediana / pior)" for a in colunas) + " |"
         L.append(cabecalho)
-        L.append("| --- |" + " --- |" * len(medidos))
+        L.append("| --- |" + " --- |" * len(colunas))
         for chave, rotulo in METRICAS:
             celulas = []
-            for a in medidos:
-                m = a["metricas"].get(chave)
+            for a in colunas:
+                m = (a.get("metricas") or {}).get(chave) if a["acessivel"] else None
                 if not m:
                     celulas.append("não medido")
                     continue
