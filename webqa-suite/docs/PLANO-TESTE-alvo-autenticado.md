@@ -162,6 +162,12 @@ no crawl continua anônimo). O que conferir no laudo:
 - `Disallow` do alvo continua valendo: caminho proibido não é visitado nem
   estando linkado. Oferecer não revoga ter pedido para não entrar.
 
+> **Por que este roteiro roda na VPS e não no container do dev** (regra da casa
+> §2.11): o alvo fixture é loopback, e loopback é **isento de etiqueta por
+> design** — contra ele o caminho inteiro do `robots.txt` nem executa. Foi assim
+> que este limite escapou duas vezes. Loopback prova a lógica; a fronteira só se
+> prova contra host real.
+
 ---
 
 ## Fase 2 — Exploração passiva autenticada (OS-38)
