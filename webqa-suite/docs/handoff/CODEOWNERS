@@ -1,0 +1,7 @@
+# Controle TÉCNICO de governança da Fase C (docs/FASE-C-revisao-1.md B.2).
+# Estes caminhos removem ou abrem invariantes de segurança — exigem revisão
+# nomeada de code owner, não podem entrar por squash silencioso.
+webqa-suite/tests/test_fase_c_travada.py   @danzeroum
+webqa-suite/webqa/gates.py                 @danzeroum
+webqa-suite/webqa/escopo.py                @danzeroum
+webqa-suite/data/caminhos-sensiveis.yaml   @danzeroum

@@ -1,0 +1,18 @@
+# EXEMPLO — copie para escopo-autorizado.yaml e edite. O arquivo REAL nunca é
+# comitado num repo público (docs/FASE-C.md B.8): ele vive fora do repo (secret/
+# config privada) e é injetado no CI. Aqui vai só o schema, com placeholders.
+#
+# Cada entrada autoriza UM host, por ORIGEM EXATA (esquema://host[:porta], no
+# formato que webqa.auth.origem_de produz). www e apex são hosts distintos:
+# liste os dois se ambos forem alvo. https obrigatório.
+
+alvos:
+  - origem: "https://homolog.seu-dominio.exemplo"   # troque pelo SEU host
+    autorizado_por: "seu-nome"
+    data: "2026-07-31"
+    evidencia: "link ou hash do aceite (ex.: pr#42)"
+    ambiente: "homologacao"          # producao | homologacao | sandbox
+    # C2 (interação com escrita) é PROIBIDA em producao — use homologacao/sandbox.
+    verificacao:
+      tipo: "dns_txt"                # prova de posse (R-C6)
+      valor: "webqa-ownership=<hash-desta-entrada>"
