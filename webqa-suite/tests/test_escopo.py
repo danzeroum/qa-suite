@@ -7,6 +7,7 @@ real — o modo de falha que este arquivo existe para impedir.
 """
 from __future__ import annotations
 
+import socket
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -17,6 +18,40 @@ from webqa import escopo
 pytestmark = pytest.mark.verification
 
 RAIZ = Path(__file__).resolve().parent.parent
+
+
+def _dubla_getaddrinfo(monkeypatch, *ips: str) -> None:
+    """Faz `getaddrinfo` devolver exatamente estes IPs — nenhuma consulta sai.
+
+    Mesma técnica de `tests/test_fronteira_de_rede.py`: é o único jeito de
+    exercitar a prova de posse (snapshot no carregamento e re-resolução) sem
+    tocar a rede.
+    """
+    infos = [
+        (socket.AF_INET6 if ":" in ip else socket.AF_INET,
+         socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (ip, 443))
+        for ip in ips
+    ]
+    monkeypatch.setattr(socket, "getaddrinfo", lambda h, p, *a, **k: infos)
+
+
+def _falha_getaddrinfo(monkeypatch) -> None:
+    def _erro(*_a, **_k):
+        raise socket.gaierror("Name or service not known")
+
+    monkeypatch.setattr(socket, "getaddrinfo", _erro)
+
+
+@pytest.fixture(autouse=True)
+def _sem_dns_real(monkeypatch):
+    """Nenhuma consulta DNS real sai destes testes (regra da casa).
+
+    O carregamento agora resolve para o snapshot de posse; sem este dublê, cada
+    `carregar` bateria em DNS de verdade. Default: resolução falha → snapshot
+    vazio. Os testes de posse instalam o próprio dublê antes de `carregar`,
+    sobrescrevendo este (o último `setattr` no mesmo monkeypatch vence).
+    """
+    _falha_getaddrinfo(monkeypatch)
 
 
 def _escrever(tmp_path, origem="https://meusite.exemplo.br", ambiente="homologacao",
@@ -127,6 +162,72 @@ def test_hash_congelado_muda_com_o_conteudo(tmp_path):
     h1 = escopo.carregar(_escrever(tmp_path, "https://a.exemplo.br")).hash_congelado
     h2 = escopo.carregar(_escrever(tmp_path, "https://b.exemplo.br")).hash_congelado
     assert h1 != h2 and len(h1) == 64
+
+
+# ---------- prova de posse por IP (R-C6): takeover de subdomínio ----------
+#
+# TDD: o teste de divergência (o takeover) vem primeiro — é o modo de falha que
+# a função existe para pegar. Um snapshot que só foi visto "bater" nunca provou
+# que detecta a troca de dono.
+
+def test_divergencia_de_ip_e_detectada_como_takeover(tmp_path, monkeypatch):
+    """Snapshot num IP, host agora aponta para outro → posse recusada.
+
+    É o caso R-C6: entre autorizar o host e sondá-lo, o DNS foi reapontado para
+    infra de terceiro. Sondar assim atingiria quem não autorizou; a divergência
+    tem de abortar, nunca passar batido."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")           # baseline no carregamento
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "198.51.100.9")          # host trocou de dono
+    assert esc.verificar_posse("meusite.exemplo.br") is False
+
+
+def test_posse_ok_quando_o_ip_bate(tmp_path, monkeypatch):
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")           # mesmo IP na re-verificação
+    assert esc.verificar_posse("meusite.exemplo.br") is True
+
+
+def test_falha_de_resolucao_agora_e_nao_posse_sem_excecao(tmp_path, monkeypatch):
+    """Host resolvia no carregamento, agora não resolve → não-posse, sem
+    exceção crua subindo. Na dúvida, o lado seguro é recusar o probe."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _falha_getaddrinfo(monkeypatch)
+    assert esc.verificar_posse("meusite.exemplo.br") is False
+
+
+def test_snapshot_grava_os_ips_no_carregamento(tmp_path, monkeypatch):
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    assert esc.ips_no_carregamento["meusite.exemplo.br"] == frozenset({"203.0.113.7"})
+
+
+def test_host_que_nao_resolveu_no_carregamento_nao_afirma_posse(tmp_path, monkeypatch):
+    """Sem baseline (não resolveu no carregamento), `verificar_posse` recusa
+    mesmo que agora resolva — posse se prova contra um snapshot, não do nada."""
+    _falha_getaddrinfo(monkeypatch)                          # carrega sem baseline
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    assert esc.ips_no_carregamento["meusite.exemplo.br"] == frozenset()
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    assert esc.verificar_posse("meusite.exemplo.br") is False
+
+
+def test_host_fora_do_escopo_nao_tem_posse(tmp_path, monkeypatch):
+    """Host que não está no escopo nunca tem posse — não há baseline para ele."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    assert esc.verificar_posse("outro-host.exemplo.br") is False
+
+
+def test_posse_distingue_ip_parcialmente_coincidente(tmp_path, monkeypatch):
+    """Conjunto que só coincide em parte é divergência: um IP novo no round-robin
+    é exatamente o vetor de takeover que a igualdade estrita pega."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7", "203.0.113.8")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7", "198.51.100.9")
+    assert esc.verificar_posse("meusite.exemplo.br") is False
 
 
 # ---------- os alvos de TERCEIRO da campanha nunca entram no escopo ----------

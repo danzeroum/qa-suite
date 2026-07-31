@@ -53,6 +53,15 @@ FRONTEIRAS_DE_REDE: dict[str, tuple[str, ...]] = {
     "webqa/llm.py": (
         "test_endpoint_publico_e_recusado",
     ),
+    # escopo consome `ips_de` de um jeito diferente dos outros três: não decide
+    # local × terceiro, e sim POSSE — se os IPs do host ainda são os do
+    # carregamento. O ramo que precisa de prova é a divergência (takeover), e é
+    # ela que estes testes exercitam, em tests/test_escopo.py.
+    "webqa/escopo.py": (
+        "test_divergencia_de_ip_e_detectada_como_takeover",
+        "test_posse_ok_quando_o_ip_bate",
+        "test_falha_de_resolucao_agora_e_nao_posse_sem_excecao",
+    ),
 }
 
 
