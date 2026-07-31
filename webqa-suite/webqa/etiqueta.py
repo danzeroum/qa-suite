@@ -131,7 +131,18 @@ class PoliteFetcher:
         return f"{partes.scheme}://{partes.netloc}"
 
     def isento(self, url: str) -> bool:
-        """Alvo controlado (loopback/rede local) não deve etiqueta a ninguém."""
+        """Alvo controlado (loopback/rede local) não deve etiqueta a ninguém.
+
+        ⚠️ Este `True` **curto-circuita tudo que vem depois** em `preparar`: a
+        busca do `robots.txt`, o tratamento de status, a leitura autenticada e o
+        `Disallow`. Contra `127.0.0.1` nada disso executa — então o alvo fixture
+        é incapaz, por construção, de exercitar esse caminho, e um ensaio local
+        sai verde sem ter rodado a linha que interessa.
+
+        Custou duas vezes (OS-37 e OS-38). É a regra da casa **§2.11** em
+        `docs/PROXIMOS-PASSOS.md`: loopback prova a lógica, nunca a fronteira —
+        comportamento daqui pra baixo só se dá por provado contra host não-local.
+        """
         partes = urlsplit(url)
         porta = partes.port or PORTA_PADRAO.get(partes.scheme, 80)
         return host_e_local(partes.hostname or "", porta)

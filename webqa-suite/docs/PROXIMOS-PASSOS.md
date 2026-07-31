@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **630 testes coletados**; num ambiente
-limpo o resultado é **627 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **638 testes coletados**; num ambiente
+limpo o resultado é **635 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -244,6 +244,50 @@ independente de permissão por isso.
 Uma nota sobre a primeira: o pytest coleta por `test*`, **não** por `test_*`.
 `testes_lentos` e `testar_alvo` entram na coleta, e em código português esse
 prefixo aparece sem querer. A guarda checa o prefixo que o pytest usa de fato.
+
+### 2.11 Loopback prova a lógica, nunca a fronteira
+
+Todo comportamento que dependa da **camada de etiqueta** ou da distinção
+**rede-local × rede-pública** só é considerado *provado* depois de exercido
+contra host **não-local**.
+
+O alvo fixture roda em `127.0.0.1` e é **isento de etiqueta por design**. Isso
+não é um detalhe do fixture — é um curto-circuito no código
+(`webqa/etiqueta.py::PoliteFetcher.preparar`):
+
+```python
+if self.isento(url):          # loopback / rede privada
+    return Veredito(True, "alvo controlado (rede local) — isento de etiqueta")
+resposta = self._buscar(f"{base}/robots.txt")     # ← nada daqui pra baixo roda
+```
+
+Contra loopback, **tudo a jusante da isenção é inalcançável por construção**:
+a busca do `robots.txt`, o tratamento de status, a leitura autenticada, o
+`Disallow`. Um ensaio local contra esse caminho não é amostra fraca — é amostra
+**vazia**, e ainda assim sai verde. É a pior combinação que um teste pode ter.
+
+Custou **duas vezes no mesmo par de OS**:
+
+| Quando | O que o dublê local escondeu |
+|---|---|
+| OS-37 | `robots.txt` anônimo levava 401 em alvo protegido → a dimensão `functional` não produzia veredito nenhum. O ensaio contra o fixture passou |
+| OS-38 | o ensaio ponta a ponta do crawl autenticado não exercitou a leitura autenticada do robots — de novo foi preciso perguntar ao host real |
+
+Nas duas, quem achou foi uma pergunta a `docker.danzeroum.com`, não a suíte.
+
+**Como cumprir:**
+
+* na **unidade**, dublar `getaddrinfo` para IP público — `_publico` em
+  `tests/test_etiqueta.py`, `_resolve_para` em `tests/test_llm.py`;
+* na **validação**, perguntar a um host real antes de dar a fronteira por
+  provada. O plano de teste (`PLANO-TESTE-alvo-autenticado.md`) existe para isso.
+
+`tests/test_fronteira_de_rede.py` sustenta a metade estrutural: nenhum consumidor
+da fronteira escapa de ter o ramo público exercitado, e consumidor novo sem
+entrada no registro **reprova**. A metade humana — ir ao host real — é esta
+regra, porque os testes de `tests/` são livres de rede por outra regra da casa, e
+um teste que fingisse tocar a rede seria exatamente a garantia falsa que esta
+seção combate.
 
 ---
 
