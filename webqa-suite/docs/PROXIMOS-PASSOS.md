@@ -6,8 +6,8 @@ decisões que um leitor do código sozinho não teria como deduzir.
 
 Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
 
-A verificação da própria suíte tem hoje **607 testes coletados**; num ambiente
-limpo o resultado é **604 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **630 testes coletados**; num ambiente
+limpo o resultado é **627 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -436,10 +436,26 @@ antes de tocar no código, porque nenhuma delas é dedutível lendo só as chama
   (`tests/test_vazamento_de_credencial.py`), com um teste que prova que a
   varredura tem dentes e uma guarda AST sobre toda escrita do relatório.
 
-O próximo passo é a **OS-38** (passivo autenticado): explorar a área logada
-seguindo só o que a aplicação oferece. A Fase C segue desligada — e agora por
-escolha, não por falta de autorização, o que é uma distinção que o registro de OS
-guarda explicitamente.
+### 4.3-ter Passivo autenticado — a fronteira que é código (OS-38)
+
+`webqa/navegacao.py` percorre a área logada seguindo **só** endereços que saíram
+do DOM renderizado. A diferença entre isso e a Fase C não é de intenção nem de
+volume: é de **origem do endereço**, e por isso é verificável. Cada `Pagina` traz
+a proveniência ("link em X"), e a guarda de AST reprova literal de caminho ou
+`urljoin` com destino constante — nenhuma URL nasce no fonte.
+
+A prova executável é a **página órfã** do alvo fixture: existe, responde 200, e
+nunca é visitada. Um crawler que a alcançasse teria fabricado o endereço.
+
+A OS-38 também consertou o achado da OS-37: o `robots.txt` do alvo passa a ser
+lido **autenticado** (terceiro segue anônimo), e a dimensão `functional` deixa de
+nascer cega contra alvo protegido. Repare que esse limite era invisível no alvo
+fixture — loopback é isento de etiqueta. Foi preciso perguntar ao host real, e a
+lição vale para o próximo: **ensaio só em loopback dá confiança falsa sobre tudo
+que depende de etiqueta ou de rede pública.**
+
+A Fase C segue desligada — e agora por escolha, não por falta de autorização, o
+que é uma distinção que o registro de OS guarda explicitamente.
 
 ### 4.4 LGPD Fase 2 — travada por decisão de arquitetura
 

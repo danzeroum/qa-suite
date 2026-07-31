@@ -41,15 +41,11 @@ seguindo apenas links/botões presentes no DOM. Nunca adivinha URL, nunca sonda
 | OS | Estado | O que destrava |
 |---|---|---|
 | **OS-37** — HTTP Basic Auth (credencial por env, sanitização por valor) | ✅ em `main` (PR #35) | Fases 0, 1, 3, 4 e 5 |
-| **OS-38** — exploração passiva autenticada (crawl por proveniência de DOM, guarda AST) | ⏳ registrada, **não implementada** | Fase 2 |
+| **OS-38** — exploração passiva autenticada (crawl por proveniência de DOM, guarda AST) | ✅ implementada | Fase 2 |
 
-**Rodar em duas ondas.** Com a OS-37 em `main`, o dev já executa Fases 0, 1, 3, 4
-e 5 e entrega um laudo autenticado rico — a bateria passiva inteira roda contra a
-área logada da home. A **Fase 2** (navegação pelas telas internas descobertas por
-link) só existe depois da OS-38; até lá, a superfície coberta é a da página
-autenticada de entrada e do que ela carrega, não a do site interno inteiro.
-
-Alternativa: implementar a OS-38 antes e rodar o plano completo de uma vez.
+**Onda única.** Com as duas OS entregues, o plano roda inteiro: a Fase 2
+navega as telas internas descobertas por link e os checks passivos passam a ver
+a superfície interna, não só a página de entrada.
 
 ---
 
@@ -146,48 +142,42 @@ WEBQA_REPORT_DIR=report/auth pytest -m "not load and not verification"
   `summary.json` trouxe `ttfb_ms`, `fcp_ms`, `lcp_ms`, `cls`, `dcl_ms` e
   `page_kb` preenchidos; ausência de qualquer um deles na VPS é sinal de
   ambiente, não do alvo.
-- Sete dimensões representadas em `by_dimension` — **menos `functional`**, pelo
-  limite do `robots.txt` descrito abaixo.
-### ⚠️ Limite conhecido: a dimensão `functional` fica cega no alvo real
+- As sete dimensões representadas em `by_dimension`, **`functional` inclusive**.
 
-`PoliteFetcher` (OS-27) busca o `robots.txt` **anonimamente** — só com
-`User-Agent`, sem credencial. Atrás de Basic Auth isso responde **401**, e a
-regra da camada de etiqueta é: política ilegível → alvo pulado. Verificado
-contra o alvo de verdade:
+### O `robots.txt` do alvo protegido — o que observar
 
-```
-$ python -c "from webqa.etiqueta import PoliteFetcher; \
-    print(PoliteFetcher('WebQA-Suite/1.0', 20).preparar('https://docker.danzeroum.com/').motivo)"
-robots.txt respondeu HTTP 401 — alvo pulado
-```
+Até a OS-38, esta era a maior armadilha do roteiro. `PoliteFetcher` buscava o
+`robots.txt` **anonimamente**; atrás de Basic Auth isso responde **401**, e a
+regra da etiqueta é "política ilegível → alvo pulado". A dimensão `functional`
+não produzia veredito nenhum, e **isso não aparecia no alvo fixture local**,
+porque loopback é isento de etiqueta — só apareceu perguntando ao host real.
 
-Consequência prática: **`checks/functional/test_links.py` pula o crawl inteiro**
-contra qualquer alvo público protegido por Basic Auth. Não é falha e não é
-defeito do alvo — é a etiqueta funcionando como projetada, já que não conseguir
-ler a política de alguém não é licença para ignorá-la. Mas significa que a
-dimensão `functional` **não produz veredito** nesta campanha.
+A OS-38 passou a ler o `robots.txt` do alvo **autenticado** (terceiro alcançado
+no crawl continua anônimo). O que conferir no laudo:
 
-Isso não aparece no alvo fixture local: loopback é isento de etiqueta por
-decisão de IP resolvido, então lá o crawl roda e passa — e um ensaio local
-sozinho daria a impressão errada.
-
-**Não contornar por conta própria.** Deixar o crawl anônimo ler `robots.txt` de
-um host protegido, ou pular a consulta, é decisão de arquitetura, não de
-execução. O caminho certo é a **OS-38** passar a credencial ao `PoliteFetcher`
-para a origem do próprio alvo — legítimo, porque o alvo é do dono — sob a mesma
-política de origem+esquema da OS-37. Registrar como achado no retorno.
+- `functional` com veredito, não pulado por etiqueta;
+- se aparecer `robots.txt respondeu HTTP 401 MESMO com credencial`, a credencial
+  está errada — é dado sobre o alvo, e o crawl para de propósito;
+- se aparecer `sem credencial`, alguém esqueceu de exportar as variáveis;
+- `Disallow` do alvo continua valendo: caminho proibido não é visitado nem
+  estando linkado. Oferecer não revoga ter pedido para não entrar.
 
 ---
 
-## Fase 2 — Exploração passiva autenticada (OS-38) — **bloqueada até a OS-38**
+## Fase 2 — Exploração passiva autenticada (OS-38)
 
 Navega as telas internas seguindo só links/botões do DOM, com **proveniência**
 de cada URL registrada.
 
+Não há flag: o percurso acontece na fixture de sessão `paginas_internas`, e os
+checks que a consomem rodam junto com a dimensão `seguranca`.
+
 ```bash
-WEBQA_REPORT_DIR=report/auth pytest -m "seguranca or lgpd" --crawl-autenticado
-# (flag/rota conforme a OS-38 implementar; ver docs da OS)
+WEBQA_REPORT_DIR=report/auth pytest -m seguranca
 ```
+
+O teto de páginas é `crawl.max_pages` do `config.yaml` (padrão 15), e a etiqueta
+do alvo é respeitada: caminho em `Disallow` não é visitado mesmo estando linkado.
 
 **Aceite Fase 2**
 - Cada URL visitada tem origem registrada ("link em X") — **nenhuma adivinhada**.
@@ -268,7 +258,7 @@ echo "[${WEBQA_ACTIVE_PROBES_AUTHORIZED}]"     # deve imprimir []
 
 - [ ] Fase 0: login válido, preflight orientado, credencial errada distinguida
 - [ ] Fase 1: laudo autenticado gerado, sem métrica "não medida"
-- [ ] Fase 2: proveniência de URL registrada, zero URL adivinhada *(só após OS-38)*
+- [ ] Fase 2: proveniência de URL registrada, zero URL adivinhada
 - [ ] Fase 3: sumário (se Ollama) rotulado, ou ausência graciosa
 - [ ] **Fase 4: gates 1–3 VAZIOS (bloqueante)**
 - [ ] Fase 5: Fase C confirmadamente desligada, guarda AST verde
@@ -288,7 +278,7 @@ echo "[${WEBQA_ACTIVE_PROBES_AUTHORIZED}]"     # deve imprimir []
 
 ## Dependências e limites honestos
 
-- **OS-37 está em `main`** (PR #35); **OS-38 não** — a Fase 2 fica para a segunda onda.
+- **OS-37 e OS-38 entregues** — o plano roda inteiro numa onda só.
 - Chromium só mede com egresso real → **rodar na VPS**, nunca no ambiente de dev
   com proxy (lá os Web Vitals nascem "não medidos").
 - Este alvo é ambiente de teste do dono → a Fase C poderia ser ligada, mas a

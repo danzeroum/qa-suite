@@ -78,22 +78,52 @@ class PoliteFetcher:
     sem tocar a rede — mesma razão pela qual os checks só conhecem fixtures.
     """
 
-    def __init__(self, user_agent: str, timeout_s: float = 20.0, get=None):
+    def __init__(self, user_agent: str, timeout_s: float = 20.0, get=None,
+                 credencial=None, origem_do_alvo: str = ""):
         self.user_agent = user_agent or "*"
         self.timeout_s = timeout_s
         self._get = get
+        self._credencial = credencial
+        self._origem_do_alvo = origem_do_alvo
         self._parsers: dict[str, RobotFileParser | None] = {}
         self._vereditos: dict[str, Veredito] = {}
 
     # ------------------------------------------------------------ infra
+    def _cabecalhos(self, url: str) -> dict[str, str]:
+        """`User-Agent` sempre; `Authorization` só na origem do próprio alvo.
+
+        O `robots.txt` de um alvo protegido responde 401 para quem chega anônimo,
+        e a regra deste módulo é "política ilegível → alvo pulado" — o que
+        deixava a dimensão `functional` sem produzir veredito nenhum contra
+        qualquer alvo com Basic Auth (achado da OS-37, visto só contra host real:
+        loopback é isento e mascarava o limite).
+
+        Ler a política do alvo AUTENTICADO é legítimo — é o alvo de quem
+        configurou a credencial. Já o `robots.txt` de TERCEIRO, alcançado durante
+        um crawl, continua anônimo: a barreira de origem+esquema da OS-37 vale
+        aqui igual, e cortesia com terceiro nunca é motivo para mostrar a ele uma
+        credencial que não é dele.
+        """
+        cabecalhos = {"User-Agent": self.user_agent}
+        if self._credencial is None or not self._origem_do_alvo:
+            return cabecalhos
+        from webqa.auth import pode_enviar_credencial
+
+        if pode_enviar_credencial(url, self._origem_do_alvo):
+            cabecalhos["Authorization"] = self._credencial.cabecalho_basic
+        return cabecalhos
+
+    def _autenticou(self, url: str) -> bool:
+        return "Authorization" in self._cabecalhos(url)
+
     def _buscar(self, url: str):
+        cabecalhos = self._cabecalhos(url)
         if self._get is not None:
-            return self._get(url, timeout=self.timeout_s,
-                             headers={"User-Agent": self.user_agent})
+            return self._get(url, timeout=self.timeout_s, headers=cabecalhos)
         import httpx
 
         return httpx.get(url, timeout=self.timeout_s, follow_redirects=True,
-                         headers={"User-Agent": self.user_agent})
+                         headers=cabecalhos)
 
     @staticmethod
     def _base(url: str) -> str:
@@ -150,6 +180,17 @@ class PoliteFetcher:
             rp.allow_all = True
             self._parsers[base] = rp
             veredito = Veredito(True, "sem robots.txt (HTTP 404) — nada restrito")
+        elif status == 401 or status == 403:
+            # Distinguir os dois casos é o que torna a mensagem acionável:
+            # "faltou credencial" tem conserto do operador; "a credencial foi
+            # recusada" é dado sobre o alvo. Nenhum dos dois é licença para
+            # ignorar a política — bloqueia igual, mas dizendo o que houve.
+            motivo = (f"robots.txt respondeu HTTP {status} MESMO com credencial — "
+                      "política ilegível, alvo pulado"
+                      if self._autenticou(f"{base}/robots.txt")
+                      else f"robots.txt respondeu HTTP {status} sem credencial — alvo "
+                           "pulado (alvo protegido? defina WEBQA_BASIC_AUTH_USER/PASS)")
+            veredito = Veredito(False, motivo)
         elif status >= 400:
             veredito = Veredito(
                 False, f"robots.txt respondeu HTTP {status} — alvo pulado")
