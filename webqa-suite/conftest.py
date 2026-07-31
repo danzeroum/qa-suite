@@ -16,11 +16,14 @@ from webqa.auth import (
     aviso_de_senha_curta,
     credencial_do_ambiente,
     credenciais_para_playwright,
+    origem_de,
     verificar_desafio_de_autenticacao,
 )
 from webqa.config import Settings, load_settings
 from webqa.dominio import Recurso
+from webqa.etiqueta import PoliteFetcher
 from webqa.http_utils import Timing, make_client, timed_get
+from webqa.navegacao import percorrer
 from webqa.trackers import LoggedRequest, NetworkLog
 
 
@@ -135,6 +138,43 @@ def browser_page(browser, credenciais_navegador, alvo_alcancavel):
     page = browser.new_page(**credenciais_navegador)
     yield page
     page.close()
+
+
+@pytest.fixture(scope="session")
+def paginas_internas(browser, settings, credencial, credenciais_navegador, alvo_alcancavel):
+    """Área autenticada percorrida seguindo SÓ o que a aplicação oferece (OS-38).
+
+    Contrato (`webqa/navegacao.py`): cada `Pagina` traz a `origem` do endereço
+    que levou até ela. Página que ninguém linkou não aparece aqui — não porque
+    foi filtrada, mas porque não existe caminho no programa que fabrique um
+    endereço. Adivinhar rota é Fase C, e continua desligada.
+
+    O DOM é lido RENDERIZADO: link que só existe depois do JavaScript é link que
+    o usuário vê, e ignorá-lo faria a exploração parecer disciplinada quando na
+    verdade estaria só cega.
+    """
+    contexto = browser.new_context(user_agent=settings.user_agent, **credenciais_navegador)
+    pagina = contexto.new_page()
+
+    def abrir(url):
+        resposta = pagina.goto(url, wait_until="load", timeout=60_000)
+        return (resposta.status if resposta else 0), pagina.content()
+
+    fetcher = PoliteFetcher(settings.user_agent, timeout_s=settings.timeout_s,
+                            credencial=credencial,
+                            origem_do_alvo=origem_de(settings.target_url))
+    veredito = fetcher.preparar(settings.target_url)
+    try:
+        if veredito.bloqueado:
+            # Etiqueta bloqueou: devolve lista vazia com o motivo no laudo, em vez
+            # de percorrer assim mesmo. Ausência de análise nunca vira atestado.
+            yield []
+        else:
+            yield percorrer(settings.target_url, abrir,
+                            teto=settings.crawl_max_pages,
+                            pode_acessar=fetcher.pode_acessar)
+    finally:
+        contexto.close()
 
 
 @pytest.fixture(scope="module")

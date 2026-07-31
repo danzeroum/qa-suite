@@ -55,6 +55,20 @@ funções. A coesão da dimensão vem de tornar explícito o vocabulário:
   percent-encoded, e o blob base64 do cabeçalho `Authorization`). Varrer o
   arquivo procurando só o valor cru falharia justamente com as senhas boas — as
   que têm caractere especial.
+- **A terceira fronteira, e é de NAVEGAÇÃO (OS-38):** passivo autenticado ≠ Fase
+  C. A diferença não é de intenção nem de volume — é de **origem do endereço**.
+  `webqa/navegacao.py` só alcança página cujo endereço saiu de um atributo do DOM
+  renderizado, e cada `Pagina` carrega a `origem` ("link em X"). Nenhuma URL
+  nasce no fonte: não há literal de caminho, não há `urljoin` com destino
+  constante, e a guarda de AST em `tests/test_navegacao_autenticada.py` reprova
+  no CI se algum aparecer — provada antes contra violação plantada, como a da
+  OS-36. A prova executável é a **página órfã** do alvo fixture: existe, responde
+  200, e nunca é visitada.
+
+  Formulário não é seguido: submeter escreve no sistema do alvo e pode criar
+  registro de titular — é interação, e mora atrás de
+  `WEBQA_ACTIVE_PROBES_AUTHORIZED`.
+
 - **Onde a credencial NÃO vai** (`webqa/auth.py::pode_enviar_credencial`): o
   cliente HTTP é de sessão e visita hosts que não são o alvo — o CDN do axe-core
   e o host da política de privacidade. Um `httpx.BasicAuth` comum anexa
@@ -63,6 +77,16 @@ funções. A coesão da dimensão vem de tornar explícito o vocabulário:
   `http://` de propósito. A autenticação é presa a **origem + esquema**; a
   exceção para rede local existe pelo alvo fixture e é decidida por IP resolvido
   (`webqa/rede.py`), nunca por casar string.
+
+  A mesma barreira vale para a **cortesia** (OS-38): o `PoliteFetcher` lê o
+  `robots.txt` do alvo **autenticado** — legítimo, é o alvo de quem configurou a
+  credencial — e o de terceiro sempre **anônimo**. Sem isso a dimensão
+  `functional` nascia cega contra qualquer alvo protegido: robots respondia 401,
+  a regra "política ilegível → alvo pulado" disparava, e nenhum veredito saía. O
+  limite só apareceu contra host real, porque loopback é isento de etiqueta e
+  mascarava o caso — hoje é teste de regressão permanente. Credencial recusada
+  segue bloqueando, com motivo próprio: credencial errada é dado sobre o alvo,
+  não licença para ignorar a política.
 
 Hoje um achado é uma string de mensagem de assert — dado sem modelo. Com `Finding`,
 checks, relatório e contrato do fixture compartilham o mesmo vocabulário.

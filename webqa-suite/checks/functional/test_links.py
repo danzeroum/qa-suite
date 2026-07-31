@@ -21,6 +21,7 @@ from urllib.parse import urljoin, urlparse
 
 import pytest
 
+from webqa.auth import origem_de
 from webqa.etiqueta import PoliteFetcher, motivo_do_recuo, resposta_pede_recuo
 from webqa.sanitize import safe_url
 
@@ -39,11 +40,16 @@ def _internal_links(soup, base, host):
     return seen
 
 
-def test_links_internos_sem_quebrados(client, soup, settings):
+def test_links_internos_sem_quebrados(client, soup, settings, credencial):
     host = urlparse(settings.target_url).netloc
     fila = list(_internal_links(soup, settings.target_url, host))[: settings.crawl_max_pages]
 
-    fetcher = PoliteFetcher(settings.user_agent, timeout_s=settings.timeout_s)
+    # A credencial vai junto SÓ para a origem do alvo (`webqa/auth.py`): sem ela,
+    # o `robots.txt` de um alvo protegido responde 401 e esta dimensão inteira
+    # deixava de produzir veredito. Terceiro alcançado no crawl segue anônimo.
+    fetcher = PoliteFetcher(settings.user_agent, timeout_s=settings.timeout_s,
+                            credencial=credencial,
+                            origem_do_alvo=origem_de(settings.target_url))
     veredito = fetcher.preparar(settings.target_url)
     if veredito.bloqueado:
         pytest.skip(f"crawl não autorizado pelo alvo: {veredito.motivo}")

@@ -38,7 +38,7 @@ Trilha DESIGN/RELATÓRIO — CONCLUÍDA:
 
 Trilha ACESSO AUTENTICADO (nova):
   OS-37 ✓ (Basic Auth: entra na aplicação) — ex-"OS-39 do chat"
-     └── OS-38 (passivo autenticado: explora a área logada) — EM ABERTO
+     └── OS-38 ✓ (passivo autenticado: proveniência de URL, órfã nunca visitada)
           └── [Fase C segue DESLIGADA — autorizada pelo dono, não acionada]
 
 Trilha CAMPANHA:
@@ -74,7 +74,8 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-34 | #32 | — | Cada derivador dos dois geradores provado LIGADO ao template (sentinela) |
 | OS-35 | #33 | — | `--painel` somente-leitura: capacidade reduzida + fronteira no fonte + prova por tentativa |
 | OS-36 | #34 | — | Fase C travada por teste: detector de sondagem, símbolos ausentes, matriz 2×2 dos gates |
-| OS-37 | — | — | HTTP Basic Auth: `webqa/auth.py`, autenticação presa a origem+esquema, mascaramento por VALOR e grep na saída como aceite |
+| OS-37 | #35 | `9d97d9b` | HTTP Basic Auth: `webqa/auth.py`, autenticação presa a origem+esquema, mascaramento por VALOR e grep na saída como aceite |
+| OS-38 | — | — | Passivo autenticado: `webqa/navegacao.py` (proveniência de URL + guarda AST), robots do alvo lido autenticado, alvo fixture com página órfã |
 
 ### Fora da sequência do handoff — numeradas em chat, já em `main`
 
@@ -325,6 +326,20 @@ login nunca autoriza sondagem.
 - Níveis de teste: app de teste com topologia conhecida (páginas ligadas + órfã) é o fixture que prova a disciplina do crawler.
 </recomendacao>
 ```
+
+**Achado da OS-37 que cai nesta OS:** `PoliteFetcher` busca o `robots.txt`
+anonimamente (só `User-Agent`), então atrás de Basic Auth ele recebe **401** e a
+camada de etiqueta pula o alvo — `checks/functional/test_links.py` deixa de
+produzir veredito contra qualquer alvo público protegido. Verificado contra
+`docker.danzeroum.com`: `"robots.txt respondeu HTTP 401 — alvo pulado"`. Não
+aparece no alvo fixture porque loopback é isento de etiqueta.
+
+O conserto pertence a esta OS, não à OS-37: passar a credencial ao
+`PoliteFetcher` **para a origem do próprio alvo**, sob a mesma política de
+origem+esquema (`auth.pode_enviar_credencial`). Ler o `robots.txt` autenticado
+de um alvo do próprio dono é legítimo; o que não se pode é ignorar a política
+por não conseguir lê-la. Sem isso, o crawl autenticado desta OS nasce morto pela
+mesma razão.
 
 **A página órfã é o coração do aceite.** Uma página interna sem link para ela,
 que o crawler nunca visita, é a prova executável de que a exploração segue o que
