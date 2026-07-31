@@ -105,6 +105,55 @@ def test_finding_e_imutavel():
         achado.evidencia = AKIA
 
 
+# ---------- Finding.remediacao: obrigatória em C, sanitizada, sem markup ----------
+
+def test_fase_c_sem_remediacao_e_recusada():
+    """Aceite: um achado de sondagem ativa sem o que fazer a respeito é só uma
+    requisição intrusiva. A obrigatoriedade nasce no construtor."""
+    with pytest.raises(ValueError, match="Fase C exige remediação"):
+        Finding("t", "https://a/.git/HEAD", "alta", "e", "C")
+
+
+def test_fase_c_com_remediacao_apenas_espacos_e_recusada():
+    """`.strip()`: remediação em branco não satisfaz a exigência de C."""
+    with pytest.raises(ValueError, match="Fase C exige remediação"):
+        Finding("t", "https://a/.git/HEAD", "alta", "e", "C", remediacao="   ")
+
+
+def test_fase_c_com_remediacao_e_aceita():
+    achado = Finding("t", "https://a/.git/HEAD", "alta", "e", "C",
+                     remediacao="Remova /.git do documento raiz servido.")
+    assert achado.remediacao.startswith("Remova")
+
+
+@pytest.mark.parametrize("fase", ["A", "B"])
+def test_fase_a_b_sem_remediacao_continua_valida(fase):
+    """Retrocompatível: as dimensões passivas não têm remediação e seguem nascendo."""
+    achado = Finding("t", "https://a/x.js", "alta", "e", fase)
+    assert achado.remediacao == ""
+
+
+def test_remediacao_com_markup_e_recusada():
+    """O laudo exibe a remediação; markup aqui viraria injeção no relatório."""
+    with pytest.raises(ValueError, match="markup"):
+        Finding("t", "https://a/x.js", "alta", "e", "A", remediacao="<b>faça isto</b>")
+
+
+def test_remediacao_com_markup_apos_espacos_tambem_e_recusada():
+    """`lstrip` antes do `startswith`: espaço à frente não contrabandeia o `<`."""
+    with pytest.raises(ValueError, match="markup"):
+        Finding("t", "https://a/x.js", "alta", "e", "A", remediacao="   <script>x")
+
+
+def test_remediacao_passa_por_sanitize_como_evidencia():
+    """Segredo na remediação é mascarado no construtor, igual à evidência —
+    mesma borda, mesmo ponto único de verdade."""
+    achado = Finding("t", "https://a/x.js", "alta", "e", "C",
+                     remediacao=f"Rotacione a chave {AKIA} imediatamente.")
+    assert AKIA not in achado.remediacao
+    assert "[AWS_ACCESS_KEY_ID]" in achado.remediacao
+
+
 # ---------- Detector de segredos ----------
 
 def test_hash_hex_nao_e_falso_positivo():

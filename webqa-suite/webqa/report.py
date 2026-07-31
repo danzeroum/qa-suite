@@ -181,17 +181,23 @@ def pytest_runtest_logreport(report):
 
 
 def _metadados_de_seguranca(nodeid: str) -> dict:
-    """`severidade` e `fase_seguranca` quando o teste produziu Findings.
+    """`severidade`, `fase_seguranca` e `remediacao` quando o teste produziu Findings.
 
     Campos OPCIONAIS: dimensões anteriores não os têm, e o template não pode
     exigi-los — um summary antigo tem de renderizar exatamente como antes.
     A severidade reportada é a PIOR do teste: um teste que achou uma chave AWS e
     um token nomeado é um achado de severidade alta, não uma média das duas.
+
+    `remediacao` acompanha o achado mais severo e só entra quando existe —
+    achados A/B costumam não ter, e uma chave vazia poluiria o schema antigo.
     """
     achados = achados_de(nodeid)
     if not achados:
         return {}
-    return {"severidade": achados[0].severidade, "fase_seguranca": achados[0].fase}
+    meta = {"severidade": achados[0].severidade, "fase_seguranca": achados[0].fase}
+    if achados[0].remediacao:
+        meta["remediacao"] = achados[0].remediacao
+    return meta
 
 
 def pytest_sessionfinish(session, exitstatus):
