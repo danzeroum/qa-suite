@@ -1,0 +1,46 @@
+# Lista curada de caminhos sensíveis da Fase C (C1). Dado VERSIONADO e revisado
+# por CODEOWNERS (docs/FASE-C-revisao-1.md B.2), com PROCEDÊNCIA por item.
+#
+# Contrato do carregador (a implementar em C1a, webqa/sondagem.py):
+#   * impõe MAX_CAMINHOS — um arquivo inflado FALHA ao carregar (não sonda 10k rotas);
+#   * valida campos e `categoria` contra um enum.
+#
+# Regra de ouro: a EXISTÊNCIA (2xx) do recurso já é o achado. O motor faz HEAD,
+# nunca lê corpo (docs/FASE-C.md B2.9/B3.14). `content_type_esperado` serve só
+# para cortar soft-404 pelo header (B3.15). Nenhuma sondagem parte deste arquivo
+# enquanto a trava estiver fechada.
+
+- path: "/.git/HEAD"
+  categoria: "vcs"
+  severidade: "alta"
+  content_type_esperado: "text/plain"
+  remediacao: "Remova o diretório .git do docroot; configure o deploy para não publicar metadados de VCS."
+  procedencia: "OWASP WSTG-CONF-004 (Review Old Backup and Unreferenced Files)"
+
+- path: "/.env"
+  categoria: "configuracao"
+  severidade: "alta"
+  content_type_esperado: "application/octet-stream"
+  remediacao: "Mova segredos para variáveis de ambiente do host; bloqueie o acesso público ao arquivo."
+  procedencia: "OWASP Top 10 A05:2021 (Security Misconfiguration); CWE-538"
+
+- path: "/.htpasswd"
+  categoria: "configuracao"
+  severidade: "alta"
+  content_type_esperado: "application/octet-stream"
+  remediacao: "Nunca sirva .htpasswd; bloqueie no servidor (deny)."
+  procedencia: "OWASP WSTG-CONF-004"
+
+- path: "/backup.zip"
+  categoria: "backup"
+  severidade: "media"
+  content_type_esperado: "application/zip"
+  remediacao: "Exclua backups do diretório público; bloqueie extensões de backup no servidor."
+  procedencia: "OWASP WSTG-CONF-004"
+
+- path: "/.DS_Store"
+  categoria: "editor"
+  severidade: "baixa"
+  content_type_esperado: "application/octet-stream"
+  remediacao: "Remova .DS_Store do docroot; adicione ao .gitignore e à regra do servidor."
+  procedencia: "CWE-527 (Exposure of Version-Control Repository)"
