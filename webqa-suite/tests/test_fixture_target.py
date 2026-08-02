@@ -11,7 +11,13 @@ from pathlib import Path
 import pytest
 
 from fixture_target import servir
-from fixture_target.servir import CDN_FALSO, TRACKER, AlvoFixture, identidade
+from fixture_target.servir import (
+    CDN_FALSO,
+    MARCA_ISCA,
+    TRACKER,
+    AlvoFixture,
+    identidade,
+)
 
 pytestmark = pytest.mark.verification
 
@@ -122,6 +128,80 @@ def test_recurso_desconhecido_responde_404():
             assert exc.code == 404
         else:
             pytest.fail("security.txt deveria faltar no fixture (ausência é xfail informativo)")
+
+
+# ---------- Iscas de exposição (Fase C) — servidas, inertes, sem segredo real ----------
+#
+# Este arquivo VALIDA que a isca é servida; a DETECÇÃO em si é do PR-C1a (o motor
+# ainda não existe). Nível de sistema: o alvo fabricado responde ao probe direto.
+
+def _get_bytes(url: str):
+    with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 - 127.0.0.1 fixo
+        return resp.status, resp.read(), resp.headers
+
+
+def test_isca_env_servida_com_marcador_e_valores_fake():
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + "/.env")
+    assert status == 200
+    assert MARCA_ISCA in corpo, "corpo tem de trazer o marcador de isca"
+    assert "exemplo-fake" in corpo, "valores são explicitamente falsos"
+
+
+def test_isca_git_head_servida():
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + "/.git/HEAD")
+    assert status == 200
+    assert corpo.startswith("ref:"), "assinatura de um .git/HEAD exposto"
+
+
+def test_isca_backup_zip_servida_e_valida():
+    with AlvoFixture() as alvo:
+        status, corpo, headers = _get_bytes(alvo.url + "/backup.zip")
+    assert status == 200
+    assert headers.get("Content-Type") == "application/zip"
+    import io
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(corpo)) as z:      # zip válido de verdade
+        assert z.namelist() == ["leia.txt"]
+        assert MARCA_ISCA in z.read("leia.txt").decode("utf-8")
+
+
+def test_soft_404_ancora():
+    """Caminho benigno inexistente → 404. Âncora contra falso positivo de
+    soft-404 quando o motor de C1 existir."""
+    with AlvoFixture() as alvo:
+        try:
+            _get(alvo.url + "/nao-existe")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 404
+        else:
+            pytest.fail("caminho inexistente deveria retornar 404")
+
+
+def test_iscas_nao_sao_linkadas_no_home():
+    """São alcançáveis só por probe DIRETO — nada no HOME aponta para elas, senão
+    um check passivo as descobriria e o contrato de esperado.json mudaria."""
+    for caminho in ("/.env", "/.git", "/backup.zip"):
+        assert caminho not in servir.HOME, f"{caminho} não pode estar linkado no HOME"
+
+
+def test_iscas_nao_tem_segredo_real():
+    """Grep semântico: o motor de detecção da casa não acha segredo nas iscas —
+    são valores fake, não credenciais de verdade."""
+    from webqa.sanitize import encontrar_segredos
+
+    assert encontrar_segredos(servir.ENV_ISCA) == []
+    assert encontrar_segredos(servir.GIT_HEAD) == []
+
+
+def test_iscas_ficam_fora_da_identidade(monkeypatch):
+    """Trocar uma isca NÃO muda a identidade do alvo: elas não são parte do
+    contrato passivo, então não resetam o ledger de estabilidade."""
+    antes = identidade()
+    monkeypatch.setattr(servir, "ENV_ISCA", "API_KEY=outra-coisa-fake\n")
+    monkeypatch.setattr(servir, "GIT_HEAD", "ref: refs/heads/outro\n")
+    assert identidade() == antes
 
 
 # ---------- Identidade do alvo (chave do ledger) ----------

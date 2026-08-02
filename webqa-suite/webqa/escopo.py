@@ -22,11 +22,13 @@ Decisões que o código carrega (e que as revisões custaram a fixar):
 * **Congelamento por hash (TOCTOU).** O hash do conteúdo carregado é gravado; o
   probe valida contra o snapshot em memória, nunca relê o arquivo. (R-C7.)
 
-Somente stdlib + PyYAML (já dependência). NÃO importa `gates`, NÃO faz requisição
-e NÃO toca a rede: `esta_no_escopo` é comparação de origem (string). A prova de
-posse por IP (R-C6, snapshot via `rede.ips_de`) entra no PR-C0b junto com a
-comparação no momento do probe — e aí `escopo` vira o quarto consumidor da
-fronteira, registrado em `tests/test_fronteira_de_rede.py`.
+Somente stdlib + PyYAML (já dependência). NÃO importa `gates` e `esta_no_escopo`
+é comparação de origem (string), sem rede. A prova de posse por IP (R-C6) é a
+única parte que toca a rede: no CARREGAMENTO tira um snapshot dos IPs de cada
+host via `rede.ips_de`, e `verificar_posse` compara os IPs atuais contra esse
+snapshot ANTES do probe — divergência é takeover de subdomínio e aborta o alvo.
+Importar `ips_de` torna `escopo` o quarto consumidor da fronteira, registrado em
+`tests/test_fronteira_de_rede.py::FRONTEIRAS_DE_REDE` (regra da casa §2.11).
 """
 from __future__ import annotations
 
@@ -39,8 +41,13 @@ from urllib.parse import urlsplit
 import yaml
 
 from webqa.auth import origem_de
+from webqa.rede import ips_de
 
 AMBIENTES_VALIDOS = frozenset({"producao", "homologacao", "sandbox"})
+
+# A Fase C é contra host próprio publicado — sempre https. O snapshot de posse
+# resolve na porta do serviço que será sondado.
+_PORTA_HTTPS = 443
 
 # Coarse: primeira barreira, NÃO exaustiva. O controle real é a autorização
 # humana + CODEOWNERS; isto só pega o erro grosseiro de listar gov/mil por engano.
@@ -50,6 +57,20 @@ _SUFIXOS_BLOQUEADOS = (".gov", ".gov.br", ".mil", ".mil.br", ".jus.br")
 def _parece_gov_ou_mil(origem: str) -> bool:
     host = (urlsplit(origem).hostname or "").lower()
     return any(host == s.lstrip(".") or host.endswith(s) for s in _SUFIXOS_BLOQUEADOS)
+
+
+def _ips_resolvidos(host: str) -> frozenset[str]:
+    """IPs atuais do host como conjunto de strings; vazio se não resolve.
+
+    Nunca deixa `OSError` subir: falha de resolução vira conjunto vazio, que o
+    chamador lê como 'sem posse' / divergência — jamais silêncio que se pareça
+    com posse. Toca a rede via `rede.ips_de` (por isso `escopo` é consumidor da
+    fronteira §2.11); nos testes, `getaddrinfo` é dublado.
+    """
+    try:
+        return frozenset(str(ip) for ip in ips_de(host, _PORTA_HTTPS))
+    except OSError:
+        return frozenset()
 
 
 @dataclass(frozen=True)
@@ -94,9 +115,30 @@ class Escopo:
 
     entradas: tuple[EntradaEscopo, ...]
     hash_congelado: str
+    # host → IPs resolvidos no carregamento (prova de posse, R-C6). Default
+    # vazio mantém compatível a construção sem snapshot.
+    ips_no_carregamento: dict = field(default_factory=dict)
 
     def _por_origem(self) -> dict[str, EntradaEscopo]:
         return {e.origem: e for e in self.entradas}
+
+    def verificar_posse(self, host: str) -> bool:
+        """Os IPs de `host` ainda são os do carregamento? (prova de posse, R-C6.)
+
+        Defesa contra takeover de subdomínio: um host autorizado cujo IP mudou
+        pode ter sido reapontado para infra de terceiro entre o carregamento e o
+        probe — sondá-lo passaria a atingir quem não autorizou. `True` só quando
+        o conjunto atual é não-vazio e IDÊNTICO ao snapshot; divergência, host
+        não listado, snapshot vazio (não resolveu no carregamento) ou falha de
+        resolução agora → `False`, nunca exceção crua nem silêncio.
+
+        O snapshot é do carregamento; esta comparação roda ANTES do probe, nunca
+        dentro do laço de requisição.
+        """
+        baseline = self.ips_no_carregamento.get(host)
+        if not baseline:
+            return False
+        return _ips_resolvidos(host) == baseline
 
     def esta_no_escopo(self, url: str) -> bool:
         """A origem EXATA da URL foi autorizada? (única pergunta que os probes fazem.)"""
@@ -152,7 +194,17 @@ def carregar(path: str | Path) -> Escopo:
     if duplicadas:
         raise ValueError(f"escopo com origem duplicada: {sorted(duplicadas)}")
 
+    # Snapshot de posse por host, no carregamento (R-C6). Resolver aqui, e não
+    # no probe, é o que dá a `verificar_posse` uma linha de base contra a qual
+    # detectar takeover. Falha de resolução vira conjunto vazio, nunca aborta o
+    # carregamento — a ausência de posse é decidida depois, por host.
+    snapshot: dict[str, frozenset[str]] = {}
+    for e in entradas:
+        host = urlsplit(e.origem).hostname or ""
+        snapshot[host] = _ips_resolvidos(host)
+
     return Escopo(
         entradas=tuple(entradas),
         hash_congelado=hashlib.sha256(bruto.encode("utf-8")).hexdigest(),
+        ips_no_carregamento=snapshot,
     )

@@ -66,7 +66,7 @@ def _log(url_alvo, respostas=(), cookies=()) -> NetworkLog:
     (GITHUB, "GITHUB_TOKEN"),
 ])
 def test_find_secrets_detecta_os_formatos_da_fase_a(segredo, rotulo):
-    achados = find_secrets(f"var k = '{segredo}';", "https://a/app.js")
+    achados = find_secrets(f"var k = '{segredo}';", "https://a/app.js", "A")
     assert [a.tipo for a in achados] == [f"segredo:{rotulo}"]
     assert achados[0].fase == "A" and achados[0].severidade == "alta"
     assert segredo not in achados[0].evidencia
@@ -74,11 +74,51 @@ def test_find_secrets_detecta_os_formatos_da_fase_a(segredo, rotulo):
 
 def test_find_secrets_nao_falsa_positiva_em_sha256():
     sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    assert find_secrets(f'{{"build": "{sha}"}}', "https://a/meta.json") == []
+    assert find_secrets(f'{{"build": "{sha}"}}', "https://a/meta.json", "A") == []
 
 
 def test_find_secrets_em_texto_limpo_e_vazio():
-    assert find_secrets("function soma(a, b) { return a + b; }", "https://a/x.js") == []
+    assert find_secrets("function soma(a, b) { return a + b; }", "https://a/x.js", "A") == []
+
+
+def test_find_secrets_exige_fase_explicita():
+    """Sem default: quem chama diz de qual fase veio, senão um achado ativo (C)
+    entraria etiquetado como passivo (A) por omissão."""
+    with pytest.raises(TypeError):
+        find_secrets("var k = 'x';", "https://a/app.js")
+
+
+# ---------- laudo/summary.json expõe remediacao (aceite C0c) ----------
+
+def test_summary_expoe_remediacao_do_achado_de_fase_c():
+    """`_metadados_de_seguranca` é o que vira o bloco por-teste do summary.json.
+    Um achado de Fase C carrega remediação, e o laudo tem de expô-la."""
+    from webqa.dominio import Finding, registrar_achados
+    from webqa.report import _metadados_de_seguranca
+
+    limpar_achados()
+    registrar_achados("checks/c.py::t_git", [
+        Finding("exposicao", "https://a/.git/HEAD", "alta", "presente", "C",
+                remediacao="Bloqueie /.git no servidor.")])
+    meta = _metadados_de_seguranca("checks/c.py::t_git")
+    limpar_achados()
+    assert meta["fase_seguranca"] == "C"
+    assert meta["remediacao"] == "Bloqueie /.git no servidor."
+
+
+def test_summary_de_fase_a_b_nao_ganha_chave_remediacao_vazia():
+    """Retrocompatível: sem remediação, a chave nem aparece — schema antigo
+    intacto."""
+    from webqa.dominio import Finding, registrar_achados
+    from webqa.report import _metadados_de_seguranca
+
+    limpar_achados()
+    registrar_achados("checks/a.py::t_js", [
+        Finding("segredo", "https://a/app.js", "alta", "k", "A")])
+    meta = _metadados_de_seguranca("checks/a.py::t_js")
+    limpar_achados()
+    assert "remediacao" not in meta
+    assert meta == {"severidade": "alta", "fase_seguranca": "A"}
 
 
 # ---------- Mixed content (o fixture não consegue exercer) ----------

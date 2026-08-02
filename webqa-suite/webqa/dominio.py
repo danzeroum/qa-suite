@@ -43,6 +43,13 @@ class Finding:
     `recurso` é a URL (ou identificação) de onde veio; `fase` diz qual fase do
     desenho o produziu, o que mantém rastreável o que é passivo (A, B) e o que
     exigiu autorização explícita (C).
+
+    `remediacao` é o texto de correção. Opcional em A/B (retrocompatível), mas
+    OBRIGATÓRIO em C: um achado de sondagem ativa sem o que fazer a respeito é
+    só uma requisição intrusiva sem valor de auditoria. Passa pela MESMA
+    sanitização de `evidencia`/`recurso` (segredo mascarado no construtor) e
+    recusa markup — o laudo o renderiza, e texto de remediação não é lugar para
+    HTML/`<script>`.
     """
 
     tipo: str
@@ -50,16 +57,26 @@ class Finding:
     severidade: Severidade
     evidencia: str
     fase: Fase
+    remediacao: str = ""
 
     def __post_init__(self) -> None:
         # `object.__setattr__` porque a instância é congelada — a sanitização
         # acontece ANTES de o objeto existir para o resto do programa.
         object.__setattr__(self, "evidencia", sanitize_text(str(self.evidencia)))
         object.__setattr__(self, "recurso", sanitize_text(str(self.recurso)))
+        object.__setattr__(self, "remediacao", sanitize_text(str(self.remediacao)))
         if self.severidade not in ("alta", "media", "baixa"):
             raise ValueError(f"severidade inválida: {self.severidade!r}")
         if self.fase not in ("A", "B", "C"):
             raise ValueError(f"fase inválida: {self.fase!r}")
+        # Anti-markup sobre o valor JÁ sanitizado: o laudo exibe a remediação, e
+        # HTML aqui viraria injeção no relatório.
+        if self.remediacao.lstrip().startswith("<"):
+            raise ValueError("remediação não pode conter markup")
+        # A obrigatoriedade nasce no construtor, como a máscara: é impossível um
+        # Finding de Fase C existir sem remediação, não uma regra a lembrar.
+        if self.fase == "C" and not self.remediacao.strip():
+            raise ValueError(f"Finding de Fase C exige remediação: {self.recurso}")
 
     @property
     def contem_segredo_em_claro(self) -> bool:
@@ -234,8 +251,13 @@ def limpar_achados() -> None:
     _ACHADOS_POR_TESTE.clear()
 
 
-def find_secrets(texto: str, recurso: str, fase: Fase = "A") -> list[Finding]:
+def find_secrets(texto: str, recurso: str, fase: Fase) -> list[Finding]:
     """Credenciais no texto, já como `Finding` — logo, já mascaradas.
+
+    `fase` é OBRIGATÓRIA (sem default): a mesma varredura de segredo roda em A
+    (asset de origem), B (arquivo baixado) e, no futuro, C (recurso sondado), e
+    um default silencioso etiquetaria como passivo um achado que foi ativo. Quem
+    chama diz de qual fase veio.
 
     Mora aqui e não em `sanitize.py` por camada: `sanitize` é a borda de escrita
     e não conhece o domínio; fazê-la importar `Finding` criaria ciclo, já que o

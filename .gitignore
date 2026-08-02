@@ -7,6 +7,12 @@ webqa-suite/report/
 # VPS e são montados somente-leitura no container (docs/VPS.md).
 docker/secrets/
 
+# Escopo REAL da Fase C: carrega a autorização de um alvo específico e vive fora
+# do repo público — injetado como secret/config no CI (docs/FASE-C.md B.8). Só o
+# escopo-autorizado.yaml.example é versionado.
+escopo-autorizado.yaml
+webqa-suite/escopo-autorizado.yaml
+
 # Consolidado da campanha na VPS: mesmo motivo do report/ acima (carrega host e
 # trecho de erro do ALVO), e o volume fica fora da árvore da suíte justamente
 # para a campanha não poder sujar o `git status` da VPS.

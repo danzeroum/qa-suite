@@ -314,6 +314,27 @@ def test_cabecalho_fica_no_arquivo_e_fora_do_prompt():
         assert termo not in serializado
 
 
+def test_remediacao_do_summary_nao_vaza_para_o_prompt():
+    """O summary.json agora expõe `remediacao` nos achados de Fase C (C0c), mas
+    ela é para o laudo humano, não para o modelo: `CAMPOS_DO_PROMPT` não a inclui.
+
+    Trava a fronteira nos dois sentidos — o achado C chega ao modelo (é `failed`),
+    mas o texto de remediação, que pode ser longo, fica fora do payload."""
+    com_remediacao = [
+        {"test": "checks/c.py::t_git", "dimension": "seguranca", "estado": "failed",
+         "severidade": "alta", "fase_seguranca": "C", "detail": "/.git exposto",
+         "remediacao": "Bloqueie /.git no servidor de origem."},
+    ]
+    fake = ResumidorFake("Achado grave de exposição na dimensão seguranca.")
+    sumario.gerar(com_remediacao, fake)
+
+    assert len(fake.recebido) == 1, "o achado de Fase C chega ao modelo"
+    entregue = fake.recebido[0]
+    assert entregue["fase_seguranca"] == "C"
+    assert "remediacao" not in entregue, "a remediação não é campo de prompt"
+    assert "Bloqueie /.git" not in json.dumps(fake.recebido, ensure_ascii=False)
+
+
 def test_sumario_md_esta_coberto_pelo_gitignore():
     """Artefato de execução contra alvo real — R8. `report/` já cobre, e este
     teste existe para que uma mudança no gitignore não descubra o arquivo."""

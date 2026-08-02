@@ -28,8 +28,10 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import io
 import struct
 import threading
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -78,6 +80,50 @@ SVG_EXECUTAVEL = (
 # VIOLAÇÃO (seguranca, Fase B): bundle referenciando sourcemap. O check aponta o
 # caminho e NÃO baixa o .map — baixar seria sondagem (Fase C).
 BUNDLE_JS = "var x = 1;\n//# sourceMappingURL=/bundle.js.map\n"
+
+# ---------- ISCAS DE EXPOSIÇÃO (Fase C) — NÃO LINKADAS, inertes até C1 ----------
+#
+# Recursos que só se alcança PEDINDO diretamente — nada no HOME aponta para eles.
+# É exatamente o que a sondagem ativa (Fase C) faria: pedir ao servidor o que ele
+# não ofereceu. Servem para o teste de nível de SISTEMA da Fase C (matriz A.4),
+# quando o motor existir (pós-C0d). Enquanto a trava está fechada, ficam inertes:
+# nenhum check passivo os busca.
+#
+# Conteúdo FALSO e inofensivo — nenhum segredo real entra no repositório, do mesmo
+# jeito que a chave da AWS acima é o exemplo público da documentação. E, de
+# propósito, ficam FORA de `identidade()`: o ledger de estabilidade mede o
+# contrato PASSIVO, que estes recursos não tocam — incluí-los resetaria a
+# sequência sem-flake por conteúdo que nenhum check observa.
+MARCA_ISCA = "isca-fixture-fase-c"
+
+# Assinatura clássica de repositório .git exposto. Formato real de um HEAD, valor
+# inerte (aponta para um branch, não carrega segredo).
+GIT_HEAD = "ref: refs/heads/main\n"
+
+# `.env` exposto: o alvo de SSRF/exposição mais comum. Valores explicitamente
+# FALSOS — o teste e o grep do repo provam que não há segredo real aqui.
+ENV_ISCA = (
+    f"# {MARCA_ISCA}: valores FALSOS de teste, nenhum segredo real\n"
+    "APP_ENV=fixture\n"
+    "DB_HOST=127.0.0.1\n"
+    "API_KEY=exemplo-fake-nao-e-segredo\n"
+)
+
+
+def _backup_zip() -> bytes:
+    """Zip mínimo e VÁLIDO com um único arquivo-isca de conteúdo falso.
+
+    Construído em memória (stdlib `zipfile`), sem binário opaco no repo — o que a
+    isca É fica legível no diff. `date_time` fixo mantém os bytes determinísticos.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as arquivo:
+        info = zipfile.ZipInfo("leia.txt", date_time=(1980, 1, 1, 0, 0, 0))
+        arquivo.writestr(info, f"{MARCA_ISCA}: backup falso, sem dado real\n")
+    return buffer.getvalue()
+
+
+BACKUP_ZIP = _backup_zip()
 
 
 def _foto_com_gps() -> bytes:
@@ -214,6 +260,15 @@ class _Handler(BaseHTTPRequestHandler):
             self._responder(PIXEL, "image/png", com_cookies=False)
         elif caminho.startswith("/privacidade"):
             self._responder(POLITICA.encode("utf-8"), "text/html; charset=utf-8")
+        elif caminho == "/.git/HEAD":
+            # Isca de exposição (Fase C): repositório .git servido. Inerte até C1.
+            self._responder(GIT_HEAD.encode("utf-8"), "text/plain; charset=utf-8",
+                            com_cookies=False)
+        elif caminho == "/.env":
+            self._responder(ENV_ISCA.encode("utf-8"), "text/plain; charset=utf-8",
+                            com_cookies=False)
+        elif caminho == "/backup.zip":
+            self._responder(BACKUP_ZIP, "application/zip", com_cookies=False)
         elif caminho in ("/", "/newsletter"):
             self._responder(HOME.encode("utf-8"), "text/html; charset=utf-8")
         else:
