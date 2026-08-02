@@ -1,16 +1,22 @@
-"""VERIFICAÇÃO de que a Fase C continua travada (OS-36).
+"""VERIFICAÇÃO de que a Fase C só existe sob gate + escopo + auditoria (PR-C0d).
 
-Aqui não se testa **ação** nenhuma — testa-se a **recusa**. Nenhuma linha de
-sondagem ativa é escrita, e nenhuma requisição sai: o que se prova é que, sem
-`WEBQA_ACTIVE_PROBES_AUTHORIZED=1`, nada acontece; que a fronteira é estrutural
-e não convenção; e que os dois gates são independentes.
+INVERSÃO da trava (OS-36 → C0d), aplicada com sign-off escrito de code owner
+(@danzeroum, 2026-08-02). Antes, este arquivo provava a **ausência** da
+capacidade: nenhum símbolo de sondagem ativa podia existir. Agora ele prova o
+**contorno**: a capacidade PODE existir, mas só sob governança — todo módulo de
+`webqa/` que defina sondagem ativa consome `require_discovery` +
+`require_escopo` e registra em auditoria (`AuditLog`); `checks/` (camada passiva)
+não define sondagem alguma. Enquanto o motor (C1, `webqa/sondagem.py`) não for
+escrito, nenhum módulo define os símbolos e a verificação passa: a trava abriu,
+o motor virá.
 
-Por que agora, com a Fase C ainda travada: enquanto "travada" for promessa, ela
-depende de vigilância humana — e vigilância humana é exatamente o que este
-projeto substitui por invariante estrutural em todo lugar (o `Finding` que
-sanitiza no construtor, o teste que lê o fonte da Fase B e reprova `httpx`). No
-dia em que houver alvo autorizado, a capacidade nasce sobre uma fronteira **já
-provada**, não sobre uma frase num documento.
+O que NÃO mudou, e por quê: os gates continuam fail-closed (só `"1"` autoriza),
+independentes entre si, e `require_active_probes` continua pulando sem
+autorização; a camada passiva não sonda caminho não oferecido nem consome o gate
+ativo; e o ambiente de teste continua proibido de rodar autorizado. Abrir a
+trava move a fronteira de "não existe" para "existe gated" — não afrouxa nenhuma
+garantia estrutural. E abrir a trava NÃO autoriza sondar alvo nenhum: isso ainda
+exige escopo + prova de posse (webqa/escopo.py).
 
 O detector é o coração deste arquivo, e ele próprio é testado: um detector de
 violação que nunca detectou uma violação plantada não está provado.
@@ -156,25 +162,57 @@ def test_nenhum_check_sonda_caminho_sensivel():
           "Pedir ao servidor o que ele não ofereceu é intrusão, não auditoria.")
 
 
-def test_fase_c_nao_existe_ainda():
-    """A ausência dos símbolos é intencional — e verificada.
+# Onde o motor de C1 (sondagem ativa) viveria: na BIBLIOTECA, nunca em checks/
+# (a camada passiva de testes). Marcas de que um módulo passa pelos portões.
+BIBLIOTECA = RAIZ / "webqa"
+_MARCAS_DE_GOVERNANCA = ("require_discovery", "require_escopo")
+_MARCA_DE_AUDITORIA = "AuditLog"
 
-    Não é sobre o nome: é sobre a capacidade. Se um deles aparecer, alguém
-    começou a codificar a sondagem ativa, e isso precisa passar por revisão
-    consciente em vez de entrar de carona num PR sobre outra coisa.
+
+def _define_sondagem(arvore: ast.AST) -> bool:
+    """O módulo define algum símbolo de sondagem ativa?"""
+    return any(
+        isinstance(no, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+        and no.name in SIMBOLOS_DA_FASE_C
+        for no in ast.walk(arvore))
+
+
+def test_sondagem_ativa_so_existe_sob_gate_escopo_e_auditoria():
+    """INVERSÃO de `test_fase_c_nao_existe_ainda` (PR-C0d).
+
+    Antes: nenhum símbolo de sondagem podia existir. Agora que a trava abriu, a
+    capacidade PODE existir — mas só sob governança. Todo módulo de `webqa/` que
+    DEFINA um símbolo de sondagem tem de consumir `require_discovery` +
+    `require_escopo` e registrar em `AuditLog`; e `checks/` (passiva) não define
+    sondagem alguma, gated ou não. Se a Fase C ainda não foi construída, nenhum
+    módulo define os símbolos e o teste passa: a trava abriu, o motor virá em C1.
+
+    Reprova exatamente o que a inversão precisa reprovar: capacidade de sondagem
+    sem gate/escopo — o probe que "é só um GET" entrando sem autorização.
     """
-    definidos = []
+    ofensores = []
+    # checks/ é passiva: NENHUM símbolo de sondagem pode ser definido lá.
     for arquivo in sorted(CHECKS.rglob("*.py")):
-        arvore = ast.parse(arquivo.read_text(encoding="utf-8"))
-        for no in ast.walk(arvore):
-            if isinstance(no, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
-                if no.name in SIMBOLOS_DA_FASE_C:
-                    definidos.append(f"{arquivo.relative_to(RAIZ)}:{no.lineno} → {no.name}")
+        if _define_sondagem(ast.parse(arquivo.read_text(encoding="utf-8"))):
+            ofensores.append(f"{arquivo.relative_to(RAIZ)}: sondagem em checks/ "
+                             "(camada passiva) — o motor de C1 vive em webqa/")
+    # webqa/: a capacidade PODE existir, mas só sob gate + escopo + auditoria.
+    for arquivo in sorted(BIBLIOTECA.rglob("*.py")):
+        fonte = arquivo.read_text(encoding="utf-8")
+        if not _define_sondagem(ast.parse(fonte)):
+            continue
+        faltando = [m for m in _MARCAS_DE_GOVERNANCA if m not in fonte]
+        if _MARCA_DE_AUDITORIA not in fonte:
+            faltando.append(_MARCA_DE_AUDITORIA)
+        if faltando:
+            ofensores.append(f"{arquivo.relative_to(RAIZ)} define sondagem sem: "
+                             + ", ".join(faltando))
 
-    assert not definidos, (
-        "símbolo de sondagem ativa definido em checks/:\n  " + "\n  ".join(definidos)
-        + "\nA Fase C está desenhada e NÃO implementada de propósito. Construir "
-          "capacidade intrusiva antes de haver alvo autorizado é YAGNI com peso ético.")
+    assert not ofensores, (
+        "capacidade de sondagem ativa fora da governança de C1:\n  "
+        + "\n  ".join(ofensores)
+        + "\nTodo módulo de sondagem exige require_discovery + require_escopo + "
+          "AuditLog, e nunca vive em checks/. Ver PR-C0d e docs/FASE-C.md.")
 
 
 def test_o_detector_de_simbolo_pega_um_plantado():
@@ -274,9 +312,10 @@ def test_gate_de_llm_tambem_e_independente(ambiente_limpo):
 # ---------- nenhum gate é consumido por acidente ----------
 
 def test_nenhum_check_consome_o_gate_ativo_hoje():
-    """O gate nasceu ANTES do primeiro teste ativo, de propósito: guarda criada
-    junto com a funcionalidade nasce frouxa. Enquanto a Fase C não existir,
-    ninguém deve chamá-lo — e se alguém chamar, é sinal de que começou."""
+    """A camada passiva (`checks/`) não consome o gate de sondagem ativa — nem
+    agora que a trava abriu. O consumo legítimo mora no motor de C1
+    (`webqa/sondagem.py`), fora de `checks/`; um check que passe a chamá-lo
+    deixou de ser passivo, e isso precisa de um PR que diga isso."""
     consumidores = [
         str(a.relative_to(RAIZ)) for a in sorted(CHECKS.rglob("*.py"))
         if "require_active_probes" in a.read_text(encoding="utf-8")
