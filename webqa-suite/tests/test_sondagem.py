@@ -193,7 +193,9 @@ def test_kill_switch_desde_o_inicio_aborta_sem_sondar(tmp_path, monkeypatch):
 
     assert resultado.abortado_por == "kill-switch"
     assert resultado.executado == 0
-    assert log.linhas == ()                 # nenhuma requisição registrada
+    # G4: nenhuma REQUISIÇÃO, mas o aborto deixa 1 evento (rastro de governança).
+    assert [linha["evento"] for linha in log.linhas] == ["abortado:kill-switch"]
+    assert all(linha["metodo"] == "" for linha in log.linhas)   # evento, não probe
     assert resultado.inconclusivo is True
 
 
@@ -614,3 +616,118 @@ def test_finding_sem_procedencia_fica_vazio_sem_erro(tmp_path, monkeypatch):
     rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"})}
     resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT])
     assert resultado.findings[0].procedencia == ""
+
+
+# ---------- C1e: circuit breaker (G1) + abortos no log (G4) + evento soft-404 (G5)
+#            + timeout granular (G6) ----------
+
+def _caminhos(n: int) -> list:
+    return [CaminhoSensivel(f"/p{i}", "vcs", "baixa", "text/plain", "corrija")
+            for i in range(n)]
+
+
+# --- G1: circuit breaker por falhas consecutivas ---
+
+def test_circuit_breaker_aborta_apos_falhas_consecutivas(tmp_path, monkeypatch):
+    """N recuos consecutivos → abortado_por='circuit-breaker', o laço PARA (não
+    sonda os caminhos restantes) e o run fica inconclusivo."""
+    from webqa.sondagem import MAX_FALHAS_CONSECUTIVAS
+    caminhos = _caminhos(MAX_FALHAS_CONSECUTIVAS + 3)
+    rotas = {c.path: (429, {}) for c in caminhos}
+    resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, caminhos)
+    assert resultado.abortado_por == "circuit-breaker"
+    assert resultado.recuos == MAX_FALHAS_CONSECUTIVAS   # parou no N-ésimo
+    assert resultado.executado == 0
+    assert resultado.inconclusivo is True
+
+
+def test_circuit_breaker_conta_falhas_de_rede_tambem(tmp_path, monkeypatch):
+    """Falha de rede também conta para o breaker (alvo instável)."""
+    from webqa.sondagem import MAX_FALHAS_CONSECUTIVAS
+
+    def handler(request):
+        raise httpx.ConnectError("conexão recusada")
+
+    caminhos = _caminhos(MAX_FALHAS_CONSECUTIVAS + 2)
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, caminhos, client=client, dry_run=False,
+                       dormir=lambda _s: None)
+    assert resultado.abortado_por == "circuit-breaker"
+    assert resultado.falhas_rede == MAX_FALHAS_CONSECUTIVAS
+
+
+def test_circuit_breaker_reseta_com_resposta_valida(tmp_path, monkeypatch):
+    """Uma resposta válida no meio zera o contador — nunca N seguidos, não aborta."""
+    from webqa.sondagem import MAX_FALHAS_CONSECUTIVAS
+    n = MAX_FALHAS_CONSECUTIVAS
+    caminhos = _caminhos(2 * (n - 1) + 1)
+    rotas = {c.path: (429, {}) for c in caminhos}
+    rotas[caminhos[n - 1].path] = (404, {})       # uma resposta válida no meio
+    resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, caminhos)
+    assert resultado.abortado_por == ""           # nunca N recuos seguidos
+    assert resultado.executado == 1               # o 404 concluiu
+
+
+def test_backoff_durante_recuos_respeita_piso_e_teto(tmp_path, monkeypatch):
+    """Enquanto o breaker não dispara, cada espera fica entre o piso e o teto."""
+    from webqa.sondagem import MAX_FALHAS_CONSECUTIVAS, PISO_INTERVALO_S, TETO_BACKOFF_S
+    esperas = []
+    caminhos = _caminhos(MAX_FALHAS_CONSECUTIVAS)
+    rotas = {c.path: (429, {}) for c in caminhos}
+    _sondar_ativo(tmp_path, monkeypatch, rotas, caminhos, dormir=esperas.append)
+    assert esperas
+    assert all(PISO_INTERVALO_S <= e <= TETO_BACKOFF_S for e in esperas)
+
+
+# --- G4: abortos deixam evento no AuditLog ---
+
+def test_kill_switch_deixa_evento_no_log(tmp_path, monkeypatch):
+    monkeypatch.setenv(gates.KILL_ENV, "1")
+    _resultado, log = _sondar_ativo(tmp_path, monkeypatch, {}, [C_GIT])
+    assert [linha["evento"] for linha in log.linhas] == ["abortado:kill-switch"]
+
+
+def test_posse_divergente_deixa_evento_no_log(tmp_path, monkeypatch):
+    """O aborto por rebind/takeover deixa rastro auditável (antes era mudo)."""
+    escopo = _escopo_valido(tmp_path, monkeypatch, ip=IP_ALVO)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    log = AuditLog(run_id="teste", escopo_hash=escopo.hash_congelado)
+    _resolve_para(monkeypatch, "198.51.100.9")     # host reapontado
+    resultado = sondar(escopo, ALVO, [C_GIT], client=_client({}), log=log,
+                       dry_run=False, dormir=lambda _s: None)
+    assert resultado.abortado_por == "posse-divergente"
+    assert [linha["evento"] for linha in log.linhas] == ["abortado:posse-divergente"]
+
+
+def test_circuit_breaker_deixa_evento_no_log(tmp_path, monkeypatch):
+    from webqa.sondagem import MAX_FALHAS_CONSECUTIVAS
+    caminhos = _caminhos(MAX_FALHAS_CONSECUTIVAS)
+    rotas = {c.path: (429, {}) for c in caminhos}
+    _resultado, log = _sondar_ativo(tmp_path, monkeypatch, rotas, caminhos)
+    assert "abortado:circuit-breaker" in [linha["evento"] for linha in log.linhas]
+
+
+# --- G5: descarte por soft-404 é auditado (não some) ---
+
+def test_soft_404_deixa_evento_de_descarte_no_log(tmp_path, monkeypatch):
+    """200 com text/html onde se espera text/plain: sem finding, MAS com evento
+    de descarte no log — hoje o descarte é silencioso (status=200 sem motivo)."""
+    rotas = {"/.env": (200, {"content-type": "text/html; charset=utf-8"})}
+    resultado, log = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_ENV])
+    assert resultado.findings == []
+    assert "descartado:soft-404" in [linha["evento"] for linha in log.linhas]
+
+
+# --- G6: timeout granular (connect ≠ read) ---
+
+def test_cliente_usa_timeouts_granulares():
+    from webqa.sondagem import TIMEOUT_CONNECT_S, TIMEOUT_READ_S, _cliente_padrao
+    client = _cliente_padrao()
+    try:
+        assert client._timeout.connect == TIMEOUT_CONNECT_S
+        assert client._timeout.read == TIMEOUT_READ_S
+        assert client._timeout.connect != client._timeout.read   # não é escalar único
+    finally:
+        client.close()

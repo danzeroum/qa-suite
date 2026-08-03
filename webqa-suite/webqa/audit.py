@@ -1,7 +1,12 @@
-"""Auditoria append-only da Fase C — uma linha por requisição ativa.
+"""Auditoria append-only da Fase C — uma linha por requisição ativa ou aborto.
 
-Registra o que foi pedido, quando, contra qual alvo e sob qual autorização. Três
-proteções, todas antes de a linha existir no arquivo:
+Registra o que foi pedido, quando, contra qual alvo e sob qual autorização.
+`registrar` grava uma REQUISIÇÃO (HEAD/GET); `registrar_evento` grava um EVENTO
+de governança que NÃO é requisição (kill-switch, posse-divergente,
+circuit-breaker) — os abortos mais importantes da Fase C não podem sair mudos do
+log. As mesmas chaves nos dois casos; num evento, `metodo`/`url` ficam vazios.
+
+Três proteções, todas antes de a linha existir no arquivo:
 
 * **mascaramento por valor** (`sanitize.sanitize_text`) — segredo registrado não
   vaza para o log, mesmo que apareça numa URL ou num header de erro (R-C8);
@@ -50,7 +55,7 @@ class AuditLog:
 
     def registrar(self, *, url: str, metodo: str, alvo: str, autorizacao_id: str,
                   status: int | None = None, evento: str | None = None) -> dict:
-        linha = {
+        return self._gravar({
             "ts": datetime.now(UTC).isoformat(),
             "run_id": _limpar(self.run_id),
             "escopo_hash": self.escopo_hash,
@@ -60,7 +65,28 @@ class AuditLog:
             "url": _limpar(_url_sem_query(url)),
             "status": status,
             "evento": _limpar(evento) if evento else None,
-        }
+        })
+
+    def registrar_evento(self, *, alvo: str, autorizacao_id: str, evento: str) -> dict:
+        """Registra um EVENTO de governança (aborto), não uma requisição.
+
+        Kill-switch, posse-divergente e circuit-breaker param o run sem emitir
+        HTTP — mas precisam deixar rastro. Mesma linha do `registrar`, com
+        `metodo`/`url` vazios (nenhuma requisição saiu) e o motivo em `evento`."""
+        return self._gravar({
+            "ts": datetime.now(UTC).isoformat(),
+            "run_id": _limpar(self.run_id),
+            "escopo_hash": self.escopo_hash,
+            "alvo": _limpar(alvo),
+            "autorizacao_id": _limpar(autorizacao_id),
+            "metodo": "",
+            "url": "",
+            "status": None,
+            "evento": _limpar(evento),
+        })
+
+    def _gravar(self, linha: dict) -> dict:
+        """Append em memória e, se houver caminho, no arquivo. Nunca reescreve."""
         self._linhas.append(linha)
         if self._caminho is not None:
             with self._caminho.open("a", encoding="utf-8") as f:
