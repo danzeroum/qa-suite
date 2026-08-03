@@ -506,3 +506,111 @@ def test_429_e_inconclusivo_e_nao_conta_como_executado(tmp_path, monkeypatch):
     assert resultado.executado == 0
     assert resultado.findings == []
     assert resultado.inconclusivo is True
+
+
+# ---------- C1d: IPv6/dual-stack no pino (G2) + procedencia no Finding (G3) ----------
+
+IP_V6 = "2001:db8::1"
+
+
+def _resolve_multi(monkeypatch, *ips: str) -> None:
+    """`getaddrinfo` devolve vários IPs (dual-stack), como no host real."""
+    infos = [(socket.AF_INET6 if ":" in ip else socket.AF_INET,
+              socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (ip, 443))
+             for ip in ips]
+    monkeypatch.setattr(socket, "getaddrinfo", lambda h, p, *a, **k: infos)
+
+
+def _escopo_multi(tmp_path, monkeypatch, *ips):
+    """Escopo com o ALVO autorizado e snapshot de posse com os IPs dados
+    (snapshot no carregamento e re-resolução no probe batem por igualdade)."""
+    _resolve_multi(monkeypatch, *ips)
+    p = tmp_path / "escopo-autorizado.yaml"
+    p.write_text(
+        "alvos:\n"
+        f'  - origem: "{ALVO}"\n'
+        '    autorizado_por: "danzeroum"\n'
+        f'    data: "{date.today().isoformat()}"\n'
+        '    evidencia: "pr#1"\n'
+        '    ambiente: "homologacao"\n',
+        encoding="utf-8")
+    return escopo_mod.carregar(p)
+
+
+# --- G2: escolha de IP por família, nunca por ordem de string ---
+
+def test_escolher_ip_prefere_ipv4_em_dual_stack():
+    from webqa.sondagem import _escolher_ip
+    assert _escolher_ip(frozenset({IP_V6, IP_ALVO})) == IP_ALVO
+    # a ordenação de string elegeria o IPv6 — é o bug que a família evita:
+    assert sorted({IP_V6, IP_ALVO})[0] == IP_V6
+
+
+def test_escolher_ip_usa_ipv6_quando_e_o_unico():
+    from webqa.sondagem import _escolher_ip
+    assert _escolher_ip(frozenset({IP_V6})) == IP_V6
+
+
+def test_url_pinada_poe_colchetes_em_ipv6():
+    from webqa.sondagem import _url_pinada
+    _log, url_pinada, host = _url_pinada(ALVO, IP_V6, "/.env")
+    assert url_pinada == "https://[2001:db8::1]:443/.env"
+    assert host == "alvo-fixture.exemplo"
+
+
+def test_url_pinada_ipv4_sem_colchetes():
+    from webqa.sondagem import _url_pinada
+    _log, url_pinada, _host = _url_pinada(ALVO, IP_ALVO, "/.env")
+    assert url_pinada == f"https://{IP_ALVO}:443/.env"
+
+
+def test_dual_stack_conecta_no_ipv4(tmp_path, monkeypatch):
+    """Host dual-stack: o probe conecta no IPv4 (a ordem de string elegeria o
+    IPv6, que ainda quebraria a URL pinada)."""
+    capturado = {}
+
+    def handler(request):
+        capturado["host"] = request.url.host
+        return httpx.Response(404)
+
+    escopo = _escopo_multi(tmp_path, monkeypatch, IP_V6, IP_ALVO)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    sondar(escopo, ALVO, [C_GIT], client=client, dry_run=False, dormir=lambda _s: None)
+    assert capturado["host"] == IP_ALVO
+
+
+def test_ipv6_unico_gera_url_bem_formada_e_conecta(tmp_path, monkeypatch):
+    """Só IPv6: a URL pinada é bem-formada (colchetes) e o probe conecta —
+    hoje viraria falha de rede silenciosa (run inconclusivo sem explicar)."""
+    capturado = {}
+
+    def handler(request):
+        capturado["host"] = request.url.host
+        return httpx.Response(404)
+
+    escopo = _escopo_multi(tmp_path, monkeypatch, IP_V6)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, [C_GIT], client=client, dry_run=False, dormir=lambda _s: None)
+    assert capturado["host"] == IP_V6        # httpx desembrulha os colchetes em .host
+    assert resultado.executado == 1
+
+
+# --- G3: procedencia do caminho curado chega ao Finding ---
+
+def test_finding_carrega_procedencia_do_caminho(tmp_path, monkeypatch):
+    """A procedencia (OWASP/CWE) do caminho curado chega ao Finding — hoje é
+    carregada de `caminhos-sensiveis.yaml` e descartada antes do achado."""
+    c = CaminhoSensivel("/.git/HEAD", "vcs", "alta", "text/plain",
+                        "Remova o .git.", procedencia="OWASP WSTG-CONF-004")
+    rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"})}
+    resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [c])
+    assert [f.procedencia for f in resultado.findings] == ["OWASP WSTG-CONF-004"]
+
+
+def test_finding_sem_procedencia_fica_vazio_sem_erro(tmp_path, monkeypatch):
+    """Caminho sem procedencia → Finding.procedencia == '' e nenhum erro."""
+    rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"})}
+    resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT])
+    assert resultado.findings[0].procedencia == ""

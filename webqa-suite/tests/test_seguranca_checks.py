@@ -121,6 +121,36 @@ def test_summary_de_fase_a_b_nao_ganha_chave_remediacao_vazia():
     assert meta == {"severidade": "alta", "fase_seguranca": "A"}
 
 
+# ---------- laudo expõe procedencia do achado (C1d / G3) ----------
+
+def test_summary_expoe_procedencia_do_achado():
+    """A procedencia (OWASP/CWE) do caminho curado sobe ao meta do summary,
+    ao lado de remediacao — é o valor de compliance que hoje se perde."""
+    from webqa.dominio import Finding, registrar_achados
+    from webqa.report import _metadados_de_seguranca
+
+    limpar_achados()
+    registrar_achados("checks/c.py::t_git", [
+        Finding("exposicao", "https://a/.git/HEAD", "alta", "presente", "C",
+                remediacao="Bloqueie /.git.", procedencia="OWASP WSTG-CONF-004")])
+    meta = _metadados_de_seguranca("checks/c.py::t_git")
+    limpar_achados()
+    assert meta["procedencia"] == "OWASP WSTG-CONF-004"
+
+
+def test_summary_sem_procedencia_nao_ganha_chave():
+    """Retrocompatível: achado sem procedencia não introduz a chave no schema."""
+    from webqa.dominio import Finding, registrar_achados
+    from webqa.report import _metadados_de_seguranca
+
+    limpar_achados()
+    registrar_achados("checks/a.py::t_js", [
+        Finding("segredo", "https://a/app.js", "alta", "k", "A")])
+    meta = _metadados_de_seguranca("checks/a.py::t_js")
+    limpar_achados()
+    assert "procedencia" not in meta
+
+
 # ---------- Mixed content (o fixture não consegue exercer) ----------
 
 def _mixed(log) -> list[str]:

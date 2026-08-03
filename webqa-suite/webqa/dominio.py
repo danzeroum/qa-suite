@@ -58,6 +58,9 @@ class Finding:
     evidencia: str
     fase: Fase
     remediacao: str = ""
+    # Referência de origem do achado (ex.: OWASP WSTG-CONF-004, CWE-538). Vem do
+    # caminho curado na Fase C; opcional e retrocompatível como `remediacao`.
+    procedencia: str = ""
 
     def __post_init__(self) -> None:
         # `object.__setattr__` porque a instância é congelada — a sanitização
@@ -65,6 +68,7 @@ class Finding:
         object.__setattr__(self, "evidencia", sanitize_text(str(self.evidencia)))
         object.__setattr__(self, "recurso", sanitize_text(str(self.recurso)))
         object.__setattr__(self, "remediacao", sanitize_text(str(self.remediacao)))
+        object.__setattr__(self, "procedencia", sanitize_text(str(self.procedencia)))
         if self.severidade not in ("alta", "media", "baixa"):
             raise ValueError(f"severidade inválida: {self.severidade!r}")
         if self.fase not in ("A", "B", "C"):
