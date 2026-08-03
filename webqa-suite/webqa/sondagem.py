@@ -601,6 +601,17 @@ def main(argv: list[str] | None = None) -> int:
               "documentada do dono do alvo. Nada foi enviado.")
         return 1
 
+    # Pré-check de escopo (Q1b): os gates em `sondar` usam pytest.skip, que fora de
+    # um teste vaza como traceback. `main()` pré-checa o predicado PURO
+    # `esta_no_escopo` e sai com mensagem — código 2, distinto do 1 (sem opt-in),
+    # para quem roda em script separar "faltou variável" de "alvo errado". Os
+    # gates internos seguem como defesa em profundidade (nunca alcançados aqui).
+    fora = [a for a in alvos if not escopo.esta_no_escopo(a)]
+    if fora:
+        print(f"Alvo fora do escopo autorizado: {', '.join(fora)}. Adicione o host "
+              f"ao {args.escopo} com autorização documentada. Nada foi enviado.")
+        return 2
+
     resultados = (sondar_multialvo(escopo, caminhos, dry_run=False) if args.multi_alvo
                   else [sondar(escopo, args.alvo, caminhos, dry_run=False)])
     for resultado in resultados:
