@@ -23,12 +23,16 @@ Decisões que o código carrega (e que as revisões custaram a fixar):
   probe valida contra o snapshot em memória, nunca relê o arquivo. (R-C7.)
 
 Somente stdlib + PyYAML (já dependência). NÃO importa `gates` e `esta_no_escopo`
-é comparação de origem (string), sem rede. A prova de posse por IP (R-C6) é a
-única parte que toca a rede: no CARREGAMENTO tira um snapshot dos IPs de cada
-host via `rede.ips_de`, e `verificar_posse` compara os IPs atuais contra esse
-snapshot ANTES do probe — divergência é takeover de subdomínio e aborta o alvo.
-Importar `ips_de` torna `escopo` o quarto consumidor da fronteira, registrado em
-`tests/test_fronteira_de_rede.py::FRONTEIRAS_DE_REDE` (regra da casa §2.11).
+é comparação de origem (string), sem rede. A prova de posse (R-C6) é a parte que
+toca a rede: no CARREGAMENTO tira um snapshot dos IPs de cada host via
+`rede.ips_de`, e `verificar_posse` compara os IPs atuais contra esse snapshot
+ANTES do probe — divergência é takeover de subdomínio e aborta o alvo. Para hosts
+com `verificacao: dns_txt` (CDN), a posse é provada pelo token nos registros TXT
+via `rede.txt_de` — alternativa ao IP idêntico, mantendo o pino de conexão.
+Importar `ips_de` torna `escopo` consumidor da fronteira, registrado em
+`tests/test_fronteira_de_rede.py::FRONTEIRAS_DE_REDE` (regra da casa §2.11);
+`txt_de` é consulta de posse, não decisão local×público, então fica fora daquele
+registro (que rastreia a fronteira de rede-local, não todo acesso a DNS).
 """
 from __future__ import annotations
 
@@ -41,7 +45,7 @@ from urllib.parse import urlsplit
 import yaml
 
 from webqa.auth import origem_de
-from webqa.rede import ips_de
+from webqa.rede import ips_de, txt_de
 
 AMBIENTES_VALIDOS = frozenset({"producao", "homologacao", "sandbox"})
 
@@ -69,6 +73,16 @@ def _ips_resolvidos(host: str) -> frozenset[str]:
     """
     try:
         return frozenset(str(ip) for ip in ips_de(host, _PORTA_HTTPS))
+    except OSError:
+        return frozenset()
+
+
+def _txt_resolvidos(host: str) -> frozenset[str]:
+    """TXT atuais do host; vazio se não resolve. Nunca deixa `OSError` subir —
+    ausência de TXT vira conjunto vazio, lido como 'sem posse por DNS-TXT'. Toca a
+    rede via `rede.txt_de` (só a posse por DNS-TXT usa); nos testes é dublado."""
+    try:
+        return txt_de(host)
     except OSError:
         return frozenset()
 
@@ -122,6 +136,12 @@ class Escopo:
     def _por_origem(self) -> dict[str, EntradaEscopo]:
         return {e.origem: e for e in self.entradas}
 
+    def _entrada_por_host(self, host: str) -> EntradaEscopo | None:
+        for e in self.entradas:
+            if (urlsplit(e.origem).hostname or "") == host:
+                return e
+        return None
+
     def verificar_posse(self, host: str) -> frozenset[str]:
         """IPs PINADOS de `host` se a posse se confirma; conjunto vazio se não.
 
@@ -139,27 +159,47 @@ class Escopo:
         atual é não-vazia e IDÊNTICA ao snapshot — e o chamador conecta SÓ nesses
         IPs, sem re-resolver, fechando a janela entre esta checagem e a requisição.
 
-        Quatro causas DISTINTAS de "sem posse", cada uma com seu motivo, para o
-        chamador (a sondagem) logar a triagem — `escopo` NÃO importa `audit`
-        (fronteira de rede §2.11); o motivo sai por retorno, não por efeito:
+        Causas DISTINTAS de "sem posse", cada uma com seu motivo, para o chamador
+        (a sondagem) logar a triagem — `escopo` NÃO importa `audit` (fronteira de
+        rede §2.11); o motivo sai por retorno, não por efeito:
 
         * `nao-listado`      — host sem snapshot algum (não está no escopo);
         * `sem-baseline`     — listado, mas não resolveu no carregamento;
         * `resolucao-falhou` — resolvia no carregamento, agora não resolve;
-        * `takeover`         — resolve agora, mas para IPs diferentes do snapshot.
+        * `takeover`         — resolve agora, mas para IPs diferentes do snapshot;
+        * `dns-txt-ausente`  — entrada com `verificacao: dns_txt`, mas o token não
+          está nos TXT do host (igualdade EXATA).
+
+        **Posse por DNS-TXT (alternativa à posse por IP, R-C6).** Uma entrada com
+        `verificacao.tipo == "dns_txt"` prova posse pelo TOKEN em `verificacao.valor`
+        presente nos registros TXT do host — o que resolve o caso de CDN, cujo IP
+        rotaciona e não é do dono. O pino de IP da C1c PERMANECE (o probe conecta
+        nos IPs ATUAIS resolvidos); o TXT só dispensa a exigência de IP idêntico ao
+        snapshot. O token é comparado por igualdade de conjunto (nunca substring).
 
         O snapshot é do carregamento; esta comparação roda ANTES do probe, e os
-        IPs devolvidos são os que o probe deve usar — nunca dentro do laço. Os IPs
-        são diagnóstico interno: vão ao AuditLog, nunca ao laudo.
+        IPs devolvidos são os que o probe deve usar — nunca dentro do laço. IPs e
+        tokens são diagnóstico interno: vão ao AuditLog, nunca ao laudo.
         """
         if host not in self.ips_no_carregamento:
             return frozenset(), "nao-listado"
-        baseline = self.ips_no_carregamento[host]
-        if not baseline:
-            return frozenset(), "sem-baseline"
         atuais = _ips_resolvidos(host)
         if not atuais:
             return frozenset(), "resolucao-falhou"
+
+        entrada = self._entrada_por_host(host)
+        if entrada is not None and entrada.verificacao.get("tipo") == "dns_txt":
+            # Posse por DNS-TXT: token EXATO nos TXT do host dispensa IP idêntico
+            # (CDN). Pina nos IPs atuais — o pino de conexão da C1c permanece.
+            token = str(entrada.verificacao.get("valor", ""))
+            if token and token in _txt_resolvidos(host):
+                return atuais, ""
+            return frozenset(), "dns-txt-ausente"
+
+        # Posse por IP (padrão): o snapshot precisa existir e bater com o atual.
+        baseline = self.ips_no_carregamento[host]
+        if not baseline:
+            return frozenset(), "sem-baseline"
         if atuais != baseline:
             return frozenset(), "takeover"
         return atuais, ""

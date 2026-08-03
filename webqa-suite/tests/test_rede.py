@@ -164,3 +164,91 @@ def test_ips_de_deduplica_preservando_ordem(monkeypatch):
         ipaddress.ip_address("10.0.0.1"),
         ipaddress.ip_address("10.0.0.2"),
     ]
+
+
+# ---------- C2 fatia 2b: resolvedor DNS TXT raw (posse por DNS-TXT) ----------
+#
+# Parser escrito à mão é onde bug de rede vira vazamento de garantia (posse
+# aceitando token errado). Prova-se com pacote forjado e socket dublado — sem rede.
+
+import struct  # noqa: E402 — local a esta seção, como o resto usa dublês
+
+
+def _qname(host: str) -> bytes:
+    return b"".join(struct.pack("B", len(r)) + r.encode() for r in host.split(".")) + b"\x00"
+
+
+def _resposta_txt(host: str, *textos: str) -> bytes:
+    """Resposta DNS TXT válida: header + pergunta + respostas com ponteiro de nome
+    (0xC00C → offset 12) e RDATA de string tamanho-prefixada."""
+    header = struct.pack(">HHHHHH", 0x1234, 0x8180, 1, len(textos), 0, 0)
+    pergunta = _qname(host) + struct.pack(">HH", 16, 1)
+    corpo = b""
+    for t in textos:
+        tb = t.encode()
+        rdata = struct.pack("B", len(tb)) + tb
+        corpo += struct.pack(">HHHIH", 0xC00C, 16, 1, 0, len(rdata)) + rdata
+    return header + pergunta + corpo
+
+
+def test_montar_consulta_txt_pede_txt_in():
+    q = rede._montar_consulta_txt("cdn.exemplo.br")
+    assert q[-4:] == struct.pack(">HH", 16, 1)      # QTYPE=TXT(16), QCLASS=IN(1)
+    assert b"\x03cdn" in q
+
+
+def test_parse_txt_extrai_a_string():
+    pkt = _resposta_txt("cdn.exemplo.br", "webqa-ownership=abc123")
+    assert rede._parse_txt(pkt) == frozenset({"webqa-ownership=abc123"})
+
+
+def test_parse_txt_multiplos_registros():
+    pkt = _resposta_txt("a.b", "t1=x", "t2=y")
+    assert rede._parse_txt(pkt) == frozenset({"t1=x", "t2=y"})
+
+
+def test_parse_txt_resposta_curta_levanta_oserror():
+    with pytest.raises(OSError):
+        rede._parse_txt(b"\x00\x01\x02")
+
+
+def test_parse_txt_rdata_truncado_levanta_oserror():
+    with pytest.raises(OSError):
+        rede._parse_txt(_resposta_txt("a.b", "t=x")[:-2])
+
+
+def test_txt_de_com_socket_dublado(monkeypatch):
+    """txt_de ponta a ponta sem rede: nameserver e socket UDP dublados."""
+    monkeypatch.setattr(rede, "_nameserver_do_sistema", lambda: "127.0.0.1")
+    enviado = {}
+
+    class _FakeSock:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def settimeout(self, t):
+            pass
+
+        def sendto(self, dados, destino):
+            enviado["destino"] = destino
+
+        def recv(self, n):
+            return _resposta_txt("cdn.exemplo.br", "webqa-ownership=abc123")
+
+    monkeypatch.setattr(socket, "socket", _FakeSock)
+    assert rede.txt_de("cdn.exemplo.br") == frozenset({"webqa-ownership=abc123"})
+    assert enviado["destino"] == ("127.0.0.1", 53)
+
+
+def test_txt_de_sem_nameserver_levanta_oserror(monkeypatch):
+    def _sem():
+        raise OSError("sem nameserver")
+    monkeypatch.setattr(rede, "_nameserver_do_sistema", _sem)
+    with pytest.raises(OSError):
+        rede.txt_de("cdn.exemplo.br")

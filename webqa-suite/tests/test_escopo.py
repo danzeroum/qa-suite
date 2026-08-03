@@ -287,6 +287,59 @@ def test_verificar_posse_mantem_assinatura_frozenset(tmp_path, monkeypatch):
     assert esc.verificar_posse("meusite.exemplo.br") == frozenset()
 
 
+# ---------- C2 fatia 2b: posse por DNS-TXT (alternativa ao pino de IP, CDN) ----------
+
+_VERIF_DNS_TXT = ('    verificacao:\n'
+                  '      tipo: "dns_txt"\n'
+                  '      valor: "webqa-ownership=abc123"\n')
+
+
+def _dubla_txt(monkeypatch, *tokens: str) -> None:
+    monkeypatch.setattr("webqa.escopo.txt_de", lambda h: frozenset(tokens))
+
+
+def test_dns_txt_aprova_com_token_exato_mesmo_ip_rotacionado(tmp_path, monkeypatch):
+    """CDN: IP rotaciona (seria takeover na posse por IP), mas o token TXT prova
+    posse — aprova, pinando nos IPs ATUAIS (o pino de conexão da C1c permanece)."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")                 # snapshot
+    esc = escopo.carregar(_escrever(tmp_path, "https://cdn.exemplo.br", extra=_VERIF_DNS_TXT))
+    _dubla_getaddrinfo(monkeypatch, "198.51.100.9")                # IP rotacionou
+    _dubla_txt(monkeypatch, "webqa-ownership=abc123")
+    assert esc.verificar_posse_detalhada("cdn.exemplo.br") == (frozenset({"198.51.100.9"}), "")
+
+
+def test_dns_txt_recusa_sem_token(tmp_path, monkeypatch):
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://cdn.exemplo.br", extra=_VERIF_DNS_TXT))
+    _dubla_txt(monkeypatch, "outra-coisa=1")
+    assert esc.verificar_posse_detalhada("cdn.exemplo.br") == (frozenset(), "dns-txt-ausente")
+
+
+def test_dns_txt_igualdade_exata_nao_substring(tmp_path, monkeypatch):
+    """Token do alvo como SUBSTRING de outro TXT não basta — igualdade exata."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://cdn.exemplo.br", extra=_VERIF_DNS_TXT))
+    _dubla_txt(monkeypatch, "x-webqa-ownership=abc123-y")          # token embutido
+    assert esc.verificar_posse_detalhada("cdn.exemplo.br") == (frozenset(), "dns-txt-ausente")
+
+
+def test_dns_txt_sem_resolucao_de_ip_e_resolucao_falhou(tmp_path, monkeypatch):
+    """Mesmo com TXT, sem IP atual não há onde pinar → resolucao-falhou."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://cdn.exemplo.br", extra=_VERIF_DNS_TXT))
+    _falha_getaddrinfo(monkeypatch)
+    _dubla_txt(monkeypatch, "webqa-ownership=abc123")
+    assert esc.verificar_posse_detalhada("cdn.exemplo.br") == (frozenset(), "resolucao-falhou")
+
+
+def test_sem_dns_txt_mantem_posse_por_ip(tmp_path, monkeypatch):
+    """Entrada sem verificacao dns_txt segue na posse por IP (takeover reprova)."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "198.51.100.9")
+    assert esc.verificar_posse_detalhada("meusite.exemplo.br") == (frozenset(), "takeover")
+
+
 # ---------- os alvos de TERCEIRO da campanha nunca entram no escopo ----------
 
 def test_alvos_de_terceiro_da_campanha_reprovam_escopo(tmp_path):
