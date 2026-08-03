@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -123,16 +124,20 @@ class ResultadoSondagem:
     executado: int = 0
     findings: list[Finding] = field(default_factory=list)
     abortado_por: str = ""
+    run_id: str = ""
+    falhas_rede: int = 0
 
     @property
     def inconclusivo(self) -> bool:
         """Run parcial NÃO é 'tudo limpo'.
 
-        Abortado (kill-switch, posse) ou com menos probes que o esperado: o
-        resultado não cobre a superfície declarada, e tratá-lo como conclusivo
-        seria a falha de infra que parece 'zero exposições'.
+        Abortado (kill-switch, posse), falha de rede em algum probe, ou com menos
+        probes que o esperado: o resultado não cobre a superfície declarada, e
+        tratá-lo como conclusivo seria a falha de infra que parece 'zero
+        exposições'.
         """
-        return bool(self.abortado_por) or self.executado < self.esperado
+        return (bool(self.abortado_por) or self.falhas_rede > 0
+                or self.executado < self.esperado)
 
 
 def _cliente_padrao() -> httpx.Client:
@@ -153,27 +158,63 @@ def _e_soft_404(content_type_esperado: str, content_type_recebido: str) -> bool:
     """Heurística de soft-404 pelo header, sem ler corpo.
 
     Um servidor que responde 200 para tudo entrega HTML de erro onde se esperava
-    `application/octet-stream`/`text/plain`. Só corta quando há divergência CLARA
-    (esperado não-HTML, recebido HTML); na dúvida, NÃO corta — falso negativo
-    aqui é pior que reportar um achado a mais para revisão humana.
+    `application/octet-stream`/`text/plain`. Corta quando o recebido é HTML e o
+    esperado não é — INCLUSIVE quando não há tipo esperado declarado: sem
+    contrato, HTML recebido é suspeito de catch-all, e desconfiar é o lado seguro
+    (um catch-all vira falso positivo em todo caminho). Sem Content-Type na
+    resposta, não há sinal e não se corta.
     """
     esperado = (content_type_esperado or "").split(";")[0].strip().lower()
     recebido = (content_type_recebido or "").split(";")[0].strip().lower()
-    if not esperado or not recebido:
+    if not recebido:
         return False
+    if not esperado:
+        return recebido == "text/html"
     return esperado != "text/html" and recebido == "text/html"
 
 
+class _FalhaDeRede:
+    """Sinal interno: o probe falhou por rede — não é achado nem 'não existe'."""
+
+
+_FALHA_DE_REDE = _FalhaDeRede()
+
+
+def _validar_alvo(alvo: str) -> None:
+    """Rejeita alvo malformado ANTES dos portões — fail-fast e claro.
+
+    O alvo é uma ORIGEM (`esquema://host[:porta]`), não uma URL com path: sondar
+    `https://x/app` levaria os caminhos para baixo de `/app`, não à raiz do host,
+    e uma query/fragment no alvo não tem sentido para descoberta de recurso.
+    """
+    partes = urlsplit(alvo)
+    if partes.scheme not in ("http", "https"):
+        raise ValueError(f"alvo deve ser http(s)://: {alvo!r}")
+    if not partes.hostname:
+        raise ValueError(f"alvo sem hostname: {alvo!r}")
+    if partes.path not in ("", "/") or partes.query or partes.fragment:
+        raise ValueError(f"alvo deve ser origem sem path/query/fragment: {alvo!r}")
+
+
 def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
-                   log: AuditLog, autorizacao_id: str) -> Finding | None:
+                   log: AuditLog, autorizacao_id: str) -> Finding | None | _FalhaDeRede:
     """UM probe: HEAD no caminho, audita, e devolve Finding se existir (2xx).
 
     Nunca lê corpo e nunca segue redirect (o cliente é `follow_redirects=False`).
     Um 3xx/4xx não é achado; um 2xx que pareça soft-404 pelo Content-Type também
     não. A existência confirmada é o único achado, e ele nasce mascarado.
+
+    Falha de rede (`httpx.RequestError`) NÃO derruba o run: é auditada com
+    `status=-1`, devolve o sinal `_FALHA_DE_REDE`, e o laço segue. O resultado
+    fica inconclusivo — honesto, nunca um silêncio que pareça 'tudo limpo'.
     """
     url = urljoin(alvo if alvo.endswith("/") else alvo + "/", caminho.path.lstrip("/"))
-    resposta = client.head(url)
+    try:
+        resposta = client.head(url)
+    except httpx.RequestError as erro:
+        log.registrar(url=url, metodo="HEAD", alvo=alvo, autorizacao_id=autorizacao_id,
+                      status=-1, evento=f"falha-de-rede:{type(erro).__name__}")
+        return _FALHA_DE_REDE
     log.registrar(url=url, metodo="HEAD", alvo=alvo,
                   autorizacao_id=autorizacao_id, status=resposta.status_code)
     if not (200 <= resposta.status_code < 300):
@@ -203,12 +244,16 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     allowlist) e `verificar_posse` (IP não divergiu do carregamento). Depois,
     o laço respeita o piso de rate-limit e checa o kill-switch a cada iteração.
     """
+    _validar_alvo(alvo)          # fail-fast antes de qualquer portão ou requisição
     esperado = len(caminhos)
+    # run_id único por run: sem log injetado, dois runs não colidem no AuditLog.
+    # Com log injetado, herda o run_id dele (o caller manda na trilha).
+    run_id = log.run_id if log is not None else f"fase-c-{uuid.uuid4().hex[:12]}"
 
     # Planejar é seguro e não exige autorização: nenhuma requisição sai.
     if dry_run:
         return ResultadoSondagem(alvo=alvo, esperado=esperado, executado=0,
-                                 abortado_por="dry-run")
+                                 abortado_por="dry-run", run_id=run_id)
 
     # --- portões: sem os três, nenhum probe acontece ---
     require_discovery()
@@ -216,16 +261,16 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     host = urlsplit(alvo).hostname or ""
     if not escopo.verificar_posse(host):
         return ResultadoSondagem(alvo=alvo, esperado=esperado, executado=0,
-                                 abortado_por="posse-divergente")
+                                 abortado_por="posse-divergente", run_id=run_id)
 
     intervalo = max(intervalo_s, PISO_INTERVALO_S)   # piso não-configurável
     fechar_no_fim = client is None
     client = client or _cliente_padrao()
-    log = log or AuditLog(run_id="fase-c", escopo_hash=getattr(escopo, "hash_congelado", ""))
-    autorizacao_id = (escopo.entrada(alvo).evidencia
-                      if escopo.esta_no_escopo(alvo) else "")
+    log = log or AuditLog(run_id=run_id, escopo_hash=getattr(escopo, "hash_congelado", ""))
+    # require_escopo já abortou se fora do escopo: aqui o alvo está no escopo.
+    autorizacao_id = escopo.entrada(alvo).evidencia
 
-    resultado = ResultadoSondagem(alvo=alvo, esperado=esperado)
+    resultado = ResultadoSondagem(alvo=alvo, esperado=esperado, run_id=run_id)
     try:
         for i, caminho in enumerate(caminhos):
             if kill_switch_active():
@@ -234,6 +279,9 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
             if i:
                 dormir(intervalo)      # piso ENTRE requisições, nunca antes da 1ª
             achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id)
+            if isinstance(achado, _FalhaDeRede):
+                resultado.falhas_rede += 1     # probe não concluído: executado NÃO sobe
+                continue
             resultado.executado += 1
             if achado is not None:
                 resultado.findings.append(achado)

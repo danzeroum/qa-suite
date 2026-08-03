@@ -290,6 +290,107 @@ def test_caminho_sensivel_nasce_validado(kwargs, erro):
         CaminhoSensivel(**base)
 
 
+# ---------- C1b fatia 1: robustez e correção (Tier A #2–#6) ----------
+
+def test_erro_de_rede_num_probe_nao_derruba_o_run(tmp_path, monkeypatch):
+    """#2: um ConnectError no meio da lista NÃO crasha — conta falha, segue,
+    o run fica inconclusivo, e os achados anteriores são preservados."""
+    def handler(request):
+        if request.url.path == "/.env":
+            raise httpx.ConnectError("conexão recusada")
+        status = 200 if request.url.path == "/.git/HEAD" else 404
+        headers = {"content-type": "text/plain"} if status == 200 else {}
+        return httpx.Response(status, headers=headers)
+
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    log = AuditLog(run_id="teste", escopo_hash=escopo.hash_congelado)
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, [C_GIT, C_ENV, C_BACKUP], client=client, log=log,
+                       dry_run=False, dormir=lambda _s: None)
+
+    assert resultado.falhas_rede == 1
+    assert resultado.executado == 2          # git e backup concluíram; env falhou
+    assert len(resultado.findings) == 1      # o achado de /.git/HEAD foi preservado
+    assert resultado.inconclusivo is True
+    assert any(linha["status"] == -1 for linha in log.linhas), "a falha foi auditada"
+
+
+def test_runs_sem_log_injetado_tem_run_ids_distintos(tmp_path, monkeypatch):
+    """#3: sem log injetado, cada run gera um run_id único — não colidem."""
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    r1 = sondar(escopo, ALVO, [C_GIT], client=_client({"/.git/HEAD": (404, {})}),
+                dry_run=False, dormir=lambda _s: None)
+    r2 = sondar(escopo, ALVO, [C_GIT], client=_client({"/.git/HEAD": (404, {})}),
+                dry_run=False, dormir=lambda _s: None)
+    assert r1.run_id.startswith("fase-c-") and r2.run_id.startswith("fase-c-")
+    assert r1.run_id != r2.run_id
+
+
+def test_run_id_injetado_e_herdado_do_log(tmp_path, monkeypatch):
+    """Com log injetado, o resultado herda o run_id do log (o caller manda)."""
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    log = AuditLog(run_id="run-do-caller", escopo_hash=escopo.hash_congelado)
+    r = sondar(escopo, ALVO, [C_GIT], client=_client({"/.git/HEAD": (404, {})}),
+               log=log, dry_run=False, dormir=lambda _s: None)
+    assert r.run_id == "run-do-caller"
+
+
+def test_e_soft_404_sem_tipo_esperado_desconfia_de_html():
+    """#4: sem content_type_esperado declarado, HTML recebido é soft-404 suspeito."""
+    from webqa.sondagem import _e_soft_404
+    assert _e_soft_404("", "text/html; charset=utf-8") is True
+    assert _e_soft_404("", "application/json") is False          # não-HTML: não corta
+    assert _e_soft_404("", "") is False                          # sem sinal: não corta
+    assert _e_soft_404("application/zip", "application/zip") is False
+
+
+def test_caminho_sem_tipo_esperado_com_html_e_descartado(tmp_path, monkeypatch):
+    """#4 ponta a ponta: caminho sem tipo esperado + 200 text/html → não é achado."""
+    c = CaminhoSensivel("/qualquer", "configuracao", "media", "", "corrija")
+    rotas = {"/qualquer": (200, {"content-type": "text/html"})}
+    resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [c])
+    assert resultado.findings == []
+    assert resultado.executado == 1
+
+
+@pytest.mark.parametrize("alvo", [
+    "example.com",                # sem esquema
+    "ftp://x",                    # esquema errado
+    "https://x/app",             # com path
+    "https://x/?q=1",            # com query
+    "https://x#frag",            # com fragment
+    "https:///sem-host",         # sem hostname
+])
+def test_validar_alvo_reprova_malformado(alvo):
+    """#5: alvo que não é origem http(s) limpa → ValueError."""
+    from webqa.sondagem import _validar_alvo
+    with pytest.raises(ValueError):
+        _validar_alvo(alvo)
+
+
+def test_alvo_malformado_reprova_em_sondar_antes_de_tocar_a_rede(tmp_path, monkeypatch):
+    """#5: a validação roda ANTES dos portões e da rede.
+
+    O alvo tem ORIGEM no escopo (`origem_de` remove o path), mas é malformado
+    (path+query). Assim, sem `_validar_alvo`, o `require_escopo` deixaria passar
+    — e é o `_validar_alvo` que tem de barrar. Escolha deliberada para que a
+    prova por mutação FALHE (não seja pulada pelo gate de escopo)."""
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    with pytest.raises(ValueError):
+        sondar(escopo, ALVO + "/app?q=1", [C_GIT],
+               client=_client({}), dry_run=False, dormir=lambda _s: None)
+
+
+def test_autorizacao_id_vem_direto_do_escopo(tmp_path, monkeypatch):
+    """#6: o autorizacao_id auditado vem de escopo.entrada(alvo).evidencia."""
+    _, log = _sondar_ativo(tmp_path, monkeypatch, {"/.git/HEAD": (404, {})}, [C_GIT])
+    assert log.linhas[0]["autorizacao_id"] == "pr#1"
+
+
 # ---------- specs adiadas ao C1b (contrato registrado, ainda não implementado) ----------
 
 @pytest.mark.xfail(strict=True, reason="C1b: fallback GET Range: bytes=0-0 quando HEAD é 405")
