@@ -270,17 +270,27 @@ def calcular_espera_backoff(recuos_seguidos: int, intervalo: float) -> float:
 
 
 def avaliar_resposta_em_finding(status: int, content_type: str,
-                                caminho: CaminhoSensivel, url_logica: str):
+                                caminho: CaminhoSensivel, url_logica: str, *,
+                                content_length: str | None = None,
+                                baseline_catch_all: tuple | None = None):
     """PURA: classifica a resposta FINAL do probe, sem I/O nem log.
 
     `_PEDE_RECUO` (429/503) · `None` (não-2xx: ausência) · `_SOFT_404` (2xx mas
     provável soft-404 — o chamador audita o descarte) · `Finding` (2xx legítimo).
-    Isolar aqui a decisão a torna testável sem mockar httpx nem AuditLog."""
+    Isolar aqui a decisão a torna testável sem mockar httpx nem AuditLog.
+
+    `baseline_catch_all` é a assinatura `(content_type, content_length)` de um
+    caminho-fantasma inexistente que respondeu 2xx: um alvo catch-all responde
+    igual a tudo, então um probe com a MESMA assinatura é ruído, não achado —
+    descartado como soft-404. Content-length diferente do fantasma continua sendo
+    achado (o baseline não engole verdadeiro-positivo)."""
     if status in STATUS_DE_RECUO:
         return _PEDE_RECUO
     if not (200 <= status < 300):
         return None
     if _e_soft_404(caminho.content_type_esperado, content_type):
+        return _SOFT_404
+    if baseline_catch_all is not None and (content_type, content_length) == baseline_catch_all:
         return _SOFT_404
     return Finding(
         tipo=f"exposicao:{caminho.categoria}",
@@ -295,17 +305,18 @@ def avaliar_resposta_em_finding(status: int, content_type: str,
 
 
 def executar_fallback_get(client: httpx.Client, url_logica: str, url_pinada: str,
-                          cabecalhos: dict, extensoes: dict, log: AuditLog,
-                          alvo: str, autorizacao_id: str) -> tuple[int, str] | _FalhaDeRede:
+                          cabecalhos: dict, extensoes: dict, log: AuditLog, alvo: str,
+                          autorizacao_id: str) -> tuple[int, str, str | None] | _FalhaDeRede:
     """A ÚNICA exceção ao HEAD-only, isolada para o CODEOWNER auditar num só lugar
     que 'nunca baixa o recurso' é mantido: 405 → GET com `Range: bytes=0-0`, em
-    stream SEM iterar (lê no máximo 1 byte). Devolve (status, content_type) ou
-    `_FALHA_DE_REDE`; audita a requisição (ou a falha) como qualquer probe."""
+    stream SEM iterar (lê no máximo 1 byte). Devolve (status, content_type,
+    content_length) ou `_FALHA_DE_REDE`; audita a requisição (ou a falha)."""
     try:
         with client.stream("GET", url_pinada, extensions=extensoes,
                            headers={**cabecalhos, "Range": "bytes=0-0"}) as r:
             status = r.status_code
             content_type = r.headers.get("content-type", "")
+            content_length = r.headers.get("content-length")
     except httpx.RequestError as erro:
         log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
                       autorizacao_id=autorizacao_id, status=-1,
@@ -313,12 +324,36 @@ def executar_fallback_get(client: httpx.Client, url_logica: str, url_pinada: str
         return _FALHA_DE_REDE
     log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
                   autorizacao_id=autorizacao_id, status=status)
-    return status, content_type
+    return status, content_type, content_length
+
+
+def _detectar_catch_all(client: httpx.Client, alvo: str, ip_pinado: str,
+                        log: AuditLog, autorizacao_id: str) -> tuple | None:
+    """1 HEAD num caminho inexistente ALEATÓRIO, ANTES do laço, para pegar alvo
+    catch-all (responde 2xx a tudo). Se 2xx, devolve a assinatura
+    `(content_type, content_length)` que os probes idênticos serão descartados
+    contra. Auditada (`evento="baseline-soft404"`) — nenhuma requisição invisível;
+    conecta no IP pinado com SNI pelo hostname, como qualquer probe."""
+    ghost = f"/{uuid.uuid4().hex}"          # inexistente por construção
+    url_logica, url_pinada, host = _url_pinada(alvo, ip_pinado, ghost)
+    try:
+        r = client.head(url_pinada, headers={"Host": host},
+                        extensions={"sni_hostname": host})
+    except httpx.RequestError as erro:
+        log.registrar(url=url_logica, metodo="HEAD", alvo=alvo, autorizacao_id=autorizacao_id,
+                      status=-1, evento=f"baseline-soft404:falha-de-rede:{type(erro).__name__}")
+        return None
+    log.registrar(url=url_logica, metodo="HEAD", alvo=alvo, autorizacao_id=autorizacao_id,
+                  status=r.status_code, evento="baseline-soft404")
+    if 200 <= r.status_code < 300:
+        return (r.headers.get("content-type", ""), r.headers.get("content-length"))
+    return None
 
 
 def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
-                   log: AuditLog, autorizacao_id: str,
-                   ip_pinado: str) -> Finding | None | _FalhaDeRede | _PedeRecuo:
+                   log: AuditLog, autorizacao_id: str, ip_pinado: str,
+                   baseline_catch_all: tuple | None = None
+                   ) -> Finding | None | _FalhaDeRede | _PedeRecuo:
     """UM probe: HEAD no caminho, conectando ao IP PINADO, com TLS pelo hostname.
 
     Conecta ao `ip_pinado` (o IP provado por `verificar_posse`), NÃO ao que o DNS
@@ -347,6 +382,7 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
                   autorizacao_id=autorizacao_id, status=resposta.status_code)
     status = resposta.status_code
     content_type = resposta.headers.get("content-type", "")
+    content_length = resposta.headers.get("content-length")
 
     # 405 (HEAD não permitido): confirma existência com GET mínimo (Range), na
     # função isolada que o CODEOWNER audita como a única exceção ao HEAD-only.
@@ -356,9 +392,11 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
                                          cabecalhos, extensoes, log, alvo, autorizacao_id)
         if isinstance(fallback, _FalhaDeRede):
             return _FALHA_DE_REDE
-        status, content_type = fallback
+        status, content_type, content_length = fallback
 
-    veredito = avaliar_resposta_em_finding(status, content_type, caminho, url_logica)
+    veredito = avaliar_resposta_em_finding(
+        status, content_type, caminho, url_logica,
+        content_length=content_length, baseline_catch_all=baseline_catch_all)
     if veredito is _SOFT_404:
         # Descarte auditado: sem isto o log mostra 200 sem finding e sem motivo,
         # indistinguível de bug (G5). Nenhuma requisição nova — só a decisão.
@@ -424,6 +462,16 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     recuos_seguidos = 0
     falhas_consecutivas = 0
     try:
+        # Kill-switch checado ANTES do HEAD-fantasma: ativo desde o início, nem o
+        # baseline sai (kill-switch = nenhuma requisição).
+        if kill_switch_active():
+            resultado.abortado_por = "kill-switch"
+            log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
+                                 evento="abortado:kill-switch")
+            return resultado
+        # Baseline dinâmico de soft-404: 1 HEAD-fantasma ANTES do laço. Se o alvo
+        # é catch-all, os probes com a mesma assinatura viram ruído, não achado.
+        baseline_catch_all = _detectar_catch_all(client, alvo, ip_pinado, log, autorizacao_id)
         for i, caminho in enumerate(caminhos):
             if kill_switch_active():
                 resultado.abortado_por = "kill-switch"
@@ -434,7 +482,8 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
                 # Piso entre requisições; após recuo (429/503), backoff exponencial
                 # com teto. Nunca antes da 1ª, e nunca abaixo do piso.
                 dormir(calcular_espera_backoff(recuos_seguidos, intervalo))
-            achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id, ip_pinado)
+            achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id,
+                                    ip_pinado, baseline_catch_all)
             if isinstance(achado, _PedeRecuo | _FalhaDeRede):
                 # Probe NÃO concluído (executado não sobe). Recuo amplia o backoff;
                 # ambos contam para o circuit breaker (G1).
@@ -463,6 +512,19 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     return resultado
 
 
+def sondar_multialvo(escopo, caminhos: list[CaminhoSensivel],
+                     **kwargs) -> list[ResultadoSondagem]:
+    """Sonda TODAS as origens do escopo CARREGADO — nunca uma lista externa.
+
+    Iterar só o escopo é o que impede a ampliação de cobertura de virar brecha no
+    portão de origem exata: um alvo fora do escopo não existe aqui. Cada alvo
+    passa pelos próprios portões (discovery/escopo/posse) e pelo próprio piso de
+    rate-limit; um alvo que aborta (ex.: posse-divergente) devolve seu resultado
+    e NÃO impede os demais. Devolve um resultado por alvo (resumo consolidado)."""
+    return [sondar(escopo, entrada.origem, caminhos, **kwargs)
+            for entrada in escopo.entradas]
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI. `--dry-run` é o padrão; sondar de verdade exige `--executar`.
 
@@ -473,20 +535,26 @@ def main(argv: list[str] | None = None) -> int:
     from webqa.gates import DISCOVERY_ENV, discovery_authorized
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--alvo", required=True, help="origem exata (https://host)")
+    parser.add_argument("--alvo", help="origem exata (https://host)")
+    parser.add_argument("--multi-alvo", action="store_true",
+                        help="sonda TODAS as origens do escopo (ignora --alvo)")
     parser.add_argument("--escopo", type=Path, default=Path("escopo-autorizado.yaml"))
     parser.add_argument("--caminhos", type=Path, default=Path("data/caminhos-sensiveis.yaml"))
     parser.add_argument("--executar", action="store_true",
                         help="sonda de verdade; sem esta flag, só planeja (dry-run)")
     args = parser.parse_args(argv)
+    if not args.alvo and not args.multi_alvo:
+        parser.error("informe --alvo ou --multi-alvo")
 
     caminhos = carregar_caminhos(args.caminhos)
     escopo = escopo_mod.carregar(args.escopo)
+    alvos = [e.origem for e in escopo.entradas] if args.multi_alvo else [args.alvo]
 
     if not args.executar:
-        print(f"[dry-run] {len(caminhos)} caminhos planejados contra {args.alvo}:")
-        for c in caminhos:
-            print(f"  HEAD {args.alvo.rstrip('/')}{c.path}  ({c.categoria}/{c.severidade})")
+        print(f"[dry-run] {len(caminhos)} caminhos planejados contra {len(alvos)} alvo(s):")
+        for alvo in alvos:
+            for c in caminhos:
+                print(f"  HEAD {alvo.rstrip('/')}{c.path}  ({c.categoria}/{c.severidade})")
         print("Nenhuma requisição foi feita. Use --executar para sondar.")
         return 0
 
@@ -495,14 +563,16 @@ def main(argv: list[str] | None = None) -> int:
               "documentada do dono do alvo. Nada foi enviado.")
         return 1
 
-    resultado = sondar(escopo, args.alvo, caminhos, dry_run=False)
-    print(f"Sondagem: {resultado.executado}/{resultado.esperado} caminhos, "
-          f"{len(resultado.findings)} achado(s)"
-          + (f", ABORTADO por {resultado.abortado_por}" if resultado.abortado_por else ""))
-    if resultado.inconclusivo:
-        print("Resultado INCONCLUSIVO: o run não cobriu a superfície declarada.")
-    for f in resultado.findings:
-        print(f"  [{f.severidade}] {f.tipo} — {f.recurso}")
+    resultados = (sondar_multialvo(escopo, caminhos, dry_run=False) if args.multi_alvo
+                  else [sondar(escopo, args.alvo, caminhos, dry_run=False)])
+    for resultado in resultados:
+        print(f"Sondagem [{resultado.alvo}]: {resultado.executado}/{resultado.esperado} "
+              f"caminhos, {len(resultado.findings)} achado(s)"
+              + (f", ABORTADO por {resultado.abortado_por}" if resultado.abortado_por else ""))
+        if resultado.inconclusivo:
+            print("  Resultado INCONCLUSIVO: o run não cobriu a superfície declarada.")
+        for f in resultado.findings:
+            print(f"  [{f.severidade}] {f.tipo} — {f.recurso}")
     return 0
 
 

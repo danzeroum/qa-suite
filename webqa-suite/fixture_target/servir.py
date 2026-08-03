@@ -125,6 +125,16 @@ def _backup_zip() -> bytes:
 
 BACKUP_ZIP = _backup_zip()
 
+# Iscas de exposição da Fase C (existência 2xx = achado). Mapa REUSÁVEL: o teste
+# de sistema do motor (tests/test_sondagem.py) prova a detecção ponta a ponta
+# contra AS MESMAS iscas que o fixture serve — remover uma daqui some do fixture
+# e reprova o teste juntos (prova por mutação do nível A.4).
+ISCAS_FASE_C: dict[str, tuple[bytes, str]] = {
+    "/.git/HEAD": (GIT_HEAD.encode("utf-8"), "text/plain; charset=utf-8"),
+    "/.env": (ENV_ISCA.encode("utf-8"), "text/plain; charset=utf-8"),
+    "/backup.zip": (BACKUP_ZIP, "application/zip"),
+}
+
 
 def _foto_com_gps() -> bytes:
     """JPEG 1x1 válido com APP1/EXIF contendo ponteiro de IFD de GPS.
@@ -260,15 +270,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._responder(PIXEL, "image/png", com_cookies=False)
         elif caminho.startswith("/privacidade"):
             self._responder(POLITICA.encode("utf-8"), "text/html; charset=utf-8")
-        elif caminho == "/.git/HEAD":
-            # Isca de exposição (Fase C): repositório .git servido. Inerte até C1.
-            self._responder(GIT_HEAD.encode("utf-8"), "text/plain; charset=utf-8",
-                            com_cookies=False)
-        elif caminho == "/.env":
-            self._responder(ENV_ISCA.encode("utf-8"), "text/plain; charset=utf-8",
-                            com_cookies=False)
-        elif caminho == "/backup.zip":
-            self._responder(BACKUP_ZIP, "application/zip", com_cookies=False)
+        elif caminho in ISCAS_FASE_C:
+            # Iscas de exposição (Fase C): existência 2xx = achado. Inerte até C1.
+            corpo, tipo = ISCAS_FASE_C[caminho]
+            self._responder(corpo, tipo, com_cookies=False)
         elif caminho in ("/", "/newsletter"):
             self._responder(HOME.encode("utf-8"), "text/html; charset=utf-8")
         else:
