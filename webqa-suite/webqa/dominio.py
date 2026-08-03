@@ -61,6 +61,10 @@ class Finding:
     # Referência de origem do achado (ex.: OWASP WSTG-CONF-004, CWE-538). Vem do
     # caminho curado na Fase C; opcional e retrocompatível como `remediacao`.
     procedencia: str = ""
+    # Método HTTP que confirmou a existência (Fase C): "HEAD" ou, quando o HEAD
+    # deu 405, "GET(range)". Alimenta o curl reproduzível (C3c). Rótulo interno,
+    # não conteúdo de servidor — não passa por sanitize.
+    metodo: str = "HEAD"
 
     def __post_init__(self) -> None:
         # `object.__setattr__` porque a instância é congelada — a sanitização
