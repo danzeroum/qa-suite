@@ -605,13 +605,19 @@ def main(argv: list[str] | None = None) -> int:
 
     todos_os_findings = [f for r in resultados for f in r.findings]
 
-    # --saida: laudo JSON em disco (só campos já mascarados do Finding).
+    # --saida: laudo JSON em disco (só campos já mascarados do Finding). Inclui as
+    # anotações de risco composto (C3b) — agrupamento, NUNCA severidade nova.
     if args.saida:
+        from webqa.correlacao import correlacionar_findings
+        correlacoes = correlacionar_findings(todos_os_findings)
         args.saida.write_text(
-            json.dumps({"alvos": [_resultado_para_dict(r) for r in resultados]},
+            json.dumps({"alvos": [_resultado_para_dict(r) for r in resultados],
+                        "correlacoes": correlacoes},
                        ensure_ascii=False, indent=2),
             encoding="utf-8")
         print(f"Laudo gravado em {args.saida}")
+        for c in correlacoes:
+            print(f"  risco composto em {c['host']}: {c['tipo']}")
 
     # --sarif: SARIF 2.1.0 para a aba Security do GitHub.
     if args.sarif:
