@@ -1,19 +1,9 @@
-# Ordens de Serviço — registro e numeração
+# Ordens de Serviço — Dimensão `seguranca` + Camada LLM + Design do Relatório
 
-> ## Esta tabela é a FONTE ÚNICA DE VERDADE da numeração de OS.
->
-> Antes de abrir uma OS, confira o número **aqui** — nunca contra a memória do
-> chat, contra `PROXIMOS-PASSOS §4` nem contra o título de um PR. O número já
-> colou no trabalho errado três vezes, sempre pela mesma causa: ele vivia em
-> três lugares e os três divergiam.
->
-> **Próximo número livre: OS-39.**
-
-Estado em 2026-07-30 · base: `main` @ `da5d3cf` · 555 testes de verificação verdes.
-Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, `docs/CAMPANHA.md`, e — para as OS
-de design — `docs/qa-suite design brief/referencia/` (spec visual:
-`componentes.html` §5/§8; folha canônica: bloco `<style>` de
-`referencia/summary.html`, copiar byte a byte).
+Estado em 2026-07-30 · base: `main` @ `b22af7d` · 314 testes de verificação verdes.
+Contratos: `docs/SEGURANCA.md`, `docs/LLM.md`, e — para as OS de design —
+`docs/qa-suite design brief/referencia/` (spec visual: `componentes.html` §5/§8;
+folha canônica: bloco `<style>` de `referencia/summary.html`, copiar byte a byte).
 
 ---
 
@@ -21,38 +11,19 @@ de design — `docs/qa-suite design brief/referencia/` (spec visual:
 
 ```
 Trilha SEGURANÇA (checks) — CONCLUÍDA:
-  OS-20 v2 ✓ (#15) → OS-21 ✓ (#16) → OS-22 ✓ (#17)
-     └── Finding em toda a dimensão ✓ (#21, #22)
+  OS-20 v2 ✓ (#15, 5dd0245) → OS-21 ✓ (#16, 80d8269) → OS-22 ✓ (#17, b22af7d)
      └── [Fase C — apenas desenhada em docs/SEGURANCA.md §7, TRAVADA]
-          └── OS-36 ✓ (#34, a trava provada por teste — a recusa, nunca a ação)
 
-Trilha LLM — CONCLUÍDA no que independe de runtime local:
-  OS-23 v2 ✓ (#24, webqa/llm.py) → OS-24 v2 ✓ (#25, scripts/sumario.py)
-     └── [validação com Ollama real — pendente de ambiente]
+Trilha LLM (independente):
+  OS-23 v2 (webqa/llm.py) → OS-24 v2 (scripts/sumario.py)
 
-Trilha DESIGN/RELATÓRIO — CONCLUÍDA:
-  OS-25 ✓ (#18, template seguranca) → OS-26 ✓ (#26, painel de estabilidade)
-     └── OS-33 ✓ (#31, o zero do painel explicado)
-     └── OS-34 ✓ (#32, derivadores provados ligados ao template)
-     └── OS-35 ✓ (#33, --painel provado somente-leitura sobre o ledger)
-
-Trilha ACESSO AUTENTICADO (nova):
-  OS-37 ✓ (Basic Auth: entra na aplicação) — ex-"OS-39 do chat"
-     └── OS-38 ✓ (passivo autenticado: proveniência de URL, órfã nunca visitada)
-          └── [Fase C segue DESLIGADA — autorizada pelo dono, não acionada]
-
-Trilha CAMPANHA:
-  OS-27 ✓ (#27, etiqueta: robots/recuo/sequencial)
-     └── OS-28 (campanha multi-alvo) — EM ABERTO
-     └── OS-31 ✓ (#29, telemetria operacional)
-     └── OS-32 ✓ (#30, armadilhas recorrentes viram teste)
-     └── [validação contra sites públicos na VPS — pendente de ambiente]
+Trilha DESIGN/RELATÓRIO (nova; depende só da base atual):
+  OS-25 (template seguranca no summary.html) → OS-26 (painel de estabilidade)
 ```
 
 ⚠️ Numeração: OS-23/OS-24 são **LLM** (como neste pacote desde a origem). As OS
 de design que circularam em chat com esses números foram renumeradas para
-**OS-25/OS-26** — valem os blocos abaixo. Quatro outras foram numeradas em chat
-sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas".
+**OS-25/OS-26** — valem os blocos abaixo.
 
 ---
 
@@ -63,58 +34,6 @@ sem consultar este arquivo e colidem com a sequência: ver "Colisões conhecidas
 | OS-20 v2 | #15 | `5dd0245` | `Finding`/`Recurso` + `network_log` enriquecida + `docs/SEGURANCA.md` |
 | OS-21 | #16 | `80d8269` | Fase A: headers/mixed/MIME/segredos/cookies |
 | OS-22 | #17 | `b22af7d` | Fase B: magic bytes/metadados/SVG/sourcemap/SRI · fixture com 11 FAILs · novo `alvo_sha256` |
-| OS-25 | #18 | `7944fc7` | Template `seguranca` no `summary.html` (severidade tipográfica + fase) |
-| OS-23 v2 | #24 | `c175eed` | `webqa/llm.py`: `ResumidorLLM` + gate + veto de endpoint por IP resolvido |
-| OS-24 v2 | #25 | `0a9e6e5` | `scripts/sumario.py` em processo separado + guardas de linguagem e omissão |
-| OS-26 | #26 | `172ba20` | Painel de estabilidade (`report/estabilidade.html`) + `caminhada()` + schema 5 |
-| OS-27 | #27 | `db7f948` | Camada de etiqueta: robots.txt, recuo 429/503, crawl sequencial, `webqa/rede.py` |
-| OS-31 | #29 | — | Telemetria operacional: 3 cortes, `anonimizar_agregado`, `--calibrar` |
-| OS-32 | #30 | — | Armadilhas recorrentes como teste: prefixo de coleta, folga em float, anonimato recursivo |
-| OS-33 | #31 | — | Painel explica POR QUE a sequência está em zero (origem, quarentena, alvo novo) |
-| OS-34 | #32 | — | Cada derivador dos dois geradores provado LIGADO ao template (sentinela) |
-| OS-35 | #33 | — | `--painel` somente-leitura: capacidade reduzida + fronteira no fonte + prova por tentativa |
-| OS-36 | #34 | — | Fase C travada por teste: detector de sondagem, símbolos ausentes, matriz 2×2 dos gates |
-| OS-37 | #35 | `9d97d9b` | HTTP Basic Auth: `webqa/auth.py`, autenticação presa a origem+esquema, mascaramento por VALOR e grep na saída como aceite |
-| OS-38 | — | — | Passivo autenticado: `webqa/navegacao.py` (proveniência de URL + guarda AST), robots do alvo lido autenticado, alvo fixture com página órfã |
-
-### Fora da sequência do handoff — numeradas em chat, já em `main`
-
-Estas quatro nasceram da leitura de compreensão e foram numeradas sem consultar
-este registro. **Os números colidem** com a sequência acima; ficam registradas
-com o número que está no histórico do git, porque commit mergeado é fato, e com
-o apelido canônico ao lado.
-
-| No histórico | Canônico | PR | Commit | Entrega |
-|---|---|---|---|---|
-| "OS-27" | **OS-27-bis** | #20 | `c869a28` | Correções D2–D6: pin do Playwright, EAP, entrada única, contagens |
-| "OS-28" | **OS-28-bis** | #21 | `e391e55` | Fase B emite `Finding` (severidade/fase como dado) |
-| "OS-29" | **OS-29-bis** | #22 | `980b094` | Fase A emite `Finding` — fecha o §4.2 |
-| "OS-30" | **OS-30-bis** | #23 | `bdff377` | Regra de merge para pilha de PRs encadeados (§5.1) |
-
-### Colisões conhecidas — o que fazer ao encontrar
-
-Quem procurar um número no histórico vai achar **duas coisas diferentes** em
-quatro casos. Não é erro de leitura:
-
-| Número | Significa (canônico) | Também aparece em `main` como |
-|---|---|---|
-| **OS-23** | camada LLM (`webqa/llm.py`) | `7944fc7`, template `seguranca` — hoje canonicamente **OS-25** |
-| **OS-27** | camada de etiqueta (`db7f948`) | `c869a28`, correções de doc — hoje **OS-27-bis** |
-| **OS-28** | campanha multi-alvo (**em aberto**) | `e391e55`, Fase B `Finding` — hoje **OS-28-bis** |
-| **OS-29** | — (número aposentado; a telemetria virou **OS-31**) | `980b094`, Fase A `Finding` — hoje **OS-29-bis** |
-| **OS-39** | **OS-37** (Basic Auth) | número que circulou em chat; o registro dizia "próximo livre: OS-37" |
-| **OS-40** | **OS-38** (passivo autenticado) | idem — emitida em chat como OS-40, registrada como OS-38 |
-
-Duas notas de auditoria, para que o histórico se explique sozinho:
-
-* o PR **#27** foi aberto com o título "OS-25" por engano e corrigido para
-  "OS-27" antes do merge; o commit de origem (`db7f948`) ainda diz OS-25;
-* o commit `7944fc7` diz "OS-23" porque foi o número que circulou em chat; o
-  registro já o renumerava para **OS-25**, e é esse que vale.
-
-**A regra que fecha isto:** número novo sai da linha "Próximo número livre" do
-topo deste arquivo, e essa linha é incrementada no MESMO PR que consome o
-número. Enquanto o número viver em três lugares, ele vai divergir de novo.
 
 ---
 
@@ -264,89 +183,3 @@ log. **Não emitir OS** até haver autorização explícita do dono de um alvo.
    summary antigo → saída byte-idêntica; dogfooding verde contra o fixture pós-#17.
 5. **OS-26:** diff ~zero contra a referência do designer; troca de sha reinicia a
    streak COM nota e SEM apagar histórico; ledger vazio nunca parece quebrado.
-
----
-
-## OS-38 — Exploração passiva autenticada (rica, mas nunca intrusiva)
-
-> Emitida em chat como "OS-40"; registrada como **OS-38** pela regra do topo
-> deste arquivo. Depende da **OS-37** (sem entrar, não há passivo autenticado).
-
-**A distinção que dá razão a esta OS.** Não é "Fase C travada por falta de
-autorização" — é **Fase C autorizada e conscientemente não acionada**. O alvo é
-ambiente de teste do próprio dono, então a autorização existe; o interruptor
-permanece desligado por decisão. Isso abre um território que o projeto ainda não
-tinha: o **passivo autenticado**, entre o que se observa como visitante anônimo e
-o que só se descobre sondando.
-
-A área logada tem muito mais superfície — mais JavaScript, mais chamadas de API,
-mais cookies, mais terceiros contactados — e a passiva captura tudo isso apenas
-navegando as telas que a aplicação oferece. Ganhos concretos que hoje não
-existem: segredo em JS de painel interno (mais comum e mais grave que na
-landing page), **cookie de sessão real** auditável por `HttpOnly`/`Secure`/
-`SameSite` (hoje o check pula por não haver cookie), e as APIs internas que a
-própria aplicação chama ao renderizar.
-
-**A linha, mesmo logado e mesmo autorizado:** a exploração passiva navega apenas
-onde a aplicação oferece ir — segue os links e botões que estão na tela. Não
-adivinha URL, não testa `/admin` sem link, não sonda `/.git/`. Isso continua
-sendo Fase C e continua desligado. E a diferença é **código** (proveniência de
-cada URL), não convenção.
-
-Os dois gates ganham significados distintos e independentes, que é exatamente por
-que foram criados separados: `WEBQA_BASIC_AUTH_*` diz "entre na aplicação";
-`WEBQA_ACTIVE_PROBES_AUTHORIZED` diz "sonde o que não foi oferecido". Autorizar
-login nunca autoriza sondagem.
-
-```xml
-<lang>Python 3.11 + Playwright (webqa/ crawler autenticado, checks/seguranca + lgpd; base: OS-37 mergeada)</lang>
-<task>Após o login (OS-37), explorar passivamente a área autenticada — seguindo só links/botões que a aplicação oferece — para produzir relatórios ricos, SEM sondar nada não-oferecido (isso é Fase C, permanece desligada).</task>
-<context>Alvo é ambiente de teste do próprio dono, com Basic Auth. Fase C autorizada mas conscientemente NÃO acionada. Passivo autenticado = navegar a app logada como usuário real; nunca adivinhar URL, nunca /admin sem link, nunca /.git. A network_log já captura tudo que o navegador baixa.</context>
-<rules>
-- Crawl autenticado segue APENAS href/botões presentes no DOM renderizado (mesma regra do crawler atual: mesmo host, respeita robots quando aplicável, sequencial entre páginas). NUNCA constrói URL por adivinhação.
-- A sessão autenticada é reusada nas páginas internas; cookie de sessão auditado por flags (agora existe de verdade).
-- Todos os checks passivos A/B/lgpd/seguranca rodam contra as páginas internas descobertas — mais superfície, mesmos checks, mesma sanitização.
-- Guarda dura: teste de fonte (AST) garante que o crawler autenticado NÃO contém lista de caminhos sensíveis nem geração de URL — se aparecer, é Fase C vazando, reprova no CI.
-- WEBQA_ACTIVE_PROBES_AUTHORIZED continua governando só a Fase C; exploração autenticada roda com ele DESLIGADO.
-</rules>
-<aceite>
-- Contra alvo autenticado de teste: crawler entra, navega N páginas internas descobertas por link, roda todos os checks passivos, gera laudo mais rico que o anônimo.
-- Nenhuma URL acessada que não tenha vindo de um link/botão do DOM (verificável por log de proveniência de cada URL visitada).
-- Cookie de sessão real auditado (HttpOnly/Secure/SameSite) — achado real, não "sem cookies".
-- AST do crawler autenticado: zero caminho sensível, zero geração de URL — passivo por construção.
-</aceite>
-<testes>
-- App de teste com 3 páginas internas ligadas por menu → todas visitadas; página órfã (sem link) → NÃO visitada.
-- Proveniência: cada URL no log tem origem "link em X" — nenhuma "adivinhada".
-- Credencial nunca no laudo (herda garantia da OS-37).
-- Símbolo de sondagem colado no crawler → teste de fronteira reprova.
-</testes>
-<recomendacao>
-- Segurança/ética: a diferença entre passivo-autenticado e Fase C é "seguir o que foi oferecido" × "investigar o que não foi" — e ela é código (proveniência de URL), não convenção.
-- Níveis de teste: app de teste com topologia conhecida (páginas ligadas + órfã) é o fixture que prova a disciplina do crawler.
-</recomendacao>
-```
-
-**Achado da OS-37 que cai nesta OS:** `PoliteFetcher` busca o `robots.txt`
-anonimamente (só `User-Agent`), então atrás de Basic Auth ele recebe **401** e a
-camada de etiqueta pula o alvo — `checks/functional/test_links.py` deixa de
-produzir veredito contra qualquer alvo público protegido. Verificado contra
-`docker.danzeroum.com`: `"robots.txt respondeu HTTP 401 — alvo pulado"`. Não
-aparece no alvo fixture porque loopback é isento de etiqueta.
-
-O conserto pertence a esta OS, não à OS-37: passar a credencial ao
-`PoliteFetcher` **para a origem do próprio alvo**, sob a mesma política de
-origem+esquema (`auth.pode_enviar_credencial`). Ler o `robots.txt` autenticado
-de um alvo do próprio dono é legítimo; o que não se pode é ignorar a política
-por não conseguir lê-la. Sem isso, o crawl autenticado desta OS nasce morto pela
-mesma razão.
-
-**A página órfã é o coração do aceite.** Uma página interna sem link para ela,
-que o crawler nunca visita, é a prova executável de que a exploração segue o que
-a aplicação oferece — e não o que ela esconde. Sem esse caso no fixture, "passivo
-autenticado" seria uma promessa; com ele, é uma propriedade verificada.
-
-**Operacional para quem for rodar:** usuário de teste **descartável** (não
-credencial real, mesmo em ambiente próprio — higiene), credenciais por ambiente,
-rede liberada na VPS, e conferir com `grep` que a senha não vazou no laudo antes
-de devolver o resultado.
