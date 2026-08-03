@@ -1,0 +1,79 @@
+# Compatibilidade multi-engine (C3) — a dimensão browser contra chromium, firefox
+# e webkit. NÃO roda no PR: três engines triplicariam o tempo do CI (R-Q5). No PR
+# a dimensão browser roda só chromium (default de WEBQA_BROWSER_ENGINES); a matriz
+# completa é aqui, agendada, contra o alvo fixture.
+#
+# Skip honesto: engine sem binário instalado é pulada com instrução pelo fixture
+# `browser` (conftest.py) — nunca conta como aprovação. Por isso o passo instala
+# as três antes de rodar.
+#
+# `-m "browser and not verification"`: só os checks que tocam navegador, contra o
+# alvo fixture. A população `verification` fica de fora — ela verifica a suíte, não
+# mede o alvo, e roda no ci.yml.
+name: Compatibilidade (matriz de engines, agendado)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 05:23 UTC, fora da janela do noturno da VPS (03h) e do job de mutação (04h).
+    - cron: "23 5 * * *"
+
+# Nenhum job escreve no repositório: mede o alvo fixture e sobe artefato.
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibilidade
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: webqa-suite
+
+jobs:
+  matriz:
+    name: Dimensão browser × chromium/firefox/webkit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WEBQA_BROWSER_ENGINES: "chromium,firefox,webkit"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: webqa-suite/requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Instalar as três engines
+        run: python -m playwright install --with-deps chromium firefox webkit
+
+      - name: Subir o alvo fixture
+        run: |
+          nohup python fixture_target/servir.py --url-file "$RUNNER_TEMP/alvo.url" \
+            > "$RUNNER_TEMP/alvo.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            [ -s "$RUNNER_TEMP/alvo.url" ] && break
+            sleep 1
+          done
+          test -s "$RUNNER_TEMP/alvo.url" || { cat "$RUNNER_TEMP/alvo.log"; exit 1; }
+          echo "WEBQA_TARGET_URL=$(cat "$RUNNER_TEMP/alvo.url")" >> "$GITHUB_ENV"
+
+      # continue-on-error: o alvo fixture é NÃO CONFORME de propósito, então a
+      # dimensão reprova por definição — o valor aqui é ver a dimensão RODAR em
+      # cada engine (mesma assinatura em todas = compatível), não o exit code.
+      - name: Dimensão browser nas três engines
+        continue-on-error: true
+        run: pytest -m "browser and not verification" -q
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compatibilidade-${{ github.run_number }}
+          path: webqa-suite/report/
+          retention-days: 7
+          if-no-files-found: warn
