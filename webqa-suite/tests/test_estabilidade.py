@@ -592,3 +592,17 @@ def test_assinatura_nao_muda_o_julgamento():
     sem = _entrada("2026-08-01")
     assert sequencia_oficial([com]) == sequencia_oficial([sem])
     assert CLASSIFICADOR_VERSAO == 2
+
+
+# ---------- main --painel: leitura + render, nunca escreve o ledger ----------
+
+def test_main_painel_escreve_html_e_nao_toca_o_ledger(tmp_path):
+    """`--painel` é leitura mais render: sai 0, grava o HTML e deixa o ledger
+    intacto (é o que torna `--painel` seguro no GitHub — docs/VPS.md)."""
+    ledger = tmp_path / "ledger.json"
+    original = json.dumps({"schema": 4, "execucoes": [_entrada("2026-08-01")]})
+    ledger.write_text(original, encoding="utf-8")
+    destino = tmp_path / "painel.html"
+    assert main(["--ledger", str(ledger), "--painel", str(destino)]) == 0
+    assert destino.exists() and destino.read_text(encoding="utf-8").strip()
+    assert ledger.read_text(encoding="utf-8") == original, "painel não escreve o ledger"
