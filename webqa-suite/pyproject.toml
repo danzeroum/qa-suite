@@ -24,12 +24,10 @@ max-complexity = 8
 # visual (bloco <style> da referencia, identico byte a byte). Reformatar para
 # caber em 110 colunas quebraria justamente a propriedade que se quer garantir.
 "webqa/report_style.py" = ["E501"]
-# C901: dívida conhecida FORA da biblioteca. scripts/ e fixture_target/ são
-# ferramenta e alvo fabricado, não o motor. A isenção existe para o gate nascer
-# verde e vigiar webqa/ desde já; a lista encolhe conforme cada script é pago.
-# campanha.py e audita_design.py já saíram (funções refatoradas). Falta:
-# TODO: estabilidade.py::main (17), num PR próprio. Este é ferramenta, não motor.
-"scripts/estabilidade.py" = ["C901"]
+# C901: scripts/ QUITADO (Q1d) — todos os offenders refatorados, o gate de
+# complexidade agora vigia scripts/ igual à biblioteca. Resta só fixture_target/,
+# que é ALVO FABRICADO, não código de produção: um HTML/servidor de teste
+# deliberadamente imperfeito não presta contas de complexidade a ninguém.
 "fixture_target/**" = ["C901"]
 
 [tool.bandit]

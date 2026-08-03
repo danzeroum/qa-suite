@@ -493,92 +493,24 @@ def escrever_painel(ledger: dict, destino: Path, *, meta: int = META_PADRAO,
     return destino
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("summary", nargs="?", type=Path, default=SUMMARY_PADRAO)
-    parser.add_argument("--ledger", type=Path, default=LEDGER_PADRAO)
-    parser.add_argument("--alvo", default=None, help="URL do alvo (só o sha256 é gravado)")
-    parser.add_argument("--alvo-fixture", action="store_true",
-                        help="usa a identidade do alvo fixture (estável entre execuções, "
-                             "ao contrário da porta efêmera)")
-    parser.add_argument("--meta", type=int, default=META_PADRAO)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="classifica e imprime sem gravar (uso em CI, que não commita)")
-    parser.add_argument("--recompute", action="store_true",
-                        help="reavalia o ledger existente sem registrar execução nova "
-                             "(auditoria: mostra a sequência e a quarentena atuais)")
-    parser.add_argument("--painel", nargs="?", type=Path, const=PAINEL_PADRAO, default=None,
-                        help="gera o painel HTML do ledger (default: report/estabilidade.html). "
-                             "Só LÊ o ledger — combina com --recompute para auditar sem gravar")
-    args = parser.parse_args(argv)
+def _placar(registro, ledger: dict, meta: int) -> str:
+    """Linha de status da sequência. Extraído de `main` (§Q1d) — era função
+    aninhada; virou nível de módulo recebendo o que lia por fechamento."""
+    plural = "dia" if registro.dias == 1 else "dias"
+    distintos = "distinto" if registro.dias == 1 else "distintos"
+    placar = (f"streak {registro.streak}/{meta} "
+              f"({ORIGEM_OFICIAL}, {registro.dias} {plural} {distintos})")
+    # Entradas de antes da emenda continuam no ledger; dizer isso evita que
+    # alguém leia "0/10" como perda de histórico.
+    historicas = sum(1 for e in ledger["execucoes"] if e.get("origem") == "ci")
+    if historicas:
+        placar += f" · histórico: {historicas} execução(ões) 'ci' anterior(es), fora da conta"
+    placar += _quarentena_texto(ledger["execucoes"])
+    return placar
 
-    if args.painel is not None:
-        # Gerar o painel nunca escreve no ledger, em nenhuma combinação de
-        # flags: é leitura mais renderização. Assim `--painel` é seguro no
-        # GitHub, onde nada pode tocar o arquivo (docs/VPS.md).
-        #
-        # `ler_ledger_para_painel` em vez de `carregar_ledger`: aquele abre com
-        # O_RDONLY e não migra nada. `carregar_ledger` normaliza o schema na
-        # carga, e normalização é trabalho de quem vai gravar — não de quem
-        # desenha uma página.
-        destino = escrever_painel(ler_ledger_para_painel(args.ledger), args.painel,
-                                  meta=args.meta, rotulo_do_ledger=str(args.ledger))
-        print(f"painel: {destino}")
-        if not args.recompute:
-            return 0
 
-    if args.recompute:
-        # Auditoria pura: nenhuma classificação, nenhuma escrita. Existe porque a
-        # sequência é DERIVADA do histórico — logo é verificável a qualquer
-        # momento, sem depender de uma execução nova da suíte.
-        ledger = carregar_ledger(args.ledger)
-        streak, dias = sequencia_oficial(ledger["execucoes"])
-        plural = "dia" if dias == 1 else "dias"
-        historicas = sum(1 for e in ledger["execucoes"] if e.get("origem") == "ci")
-        linha = (f"Recompute: streak {streak}/{args.meta} "
-                 f"({ORIGEM_OFICIAL}, {dias} {plural} contado{'s' if dias != 1 else ''}, "
-                 f"{len(ledger['execucoes'])} entrada(s) no ledger)")
-        if historicas:
-            linha += f" · histórico: {historicas} execução(ões) 'ci', fora da conta"
-        print(linha + _quarentena_texto(ledger["execucoes"]))
-        return 0
-
-    if not args.summary.exists():
-        print(f"summary não encontrado: {args.summary} — rode a suíte antes.", file=sys.stderr)
-        return 2
-
-    classificacao = classificar(json.loads(args.summary.read_text(encoding="utf-8")))
-    alvo = _resolver_alvo(args.alvo, usar_fixture=args.alvo_fixture)
-    if not alvo:
-        print("alvo indeterminado: defina WEBQA_TARGET_URL, use --alvo ou --alvo-fixture.",
-              file=sys.stderr)
-        return 2
-
-    ledger = carregar_ledger(args.ledger)
-    registro = registrar(ledger, classificacao, sha256_do_alvo(alvo))
-
-    def _placar() -> str:
-        plural = "dia" if registro.dias == 1 else "dias"
-        distintos = "distinto" if registro.dias == 1 else "distintos"
-        placar = (f"streak {registro.streak}/{args.meta} "
-                  f"({ORIGEM_OFICIAL}, {registro.dias} {plural} {distintos})")
-        # Entradas de antes da emenda continuam no ledger; dizer isso evita que
-        # alguém leia "0/10" como perda de histórico.
-        historicas = sum(1 for e in ledger["execucoes"] if e.get("origem") == "ci")
-        if historicas:
-            placar += f" · histórico: {historicas} execução(ões) 'ci' anterior(es), fora da conta"
-        placar += _quarentena_texto(ledger["execucoes"])
-        return placar
-
-    if registro.ignorada:
-        print("Execução sem testes de navegador — ignorada (não conta nem zera). "
-              f"{_placar()}")
-        return 0
-    if registro.duplicada:
-        print(f"Execução {classificacao.generated_at} já registrada — nada a fazer. "
-              f"{_placar()}")
-        return 0
-
+def _relatar_execucao(registro, classificacao) -> None:
+    """Diagnóstico da execução registrada: alvo, flakes de infra e origem."""
     if registro.alvo_mudou:
         print(f"Alvo mudou desde a última execução '{ORIGEM_OFICIAL}': sequência "
               "reiniciada (métrica é por alvo).")
@@ -600,15 +532,105 @@ def main(argv: list[str] | None = None) -> int:
               f"a sequência (só '{ORIGEM_OFICIAL}' conta; declare WEBQA_ORIGEM no "
               "container oficial).")
 
+
+def _emitir_painel(args) -> None:
+    """Gera o painel HTML do ledger. NUNCA escreve o ledger — leitura mais
+    renderização, o que torna `--painel` seguro no GitHub (docs/VPS.md).
+
+    `ler_ledger_para_painel` em vez de `carregar_ledger`: aquele abre com
+    O_RDONLY e não migra nada. `carregar_ledger` normaliza o schema na carga, e
+    normalização é trabalho de quem vai gravar — não de quem desenha uma página.
+    """
+    destino = escrever_painel(ler_ledger_para_painel(args.ledger), args.painel,
+                              meta=args.meta, rotulo_do_ledger=str(args.ledger))
+    print(f"painel: {destino}")
+
+
+def _modo_recompute(args) -> int:
+    """Auditoria pura: nenhuma classificação, nenhuma escrita. Existe porque a
+    sequência é DERIVADA do histórico — logo é verificável a qualquer momento,
+    sem depender de uma execução nova da suíte."""
+    ledger = carregar_ledger(args.ledger)
+    streak, dias = sequencia_oficial(ledger["execucoes"])
+    plural = "dia" if dias == 1 else "dias"
+    historicas = sum(1 for e in ledger["execucoes"] if e.get("origem") == "ci")
+    linha = (f"Recompute: streak {streak}/{args.meta} "
+             f"({ORIGEM_OFICIAL}, {dias} {plural} contado{'s' if dias != 1 else ''}, "
+             f"{len(ledger['execucoes'])} entrada(s) no ledger)")
+    if historicas:
+        linha += f" · histórico: {historicas} execução(ões) 'ci', fora da conta"
+    print(linha + _quarentena_texto(ledger["execucoes"]))
+    return 0
+
+
+def _modo_registro(args) -> int:
+    """Fluxo principal: classifica a execução nova, registra no ledger e reporta."""
+    if not args.summary.exists():
+        print(f"summary não encontrado: {args.summary} — rode a suíte antes.", file=sys.stderr)
+        return 2
+
+    classificacao = classificar(json.loads(args.summary.read_text(encoding="utf-8")))
+    alvo = _resolver_alvo(args.alvo, usar_fixture=args.alvo_fixture)
+    if not alvo:
+        print("alvo indeterminado: defina WEBQA_TARGET_URL, use --alvo ou --alvo-fixture.",
+              file=sys.stderr)
+        return 2
+
+    ledger = carregar_ledger(args.ledger)
+    registro = registrar(ledger, classificacao, sha256_do_alvo(alvo))
+
+    if registro.ignorada:
+        print("Execução sem testes de navegador — ignorada (não conta nem zera). "
+              f"{_placar(registro, ledger, args.meta)}")
+        return 0
+    if registro.duplicada:
+        print(f"Execução {classificacao.generated_at} já registrada — nada a fazer. "
+              f"{_placar(registro, ledger, args.meta)}")
+        return 0
+
+    _relatar_execucao(registro, classificacao)
+
     if not args.dry_run:
         args.ledger.parent.mkdir(parents=True, exist_ok=True)
         args.ledger.write_text(json.dumps(ledger, indent=2, ensure_ascii=False) + "\n",
                                encoding="utf-8")
 
-    print(_placar() + (" (dry-run: ledger não gravado)" if args.dry_run else ""))
+    print(_placar(registro, ledger, args.meta)
+          + (" (dry-run: ledger não gravado)" if args.dry_run else ""))
     if registro.streak >= args.meta:
         print("FASE 2 DESTRAVADA")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("summary", nargs="?", type=Path, default=SUMMARY_PADRAO)
+    parser.add_argument("--ledger", type=Path, default=LEDGER_PADRAO)
+    parser.add_argument("--alvo", default=None, help="URL do alvo (só o sha256 é gravado)")
+    parser.add_argument("--alvo-fixture", action="store_true",
+                        help="usa a identidade do alvo fixture (estável entre execuções, "
+                             "ao contrário da porta efêmera)")
+    parser.add_argument("--meta", type=int, default=META_PADRAO)
+    parser.add_argument("--dry-run", action="store_true",
+                        help="classifica e imprime sem gravar (uso em CI, que não commita)")
+    parser.add_argument("--recompute", action="store_true",
+                        help="reavalia o ledger existente sem registrar execução nova "
+                             "(auditoria: mostra a sequência e a quarentena atuais)")
+    parser.add_argument("--painel", nargs="?", type=Path, const=PAINEL_PADRAO, default=None,
+                        help="gera o painel HTML do ledger (default: report/estabilidade.html). "
+                             "Só LÊ o ledger — combina com --recompute para auditar sem gravar")
+    args = parser.parse_args(argv)
+
+    # Três modos mutuamente exclusivos, cada um num helper (§Q1d): painel (render),
+    # recompute (auditoria) e registro (o fluxo que grava). --painel + --recompute
+    # renderiza E audita sem gravar — por isso o painel não retorna cedo nesse caso.
+    if args.painel is not None:
+        _emitir_painel(args)
+        if not args.recompute:
+            return 0
+    if args.recompute:
+        return _modo_recompute(args)
+    return _modo_registro(args)
 
 
 if __name__ == "__main__":
