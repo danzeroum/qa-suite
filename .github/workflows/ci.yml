@@ -67,8 +67,12 @@ jobs:
       - name: SAST — checks (exceções documentadas)
         run: bandit -q -c pyproject.toml -r checks --skip B101,B110,B112
 
+      # Cobertura de CÓDIGO de webqa/ (coverage.py) — outra métrica que a
+      # "cobertura de execução" do cockpit: mede quais LINHAS foram atingidas.
+      # Piso só aqui (job determinístico, sem alvo externo); 78% = margem sob os
+      # 81% medidos. Apagar um teste que baixe a cobertura reprova o gate.
       - name: Verificação (unidade, sem alvo externo)
-        run: pytest tests -m verification
+        run: pytest tests -m verification --cov=webqa --cov-report=term --cov-fail-under=78
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -104,8 +108,11 @@ jobs:
       # -m "not load": carga NUNCA roda em CI. WEBQA_LOAD_AUTHORIZED não é
       # definido aqui, e o marcador é a segunda barreira — gerar carga exige
       # autorização documentada do dono do alvo (R1).
+      # --cov aqui MEDE e reporta (é a execução que cobre os checks/), mas NÃO
+      # trava: depende de alvo externo responder, e piso viraria flake de rede em
+      # reprovação de PR. Sem --cov-fail-under de propósito.
       - name: Suíte completa (sem carga)
-        run: pytest -m "not load"
+        run: pytest -m "not load" --cov=webqa --cov-report=term
 
       # Passo informativo: classifica a execução (flake de infra × veredito
       # sobre o alvo) e mostra a sequência sem flake — critério de saída da
