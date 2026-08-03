@@ -360,10 +360,12 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     # faria um run não-autorizado criar o log (G4).
     log = log or AuditLog(run_id=run_id, escopo_hash=getattr(escopo, "hash_congelado", ""))
 
-    ips_pinados = escopo.verificar_posse(host)
+    ips_pinados, motivo_posse = escopo.verificar_posse_detalhada(host)
     if not ips_pinados:
+        # O motivo (takeover/nao-listado/sem-baseline/resolucao-falhou) vem do
+        # escopo por retorno e é logado AQUI — escopo não conhece o AuditLog (G7).
         log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
-                             evento="abortado:posse-divergente")
+                             evento=f"abortado:posse-divergente:{motivo_posse}")
         return ResultadoSondagem(alvo=alvo, esperado=esperado, executado=0,
                                  abortado_por="posse-divergente", run_id=run_id)
     # Pina UM IP provado e conecta só nele — o probe não re-resolve o DNS.

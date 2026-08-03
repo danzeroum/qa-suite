@@ -230,6 +230,63 @@ def test_posse_distingue_ip_parcialmente_coincidente(tmp_path, monkeypatch):
     assert esc.verificar_posse("meusite.exemplo.br") == frozenset()
 
 
+# ---------- G7: verificar_posse_detalhada distingue as 4 causas de "sem posse" ----------
+#
+# Hoje takeover, host não listado, snapshot vazio e falha de resolução agora são
+# o MESMO frozenset() — um rótulo para quatro causas. A detalhada dá o motivo para
+# o log do run (a sondagem o consome; escopo NÃO importa audit — fronteira §2.11).
+
+def test_detalhada_posse_ok_devolve_ips_e_motivo_vazio(tmp_path, monkeypatch):
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    assert esc.verificar_posse_detalhada("meusite.exemplo.br") == (
+        frozenset({"203.0.113.7"}), "")
+
+
+def test_detalhada_takeover(tmp_path, monkeypatch):
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "198.51.100.9")            # host reapontado
+    assert esc.verificar_posse_detalhada("meusite.exemplo.br") == (frozenset(), "takeover")
+
+
+def test_detalhada_host_nao_listado(tmp_path, monkeypatch):
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    assert esc.verificar_posse_detalhada("outro-host.exemplo.br") == (
+        frozenset(), "nao-listado")
+
+
+def test_detalhada_sem_baseline(tmp_path, monkeypatch):
+    """Host listado, mas não resolveu no carregamento (snapshot vazio) — não é
+    takeover: nunca houve baseline contra o que comparar."""
+    _falha_getaddrinfo(monkeypatch)                            # carrega sem baseline
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")             # agora resolve
+    assert esc.verificar_posse_detalhada("meusite.exemplo.br") == (
+        frozenset(), "sem-baseline")
+
+
+def test_detalhada_resolucao_falhou_agora(tmp_path, monkeypatch):
+    """Resolveu no carregamento, agora não resolve — distinto de takeover."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _falha_getaddrinfo(monkeypatch)
+    assert esc.verificar_posse_detalhada("meusite.exemplo.br") == (
+        frozenset(), "resolucao-falhou")
+
+
+def test_verificar_posse_mantem_assinatura_frozenset(tmp_path, monkeypatch):
+    """A assinatura pública NÃO muda: quem chama continua lendo vazio = sem posse."""
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
+    assert esc.verificar_posse("meusite.exemplo.br") == frozenset({"203.0.113.7"})
+    _dubla_getaddrinfo(monkeypatch, "198.51.100.9")
+    assert esc.verificar_posse("meusite.exemplo.br") == frozenset()
+
+
 # ---------- os alvos de TERCEIRO da campanha nunca entram no escopo ----------
 
 def test_alvos_de_terceiro_da_campanha_reprovam_escopo(tmp_path):
