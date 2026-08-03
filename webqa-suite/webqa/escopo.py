@@ -125,24 +125,44 @@ class Escopo:
     def verificar_posse(self, host: str) -> frozenset[str]:
         """IPs PINADOS de `host` se a posse se confirma; conjunto vazio se não.
 
+        Fachada estável para os chamadores que só decidem SE há posse: delega a
+        `verificar_posse_detalhada` e devolve apenas os IPs. Vazio = sem posse.
+        """
+        return self.verificar_posse_detalhada(host)[0]
+
+    def verificar_posse_detalhada(self, host: str) -> tuple[frozenset[str], str]:
+        """(IPs pinados, motivo). IPs vazios = sem posse; `motivo` diz por quê.
+
         Defesa contra takeover de subdomínio E contra DNS rebinding (R-C6, A#1):
         um host autorizado cujo IP mudou pode ter sido reapontado para infra de
-        terceiro. Devolve o conjunto de IPs quando a resolução atual é não-vazia
-        e IDÊNTICA ao snapshot — e o chamador conecta SÓ nesses IPs, sem
-        re-resolver, fechando a janela entre esta checagem e a requisição.
+        terceiro. Devolve o conjunto de IPs (e motivo "") quando a resolução
+        atual é não-vazia e IDÊNTICA ao snapshot — e o chamador conecta SÓ nesses
+        IPs, sem re-resolver, fechando a janela entre esta checagem e a requisição.
 
-        Conjunto VAZIO = sem posse: divergência (host reapontado), host não
-        listado, snapshot vazio (não resolveu no carregamento), ou falha de
-        resolução agora. Nunca exceção crua nem silêncio.
+        Quatro causas DISTINTAS de "sem posse", cada uma com seu motivo, para o
+        chamador (a sondagem) logar a triagem — `escopo` NÃO importa `audit`
+        (fronteira de rede §2.11); o motivo sai por retorno, não por efeito:
+
+        * `nao-listado`      — host sem snapshot algum (não está no escopo);
+        * `sem-baseline`     — listado, mas não resolveu no carregamento;
+        * `resolucao-falhou` — resolvia no carregamento, agora não resolve;
+        * `takeover`         — resolve agora, mas para IPs diferentes do snapshot.
 
         O snapshot é do carregamento; esta comparação roda ANTES do probe, e os
-        IPs devolvidos são os que o probe deve usar — nunca dentro do laço.
+        IPs devolvidos são os que o probe deve usar — nunca dentro do laço. Os IPs
+        são diagnóstico interno: vão ao AuditLog, nunca ao laudo.
         """
-        baseline = self.ips_no_carregamento.get(host)
+        if host not in self.ips_no_carregamento:
+            return frozenset(), "nao-listado"
+        baseline = self.ips_no_carregamento[host]
         if not baseline:
-            return frozenset()
+            return frozenset(), "sem-baseline"
         atuais = _ips_resolvidos(host)
-        return atuais if atuais == baseline else frozenset()
+        if not atuais:
+            return frozenset(), "resolucao-falhou"
+        if atuais != baseline:
+            return frozenset(), "takeover"
+        return atuais, ""
 
     def esta_no_escopo(self, url: str) -> bool:
         """A origem EXATA da URL foi autorizada? (única pergunta que os probes fazem.)"""

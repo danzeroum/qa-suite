@@ -698,7 +698,8 @@ def test_posse_divergente_deixa_evento_no_log(tmp_path, monkeypatch):
     resultado = sondar(escopo, ALVO, [C_GIT], client=_client({}), log=log,
                        dry_run=False, dormir=lambda _s: None)
     assert resultado.abortado_por == "posse-divergente"
-    assert [linha["evento"] for linha in log.linhas] == ["abortado:posse-divergente"]
+    # G7: o evento agora carrega a CAUSA (aqui, takeover — o IP divergiu).
+    assert [linha["evento"] for linha in log.linhas] == ["abortado:posse-divergente:takeover"]
 
 
 def test_circuit_breaker_deixa_evento_no_log(tmp_path, monkeypatch):
