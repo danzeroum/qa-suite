@@ -732,3 +732,64 @@ def test_cliente_usa_timeouts_granulares():
         assert client._timeout.connect != client._timeout.read   # não é escalar único
     finally:
         client.close()
+
+
+# ---------- C1g: funções puras extraídas (higiene 1.7) — testáveis isoladas ----------
+
+def test_avaliar_resposta_recuo_sinaliza_pede_recuo():
+    from webqa.sondagem import _PEDE_RECUO, avaliar_resposta_em_finding
+    assert avaliar_resposta_em_finding(429, "", C_GIT, "https://a/.git/HEAD") is _PEDE_RECUO
+    assert avaliar_resposta_em_finding(503, "", C_GIT, "https://a/.git/HEAD") is _PEDE_RECUO
+
+
+def test_avaliar_resposta_nao_2xx_e_ausencia():
+    from webqa.sondagem import avaliar_resposta_em_finding
+    assert avaliar_resposta_em_finding(404, "", C_GIT, "https://a/.git/HEAD") is None
+    assert avaliar_resposta_em_finding(302, "", C_GIT, "https://a/.git/HEAD") is None
+
+
+def test_avaliar_resposta_soft_404_sinaliza_descarte():
+    from webqa.sondagem import _SOFT_404, avaliar_resposta_em_finding
+    # 200 text/html onde se espera text/plain → provável soft-404
+    assert avaliar_resposta_em_finding(200, "text/html", C_GIT, "https://a/.git/HEAD") is _SOFT_404
+
+
+def test_avaliar_resposta_2xx_legitimo_vira_finding():
+    from webqa.sondagem import avaliar_resposta_em_finding
+    f = avaliar_resposta_em_finding(200, "text/plain", C_GIT, "https://a/.git/HEAD")
+    assert f.fase == "C" and f.tipo == "exposicao:vcs"
+    assert f.recurso == "https://a/.git/HEAD" and f.remediacao
+
+
+def test_calcular_espera_backoff_piso_teto_e_exponencial():
+    from webqa.sondagem import (
+        BACKOFF_FATOR,
+        PISO_INTERVALO_S,
+        TETO_BACKOFF_S,
+        calcular_espera_backoff,
+    )
+    assert calcular_espera_backoff(0, PISO_INTERVALO_S) == PISO_INTERVALO_S     # nunca < piso
+    assert calcular_espera_backoff(1, PISO_INTERVALO_S) == PISO_INTERVALO_S * BACKOFF_FATOR
+    assert calcular_espera_backoff(10, PISO_INTERVALO_S) == TETO_BACKOFF_S      # capado no teto
+
+
+def test_executar_fallback_get_le_status_sem_baixar_corpo():
+    from webqa.sondagem import executar_fallback_get
+    pedido = {}
+
+    def handler(request):
+        pedido["method"] = request.method
+        pedido["range"] = request.headers.get("range")
+        return httpx.Response(206, headers={"content-type": "application/octet-stream"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    log = AuditLog(run_id="t", escopo_hash="")
+    try:
+        status, ct = executar_fallback_get(
+            client, "https://a/.env", "https://203.0.113.7:443/.env",
+            {"Host": "a"}, {"sni_hostname": "a"}, log, "https://a", "pr#1")
+    finally:
+        client.close()
+    assert pedido["method"] == "GET" and pedido["range"] == "bytes=0-0"
+    assert status == 206 and ct == "application/octet-stream"
+    assert log.linhas[0]["metodo"] == "GET(range)"
