@@ -1095,3 +1095,56 @@ def test_cli_curl_imprime_resolve_e_nao_ip_na_url(tmp_path, monkeypatch, capsys)
     saida = capsys.readouterr().out
     assert f"--resolve alvo-fixture.exemplo:443:{IP_ALVO}" in saida
     assert f"https://{IP_ALVO}" not in saida         # IP nunca na URL do curl
+
+
+# ---------- Q1b: contrato de erro da CLI (a interface que a pessoa digita) ----------
+
+def _caminhos_min(tmp_path):
+    p = tmp_path / "caminhos.yaml"
+    p.write_text(
+        '- path: "/.git/HEAD"\n  categoria: "vcs"\n  severidade: "alta"\n'
+        '  content_type_esperado: "text/plain"\n  remediacao: "Remova."\n'
+        '  procedencia: "OWASP WSTG-CONF-004"\n', encoding="utf-8")
+    return p
+
+
+def test_cli_dry_run_e_o_padrao_sai_0_sem_tocar_rede(tmp_path, monkeypatch, capsys):
+    """Sem --executar: planeja e sai 0; nenhum cliente HTTP é criado."""
+    _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setattr("webqa.sondagem._cliente_padrao",
+                        lambda: (_ for _ in ()).throw(AssertionError("dry-run não sonda")))
+    rc = sondagem_mod.main(["--alvo", ALVO,
+                            "--escopo", str(tmp_path / "escopo-autorizado.yaml"),
+                            "--caminhos", str(_caminhos_min(tmp_path))])
+    assert rc == 0
+    assert "[dry-run]" in capsys.readouterr().out
+
+
+def test_cli_sem_opt_in_recusa_e_sai_1(tmp_path, monkeypatch, capsys):
+    """Sem WEBQA_DISCOVERY_AUTHORIZED, a CLI explica e sai 1 — sem traceback."""
+    _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.delenv(gates.DISCOVERY_ENV, raising=False)
+    rc = sondagem_mod.main(["--alvo", ALVO, "--executar",
+                            "--escopo", str(tmp_path / "escopo-autorizado.yaml"),
+                            "--caminhos", str(_caminhos_min(tmp_path))])
+    assert rc == 1
+    assert "não autorizada" in capsys.readouterr().out
+
+
+def test_cli_alvo_fora_do_escopo_sai_2_sem_traceback(tmp_path, monkeypatch, capsys):
+    """REGRESSÃO Q1b: hoje isto termina em `Skipped` cru (require_escopo). Deve
+    sair 2 com mensagem, sem vazar traceback e sem tocar a rede."""
+    _escopo_valido(tmp_path, monkeypatch)                 # escopo tem só o ALVO
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    monkeypatch.setattr("webqa.sondagem._cliente_padrao",
+                        lambda: (_ for _ in ()).throw(AssertionError("fora do escopo não sonda")))
+    args = ["--alvo", "https://outro.exemplo", "--executar",
+            "--escopo", str(tmp_path / "escopo-autorizado.yaml"),
+            "--caminhos", str(_caminhos_min(tmp_path))]
+    try:
+        rc = sondagem_mod.main(args)
+    except BaseException as e:   # noqa: BLE001 — o bug ESCAPA como Skipped; queremos FALHAR, não pular
+        pytest.fail(f"main() vazou {type(e).__name__} em vez de sair limpo: {e}")
+    assert rc == 2
+    saida = capsys.readouterr().out
+    assert "fora do escopo" in saida and "Traceback" not in saida
