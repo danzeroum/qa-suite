@@ -125,19 +125,30 @@ def criterio_headings_sem_salto(doc: Documento) -> Resultado:
     return Resultado(PASS, f"{len(niveis)} headings, sem saltos")
 
 
+def _ofensor_externo(tag, atributo: str, doc: Documento) -> str | None:
+    """Descrição do recurso externo em `tag[atributo]`, ou `None` se não houver.
+
+    Extraído de `criterio_zero_requisicao_externa` (§Q1d) para tirar o arquivo do
+    gate C901 sem esconder a varredura por tag/atributo."""
+    valor = tag.get(atributo) or ""
+    if isinstance(valor, list):
+        valor = " ".join(valor)
+    if not re.match(r"(?i)^(https?:)?//", valor.strip()):
+        return None
+    # Link de navegação para documentação não busca recurso; recurso é
+    # o que o navegador BAIXA sozinho.
+    if tag.name == "a" and atributo == "href":
+        return None
+    return f"<{tag.name} {atributo}={valor[:60]}> (linha {doc.linha_de(valor)})"
+
+
 def criterio_zero_requisicao_externa(doc: Documento) -> Resultado:
     ofensores = []
     for tag in doc.soup.find_all(True):
         for atributo in ("src", "href", "srcset", "poster", "action"):
-            valor = tag.get(atributo) or ""
-            if isinstance(valor, list):
-                valor = " ".join(valor)
-            if re.match(r"(?i)^(https?:)?//", valor.strip()):
-                # Link de navegação para documentação não busca recurso; recurso é
-                # o que o navegador BAIXA sozinho.
-                if tag.name == "a" and atributo == "href":
-                    continue
-                ofensores.append(f"<{tag.name} {atributo}={valor[:60]}> (linha {doc.linha_de(valor)})")
+            ofensor = _ofensor_externo(tag, atributo, doc)
+            if ofensor:
+                ofensores.append(ofensor)
     for importacao in re.findall(r"@import[^;]+", doc.texto):
         if re.search(r"(?i)https?://|//", importacao):
             ofensores.append(f"@import externo (linha {doc.linha_de(importacao)})")
@@ -402,6 +413,45 @@ def montar_laudo(linhas: dict[str, dict[str, Resultado]], bloqueios: list[str],
     return "\n".join(partes)
 
 
+def _auditar_arquivos(arquivos: list[Path]) -> tuple[dict, list[str]]:
+    """Auditoria estática de cada arquivo: linhas do laudo e bloqueios acumulados.
+
+    Extraído de `main` (§Q1d) para tirar o arquivo do gate C901."""
+    linhas: dict[str, dict[str, Resultado]] = {}
+    bloqueios: list[str] = []
+    for caminho in arquivos:
+        doc = Documento(caminho, caminho.read_text(encoding="utf-8"))
+        resultados = auditar_estatico(doc)
+        linhas[doc.nome] = resultados
+        for nome, _funcao, bloqueante in CRITERIOS:
+            if bloqueante and resultados[nome].status == FAIL:
+                bloqueios.append(f"`{doc.nome}` — {nome}: {resultados[nome].evidencia}")
+    return linhas, bloqueios
+
+
+def _rodar_suite_axe(diretorio: Path, arquivos: list[Path], tmp: Path,
+                     bloqueios: list[str]) -> tuple[dict, dict]:
+    """Bateria frontend+ux (axe) contra cada arquivo, servido em porta efêmera.
+
+    Muta `bloqueios` in-place (axe crítico é bloqueante). Extraído de `main`
+    (§Q1d); é o caminho que exige navegador, isolado do estático."""
+    axe: dict[str, Resultado] = {}
+    reprovacoes: dict[str, list[str]] = {}
+    tmp.mkdir(parents=True, exist_ok=True)
+    with _Servidor(diretorio) as servidor:
+        for caminho in arquivos:
+            bateria = rodar_bateria(servidor.base, caminho.name, tmp)
+            for teste, outcome in bateria.items():
+                if outcome == "failed":
+                    reprovacoes.setdefault(teste, []).append(caminho.name)
+            resultado = veredito_axe(bateria)
+            axe[caminho.name] = resultado
+            if resultado.status == FAIL:
+                bloqueios.append(f"`{caminho.name}` — axe: {resultado.evidencia}")
+            print(f"  {caminho.name}: axe {resultado.status} — {resultado.evidencia}")
+    return axe, reprovacoes
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--dir", type=Path, default=REFERENCIA_PADRAO)
@@ -416,32 +466,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"nenhum .html em {args.dir}", file=sys.stderr)
         return 2
 
-    linhas: dict[str, dict[str, Resultado]] = {}
-    bloqueios: list[str] = []
-    for caminho in arquivos:
-        doc = Documento(caminho, caminho.read_text(encoding="utf-8"))
-        resultados = auditar_estatico(doc)
-        linhas[doc.nome] = resultados
-        for nome, _funcao, bloqueante in CRITERIOS:
-            if bloqueante and resultados[nome].status == FAIL:
-                bloqueios.append(f"`{doc.nome}` — {nome}: {resultados[nome].evidencia}")
+    linhas, bloqueios = _auditar_arquivos(arquivos)
 
     axe: dict[str, Resultado] = {}
     reprovacoes: dict[str, list[str]] = {}
     if args.suite:
         tmp = args.tmp or Path(tempfile.gettempdir()) / "webqa-design-audit"
-        tmp.mkdir(parents=True, exist_ok=True)
-        with _Servidor(args.dir) as servidor:
-            for caminho in arquivos:
-                bateria = rodar_bateria(servidor.base, caminho.name, tmp)
-                for teste, outcome in bateria.items():
-                    if outcome == "failed":
-                        reprovacoes.setdefault(teste, []).append(caminho.name)
-                resultado = veredito_axe(bateria)
-                axe[caminho.name] = resultado
-                if resultado.status == FAIL:
-                    bloqueios.append(f"`{caminho.name}` — axe: {resultado.evidencia}")
-                print(f"  {caminho.name}: axe {resultado.status} — {resultado.evidencia}")
+        axe, reprovacoes = _rodar_suite_axe(args.dir, arquivos, tmp, bloqueios)
 
     comando = "python scripts/audita_design.py" + (" --suite" if args.suite else "")
     args.saida.parent.mkdir(parents=True, exist_ok=True)
