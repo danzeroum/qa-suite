@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -62,6 +63,30 @@ POP_ROTULO = {"alvo": "Alvo (checks/ — julga o site publicado)",
 # Blocos de MEDIÇÃO opcionais (D5k). Ausentes → estado nomeado, nunca 0/verde.
 BLOCOS_D5K = (("cobertura_codigo", "Cobertura de código"),
               ("mutacao", "Score de mutação"), ("complexidade", "Complexidade ciclomática"))
+
+# Os 4 modos, em ESCADA DE GRAVIDADE (D2k). O cockpit lê só o código: sua própria
+# leitura é sempre `inventario`. A escada mostra o que EXISTE, marcando o corrente.
+MODOS = (
+    ("inventario", "Inventário", "lê o código; nenhuma requisição sai"),
+    ("passivo", "Passivo", "GET normais contra o alvo declarado"),
+    ("carga", "Carga", "rajada de requisições — exige WEBQA_LOAD_AUTHORIZED"),
+    ("sondagem", "Sondagem ativa", "pede recursos não linkados — gate + escopo + posse"),
+)
+# Gates de REDE cujo valor no ambiente arma o alarme do selo (§7.2 da arquitetura).
+# KILL é freio de emergência, não perigo — some do alarme, aparece à parte.
+GATES_REDE = ("WEBQA_DISCOVERY_AUTHORIZED", "WEBQA_ACTIVE_PROBES_AUTHORIZED",
+              "WEBQA_LOAD_AUTHORIZED")
+GATE_KILL = "WEBQA_ACTIVE_PROBES_KILL"
+
+
+def estado_do_ambiente(env: dict | None = None) -> dict:
+    """Modo da leitura + gates de rede ativos, lidos do ambiente. O cockpit só faz
+    inventário (AST), então o modo é sempre `inventario`; os gates de rede ATIVOS
+    no ambiente armam o alarme — uma leitura de inventário nunca deveria vê-los."""
+    env = env if env is not None else os.environ
+    ativos = [g for g in GATES_REDE if str(env.get(g, "")).strip()]
+    kill = bool(str(env.get(GATE_KILL, "")).strip())
+    return {"modo": "inventario", "gates_ativos": ativos, "kill": kill}
 
 
 def _e(texto) -> str:
@@ -252,35 +277,72 @@ def montar_leitura(catalogo: dict, run: dict) -> str:
             '</details></section>')
 
 
+def _selo_de_modo(modo_atual: str, gates: list[str], kill: bool) -> str:
+    """Selo dos 4 modos em escada de gravidade (D2k). O alarme vermelho SÓ veste
+    quando há gate de REDE ativo — cor cromática nunca decora, sempre significa."""
+    tem_alarme = bool(gates)
+    degraus = []
+    for chave, rotulo, desc in MODOS:
+        classe = "degrau atual" if chave == modo_atual else "degrau"
+        marca = " ◀ esta leitura" if chave == modo_atual else ""
+        degraus.append(f'<li class="{classe}"><b>{_e(rotulo)}</b>{_e(marca)}'
+                       f'<span class="apagado"> — {_e(desc)}</span></li>')
+    if tem_alarme:
+        gate_txt = ", ".join(gates)
+        alarme = (f'<p class="alarme">Gate de rede ATIVO no ambiente: {_e(gate_txt)}. '
+                  'Uma leitura de inventário não deveria vê-lo — o ambiente do gerador '
+                  'deveria estar limpo.</p>')
+    else:
+        alarme = '<p class="sereno">Nenhum gate de rede no ambiente — como deve ser.</p>'
+    kill_txt = ('<p class="apagado">Freio de emergência (kill-switch) armado.</p>'
+                if kill else "")
+    return (f'<ol class="escada">{"".join(degraus)}</ol>{alarme}{kill_txt}')
+
+
+def _incomparabilidade(padrao_versao, hash_, segundo_projeto) -> str:
+    """D4k: quando falta eixo, NOMEIA qual — nunca célula vazia, nunca 'comparável'
+    presumido. `comparavel` só é verdadeiro com todos os eixos presentes."""
+    if padrao_versao is not None and hash_ is not None and segundo_projeto:
+        return (f'<p class="ok">Comparável: régua declarada (versão '
+                f'{_e(padrao_versao)}) e há um 2º projeto.</p>')
+    faltas = []
+    if padrao_versao is None:
+        faltas.append("versão do padrão (pendente até a frente E — pacote versionado)")
+    if hash_ is None:
+        faltas.append("hash da lista curada (o run carimba via D6k; sem run, ausente)")
+    if not segundo_projeto:
+        faltas.append("um 2º projeto para comparar (leitura única)")
+    itens = "".join(f"<li>{_e(f)}</li>" for f in faltas)
+    return ('<div class="vazio-nota"><b>Incomparável</b> — comparável=null. Falta, '
+            f'nomeadamente:<ul>{itens}</ul>Nenhuma comparação entre projetos é emitida.</div>')
+
+
 def montar_regua(catalogo: dict, run: dict) -> str:
-    """Tela 6 — a régua & modo: carimbo (commit/modo/gates ao vivo; versão/hash do
-    padrão pendentes) e comparabilidade. Sem carimbo completo, comparável=null e o
-    estado dominante é INCOMPARÁVEL, com o motivo NOMEADO."""
+    """Tela 6 — a régua & modo: selo dos 4 modos (escada de gravidade) + gates ao
+    vivo + carimbo (commit/modo vivos; versão/hash do padrão pendentes) +
+    comparabilidade. Sem carimbo completo, o estado dominante é INCOMPARÁVEL, com o
+    motivo NOMEADO (D2k+D4k)."""
     proc = catalogo["procedencia"]
     carimbo = run.get("carimbo") or {}
     padrao_versao = carimbo.get("padrao_versao")
     hash_ = carimbo.get("caminhos_sensiveis_hash")
     gates = run.get("gates_ativos", [])
-    modo = run.get("modo", "inventário")
+    modo = run.get("modo", "inventario")
+
     def campo(rot, val):
         v = _e(val) if val else '<span class="pendente">pendente</span>'
         return f'<div><dt>{_e(rot)}</dt><dd>{v}</dd></div>'
-    comparavel = padrao_versao is not None and hash_ is not None
-    if comparavel:
-        estado_comp = (f'<p class="ok">Comparável: régua declarada '
-                       f'(versão {_e(padrao_versao)}).</p>')
-    else:
-        estado_comp = ('<p class="vazio-nota">Incomparável — motivo: a régua ainda não '
-                       'está carimbada (versão do padrão e hash da lista pendentes). '
-                       'Nenhuma comparação entre projetos é emitida.</p>')
+
+    selo = _selo_de_modo(modo, gates, run.get("kill", False))
+    comp = _incomparabilidade(padrao_versao, hash_, run.get("segundo_projeto"))
     return ('<section id="regua" class="tela"><h1>Um número só é comparável se a régua '
             'estiver declarada.</h1>'
-            f'<dl class="tri">{campo("commit", proc.get("commit"))}'
-            f'{campo("ramo", proc.get("ramo"))}{campo("modo", modo)}'
-            f'{campo("gates ativos", ", ".join(gates) if gates else "nenhum")}'
+            f'<h2>Modo desta leitura</h2>{selo}'
+            f'<h2>Carimbo</h2><dl class="tri">{campo("commit", proc.get("commit"))}'
+            f'{campo("ramo", proc.get("ramo"))}'
             f'{campo("versão do padrão", padrao_versao)}'
             f'{campo("hash da lista curada", hash_)}</dl>'
-            f'{estado_comp}</section>')
+            f'<h2>Comparabilidade</h2>{comp}</section>')
 
 
 def _bloco_medicao(rotulo: str, dados) -> str:
@@ -426,6 +488,14 @@ def _css() -> str:
     .medicao.ausente {{ border-style:dashed; border-color:{t['tracejado']}; }}
     .ok {{ color:{t['passed']}; }} .ruim {{ color:{t['failed']}; }} .atencao {{ color:{t['xfail']}; }}
     .pendente {{ color:{t['apagado']}; font-style:italic; }}
+    ol.escada {{ list-style:none; padding:0; margin:.5rem 0; max-width:64ch; }}
+    ol.escada .degrau {{ padding:.35rem .7rem; border-left:3px solid {t['linha']};
+      margin:.15rem 0; color:{t['apagado']}; }}
+    ol.escada .degrau.atual {{ border-left-color:{t['nao_exec']}; background:{t['well']};
+      color:{t['tinta']}; font-weight:600; }}
+    .sereno {{ color:{t['passed']}; }}
+    .alarme {{ background:{t['well']}; border-left:4px solid {t['failed']};
+      color:{t['failed']}; padding:.6rem .9rem; max-width:62ch; font-weight:600; }}
     details {{ margin:.5rem 0; }} summary {{ cursor:pointer; font-weight:600; }}
     ul.graus {{ columns:2; font-size:13px; }} ul.graus li {{ break-inside:avoid; }}
     pre.json {{ background:{t['papel']}; border:1px solid {t['linha']}; padding:1rem;
@@ -478,9 +548,9 @@ def render_html(catalogo: dict, run: dict | None = None) -> str:
 
 
 def _run_do_repo(raiz: Path) -> dict:
-    """Dados de execução/carimbo/medição fora do catálogo (D2k–D6k preenchem;
-    hoje só o que houver em report/). Ausência é o caso normal."""
-    return {}
+    """Dados fora do catálogo: modo/gates do ambiente (D2k), e execução/carimbo/
+    medição (D3k–D6k preenchem). Ausência é o caso normal, sempre nomeada."""
+    return dict(estado_do_ambiente())
 
 
 def main(argv: list[str] | None = None) -> int:

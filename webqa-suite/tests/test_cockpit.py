@@ -13,6 +13,7 @@ import pytest
 from scripts.cockpit import (
     TOKENS,
     _num,
+    estado_do_ambiente,
     montar_dimensoes,
     montar_laudo,
     montar_leitura,
@@ -111,6 +112,36 @@ def test_regua_pendente_e_incomparavel_sem_carimbo():
     html = montar_regua(cat, {})                      # sem padrao_versao/hash
     assert "pendente" in html
     assert "Incomparável" in html                     # comparavel=null nomeado
+
+
+def test_regua_incomparabilidade_nomeia_cada_eixo_faltante():
+    """D4k: nunca célula vazia — cada eixo ausente é NOMEADO."""
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    html = montar_regua(cat, {})                      # nada carimbado, leitura única
+    assert "versão do padrão" in html
+    assert "hash da lista curada" in html
+    assert "2º projeto" in html
+
+
+def test_selo_de_modo_mostra_a_escada_e_marca_inventario():
+    """D2k: os 4 modos aparecem em escada; a leitura corrente (inventário) marcada."""
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    html = montar_regua(cat, dict(estado_do_ambiente({})))   # ambiente limpo
+    for rotulo in ("Inventário", "Passivo", "Carga", "Sondagem ativa"):
+        assert rotulo in html
+    assert "esta leitura" in html
+    assert "Nenhum gate de rede" in html              # ambiente limpo = sereno
+
+
+def test_selo_arma_alarme_com_gate_de_rede_ativo():
+    """Cor cromática só significa: o alarme vermelho veste SÓ com gate de rede."""
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    limpo = montar_regua(cat, dict(estado_do_ambiente({})))
+    assert f"border-left:4px solid {TOKENS['failed']}" not in limpo   # sereno, sem alarme
+    armado = montar_regua(cat, dict(estado_do_ambiente(
+        {"WEBQA_DISCOVERY_AUTHORIZED": "1"})))
+    assert "Gate de rede ATIVO" in armado
+    assert "WEBQA_DISCOVERY_AUTHORIZED" in armado
 
 
 def test_leitura_grau2_declara_sem_contrato():
