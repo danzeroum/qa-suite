@@ -148,7 +148,41 @@ class PoliteFetcher:
         return host_e_local(partes.hostname or "", porta)
 
     # ------------------------------------------------------------ regra
-    def preparar(self, url: str) -> Veredito:  # noqa: C901 — máquina de etiqueta (isenção local, robots, status), CC 9 (teto 8). TODO(Q1d): extrair a leitura de robots.
+    def _registrar(self, base: str, veredito: Veredito,
+                   rp: RobotFileParser | None = None) -> Veredito:
+        """Memoiza o veredito do host e o parser associado (ou `None`).
+
+        `None` cobre dois casos que `pode_acessar` trata igual: isento (que
+        curto-circuita antes de olhar o parser) e alvo pulado (sem política
+        legível → o default seguro é não acessar). Ponto único de escrita nos
+        dois dicts, para nenhum ramo esquecer de gravar um."""
+        self._vereditos[base] = veredito
+        self._parsers[base] = rp
+        return veredito
+
+    def _veredito_de_erro(self, status: int, url: str) -> Veredito:
+        """Bloqueio para status >= 400 que não é 404/410. Extraído de `preparar`
+        (§Q1d) para tirar o `# noqa: C901` do motor sem esconder a decisão.
+
+        Não conseguir ler a política de alguém não é licença para ignorá-la:
+        todos bloqueiam. Só a mensagem muda, para ser acionável — distinguir
+        401/403 COM credencial (dado sobre o alvo) de SEM credencial (conserto do
+        operador) é o que a torna útil."""
+        if status in STATUS_DE_RECUO:
+            return Veredito(False, f"servidor pediu recuo ({status}) já no robots.txt")
+        if status >= 500:
+            return Veredito(
+                False, f"robots.txt respondeu HTTP {status} — política ilegível, alvo pulado")
+        if status == 401 or status == 403:
+            motivo = (f"robots.txt respondeu HTTP {status} MESMO com credencial — "
+                      "política ilegível, alvo pulado"
+                      if self._autenticou(url)
+                      else f"robots.txt respondeu HTTP {status} sem credencial — alvo "
+                           "pulado (alvo protegido? defina WEBQA_BASIC_AUTH_USER/PASS)")
+            return Veredito(False, motivo)
+        return Veredito(False, f"robots.txt respondeu HTTP {status} — alvo pulado")
+
+    def preparar(self, url: str) -> Veredito:
         """Decide se o alvo pode ser medido, consultando o `robots.txt` uma vez.
 
         `robots.txt` inacessível, 5xx ou ilegível vira **disallow temporário**:
@@ -158,66 +192,46 @@ class PoliteFetcher:
 
         404 é o contrário: o host respondeu e disse que não há política. Aí
         tudo é permitido, que é o que a norma manda.
+
+        A decisão por status mora em `_veredito_de_erro`/`_registrar` para esta
+        função ficar sob o teto de complexidade (§Q1d) sem um `# noqa` que
+        ninguém revisita.
         """
         base = self._base(url)
         if base in self._vereditos:
             return self._vereditos[base]
 
         if self.isento(url):
-            veredito = Veredito(True, "alvo controlado (rede local) — isento de etiqueta",
-                                isento=True)
-            self._vereditos[base] = veredito
-            self._parsers[base] = None
-            return veredito
+            return self._registrar(base, Veredito(
+                True, "alvo controlado (rede local) — isento de etiqueta", isento=True))
 
         try:
             resposta = self._buscar(f"{base}/robots.txt")
         except Exception as erro:
-            veredito = Veredito(
-                False, f"robots.txt inacessível ({type(erro).__name__}) — alvo pulado")
-            self._vereditos[base] = veredito
-            return veredito
+            return self._registrar(base, Veredito(
+                False, f"robots.txt inacessível ({type(erro).__name__}) — alvo pulado"))
 
         status = int(getattr(resposta, "status_code", 0) or 0)
-        if status in STATUS_DE_RECUO:
-            veredito = Veredito(False, f"servidor pediu recuo ({status}) já no robots.txt")
-        elif status >= 500:
-            veredito = Veredito(
-                False, f"robots.txt respondeu HTTP {status} — política ilegível, alvo pulado")
-        elif status == 404 or status == 410:
+        if status == 404 or status == 410:
             # Sem política publicada: a norma diz que tudo é permitido.
             rp = RobotFileParser()
             rp.parse([])
             rp.allow_all = True
-            self._parsers[base] = rp
-            veredito = Veredito(True, "sem robots.txt (HTTP 404) — nada restrito")
-        elif status == 401 or status == 403:
-            # Distinguir os dois casos é o que torna a mensagem acionável:
-            # "faltou credencial" tem conserto do operador; "a credencial foi
-            # recusada" é dado sobre o alvo. Nenhum dos dois é licença para
-            # ignorar a política — bloqueia igual, mas dizendo o que houve.
-            motivo = (f"robots.txt respondeu HTTP {status} MESMO com credencial — "
-                      "política ilegível, alvo pulado"
-                      if self._autenticou(f"{base}/robots.txt")
-                      else f"robots.txt respondeu HTTP {status} sem credencial — alvo "
-                           "pulado (alvo protegido? defina WEBQA_BASIC_AUTH_USER/PASS)")
-            veredito = Veredito(False, motivo)
-        elif status >= 400:
-            veredito = Veredito(
-                False, f"robots.txt respondeu HTTP {status} — alvo pulado")
-        else:
+            return self._registrar(
+                base, Veredito(True, "sem robots.txt (HTTP 404) — nada restrito"), rp)
+
+        if status < 400:
+            # Status < 400 que não é recuo (429/503 são >= 400): política legível.
             texto = str(getattr(resposta, "text", "") or "")[:TETO_ROBOTS_BYTES]
             rp = RobotFileParser()
             # `parse` sobre o texto JÁ BAIXADO, nunca `rp.read()`: o `read` do
             # stdlib usa `urllib` sem timeout, e um host que aceita a conexão e
             # nunca responde travaria a campanha inteira, sem log e sem fim.
             rp.parse(texto.splitlines())
-            self._parsers[base] = rp
-            veredito = Veredito(True, "robots.txt lido",
-                                crawl_delay_s=_crawl_delay(rp, self.user_agent))
+            return self._registrar(base, Veredito(
+                True, "robots.txt lido", crawl_delay_s=_crawl_delay(rp, self.user_agent)), rp)
 
-        self._vereditos[base] = veredito
-        return veredito
+        return self._registrar(base, self._veredito_de_erro(status, f"{base}/robots.txt"))
 
     def pode_acessar(self, url: str) -> bool:
         """O `robots.txt` permite este caminho para o nosso user-agent?
