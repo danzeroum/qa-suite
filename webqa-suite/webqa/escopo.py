@@ -122,23 +122,27 @@ class Escopo:
     def _por_origem(self) -> dict[str, EntradaEscopo]:
         return {e.origem: e for e in self.entradas}
 
-    def verificar_posse(self, host: str) -> bool:
-        """Os IPs de `host` ainda são os do carregamento? (prova de posse, R-C6.)
+    def verificar_posse(self, host: str) -> frozenset[str]:
+        """IPs PINADOS de `host` se a posse se confirma; conjunto vazio se não.
 
-        Defesa contra takeover de subdomínio: um host autorizado cujo IP mudou
-        pode ter sido reapontado para infra de terceiro entre o carregamento e o
-        probe — sondá-lo passaria a atingir quem não autorizou. `True` só quando
-        o conjunto atual é não-vazio e IDÊNTICO ao snapshot; divergência, host
-        não listado, snapshot vazio (não resolveu no carregamento) ou falha de
-        resolução agora → `False`, nunca exceção crua nem silêncio.
+        Defesa contra takeover de subdomínio E contra DNS rebinding (R-C6, A#1):
+        um host autorizado cujo IP mudou pode ter sido reapontado para infra de
+        terceiro. Devolve o conjunto de IPs quando a resolução atual é não-vazia
+        e IDÊNTICA ao snapshot — e o chamador conecta SÓ nesses IPs, sem
+        re-resolver, fechando a janela entre esta checagem e a requisição.
 
-        O snapshot é do carregamento; esta comparação roda ANTES do probe, nunca
-        dentro do laço de requisição.
+        Conjunto VAZIO = sem posse: divergência (host reapontado), host não
+        listado, snapshot vazio (não resolveu no carregamento), ou falha de
+        resolução agora. Nunca exceção crua nem silêncio.
+
+        O snapshot é do carregamento; esta comparação roda ANTES do probe, e os
+        IPs devolvidos são os que o probe deve usar — nunca dentro do laço.
         """
         baseline = self.ips_no_carregamento.get(host)
         if not baseline:
-            return False
-        return _ips_resolvidos(host) == baseline
+            return frozenset()
+        atuais = _ips_resolvidos(host)
+        return atuais if atuais == baseline else frozenset()
 
     def esta_no_escopo(self, url: str) -> bool:
         """A origem EXATA da URL foi autorizada? (única pergunta que os probes fazem.)"""

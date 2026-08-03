@@ -179,14 +179,14 @@ def test_divergencia_de_ip_e_detectada_como_takeover(tmp_path, monkeypatch):
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7")           # baseline no carregamento
     esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
     _dubla_getaddrinfo(monkeypatch, "198.51.100.9")          # host trocou de dono
-    assert esc.verificar_posse("meusite.exemplo.br") is False
+    assert esc.verificar_posse("meusite.exemplo.br") == frozenset()
 
 
 def test_posse_ok_quando_o_ip_bate(tmp_path, monkeypatch):
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
     esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7")           # mesmo IP na re-verificação
-    assert esc.verificar_posse("meusite.exemplo.br") is True
+    assert esc.verificar_posse("meusite.exemplo.br") == frozenset({"203.0.113.7"})
 
 
 def test_falha_de_resolucao_agora_e_nao_posse_sem_excecao(tmp_path, monkeypatch):
@@ -195,7 +195,7 @@ def test_falha_de_resolucao_agora_e_nao_posse_sem_excecao(tmp_path, monkeypatch)
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
     esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
     _falha_getaddrinfo(monkeypatch)
-    assert esc.verificar_posse("meusite.exemplo.br") is False
+    assert esc.verificar_posse("meusite.exemplo.br") == frozenset()
 
 
 def test_snapshot_grava_os_ips_no_carregamento(tmp_path, monkeypatch):
@@ -211,14 +211,14 @@ def test_host_que_nao_resolveu_no_carregamento_nao_afirma_posse(tmp_path, monkey
     esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
     assert esc.ips_no_carregamento["meusite.exemplo.br"] == frozenset()
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
-    assert esc.verificar_posse("meusite.exemplo.br") is False
+    assert esc.verificar_posse("meusite.exemplo.br") == frozenset()
 
 
 def test_host_fora_do_escopo_nao_tem_posse(tmp_path, monkeypatch):
     """Host que não está no escopo nunca tem posse — não há baseline para ele."""
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7")
     esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
-    assert esc.verificar_posse("outro-host.exemplo.br") is False
+    assert esc.verificar_posse("outro-host.exemplo.br") == frozenset()
 
 
 def test_posse_distingue_ip_parcialmente_coincidente(tmp_path, monkeypatch):
@@ -227,7 +227,7 @@ def test_posse_distingue_ip_parcialmente_coincidente(tmp_path, monkeypatch):
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7", "203.0.113.8")
     esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
     _dubla_getaddrinfo(monkeypatch, "203.0.113.7", "198.51.100.9")
-    assert esc.verificar_posse("meusite.exemplo.br") is False
+    assert esc.verificar_posse("meusite.exemplo.br") == frozenset()
 
 
 # ---------- os alvos de TERCEIRO da campanha nunca entram no escopo ----------

@@ -391,6 +391,74 @@ def test_autorizacao_id_vem_direto_do_escopo(tmp_path, monkeypatch):
     assert log.linhas[0]["autorizacao_id"] == "pr#1"
 
 
+# ---------- C1c: DNS-rebind (A#1) — pino de IP com TLS por hostname ----------
+
+def test_verificar_posse_devolve_o_conjunto_pinado(tmp_path, monkeypatch):
+    """A prova de posse agora entrega os IPs pinados (não só um bool)."""
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    assert escopo.verificar_posse("alvo-fixture.exemplo") == frozenset({IP_ALVO})
+
+
+def test_probe_conecta_no_ip_pinado_preservando_sni_do_hostname(tmp_path, monkeypatch):
+    """O HEAD sai para o IP PINADO, mas Host e SNI continuam o hostname — o cert
+    é verificado contra o host, não contra o IP. É isto que fecha o rebinding."""
+    capturado = {}
+
+    def handler(request):
+        capturado["host_conectado"] = request.url.host
+        capturado["header_host"] = request.headers.get("host")
+        capturado["sni"] = request.extensions.get("sni_hostname")
+        return httpx.Response(404)
+
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    sondar(escopo, ALVO, [C_GIT], client=client, dry_run=False, dormir=lambda _s: None)
+
+    assert capturado["host_conectado"] == IP_ALVO           # conectou no IP pinado
+    assert capturado["header_host"] == "alvo-fixture.exemplo"
+    assert capturado["sni"] == "alvo-fixture.exemplo"       # TLS verifica o hostname
+
+
+def test_rebind_entre_posse_e_probe_aborta(tmp_path, monkeypatch):
+    """Snapshot num IP, resolução no probe diverge → posse-divergente, zero probes.
+    Fecha a janela A#1: o probe nunca chega a sair para o IP reapontado."""
+    escopo = _escopo_valido(tmp_path, monkeypatch, ip=IP_ALVO)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    _resolve_para(monkeypatch, "198.51.100.9")             # host reapontado
+
+    def _explode(*_a, **_k):
+        raise AssertionError("rebind não pode chegar à rede")
+    resultado = sondar(escopo, ALVO, [C_GIT, C_ENV], client=_client({}),
+                       dry_run=False, dormir=_explode)
+    assert resultado.abortado_por == "posse-divergente"
+    assert resultado.executado == 0 and resultado.inconclusivo is True
+
+
+def test_tls_nunca_e_desabilitado_no_motor():
+    """Guarda estrutural (AST): nenhuma CHAMADA no motor passa verify=False.
+
+    Pinar IP com verify=False trocaria o rebinding por um MITM — proibido. Por
+    AST, não por substring: a docstring pode citar `verify=False` para explicar a
+    proibição sem disparar a guarda — a lição da §2.11 (prosa não é código)."""
+    import ast
+    from pathlib import Path
+
+    def _desliga_tls(fonte: str) -> bool:
+        return any(
+            isinstance(no, ast.keyword) and no.arg == "verify"
+            and isinstance(no.value, ast.Constant) and no.value.value is False
+            for no in ast.walk(ast.parse(fonte)))
+
+    assert _desliga_tls("cliente(verify=False)") is True             # morde o plantado
+    assert _desliga_tls('"""nunca verify=False"""\nx = 1') is False  # ignora a prosa
+
+    raiz = Path(__file__).resolve().parent.parent
+    for modulo in ("webqa/sondagem.py", "webqa/escopo.py"):
+        fonte = (raiz / modulo).read_text(encoding="utf-8")
+        assert not _desliga_tls(fonte), f"{modulo} desliga a verificação TLS"
+
+
 # ---------- specs adiadas ao C1b (contrato registrado, ainda não implementado) ----------
 
 @pytest.mark.xfail(strict=True, reason="C1b: fallback GET Range: bytes=0-0 quando HEAD é 405")

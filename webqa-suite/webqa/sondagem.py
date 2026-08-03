@@ -33,7 +33,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlsplit
 
 import httpx
 import yaml
@@ -196,26 +196,41 @@ def _validar_alvo(alvo: str) -> None:
         raise ValueError(f"alvo deve ser origem sem path/query/fragment: {alvo!r}")
 
 
+def _url_pinada(alvo: str, ip: str, path: str) -> tuple[str, str, str]:
+    """(url_lógica, url_pinada, host). A lógica usa o hostname (para laudo e
+    auditoria); a pinada conecta no IP provado, sem re-resolver o DNS."""
+    partes = urlsplit(alvo)
+    host = partes.hostname or ""
+    porta = partes.port or (443 if partes.scheme == "https" else 80)
+    caminho_norm = path if path.startswith("/") else "/" + path
+    url_logica = f"{partes.scheme}://{partes.netloc}{caminho_norm}"
+    url_pinada = f"{partes.scheme}://{ip}:{porta}{caminho_norm}"
+    return url_logica, url_pinada, host
+
+
 def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
-                   log: AuditLog, autorizacao_id: str) -> Finding | None | _FalhaDeRede:
-    """UM probe: HEAD no caminho, audita, e devolve Finding se existir (2xx).
+                   log: AuditLog, autorizacao_id: str,
+                   ip_pinado: str) -> Finding | None | _FalhaDeRede:
+    """UM probe: HEAD no caminho, conectando ao IP PINADO, com TLS pelo hostname.
 
-    Nunca lê corpo e nunca segue redirect (o cliente é `follow_redirects=False`).
-    Um 3xx/4xx não é achado; um 2xx que pareça soft-404 pelo Content-Type também
-    não. A existência confirmada é o único achado, e ele nasce mascarado.
+    Conecta ao `ip_pinado` (o IP provado por `verificar_posse`), NÃO ao que o DNS
+    resolveria agora — é isto que fecha a janela de rebinding (A#1). O header
+    `Host` e o SNI (`sni_hostname`) permanecem o hostname, então a verificação do
+    certificado continua contra o host (nunca `verify=False`). Laudo e auditoria
+    registram a URL LÓGICA (hostname), não o IP.
 
-    Falha de rede (`httpx.RequestError`) NÃO derruba o run: é auditada com
-    `status=-1`, devolve o sinal `_FALHA_DE_REDE`, e o laço segue. O resultado
-    fica inconclusivo — honesto, nunca um silêncio que pareça 'tudo limpo'.
+    Nunca lê corpo nem segue redirect. Falha de rede → `_FALHA_DE_REDE` e o laço
+    segue; o resultado fica inconclusivo, nunca um silêncio que pareça 'limpo'.
     """
-    url = urljoin(alvo if alvo.endswith("/") else alvo + "/", caminho.path.lstrip("/"))
+    url_logica, url_pinada, host = _url_pinada(alvo, ip_pinado, caminho.path)
     try:
-        resposta = client.head(url)
+        resposta = client.head(url_pinada, headers={"Host": host},
+                               extensions={"sni_hostname": host})
     except httpx.RequestError as erro:
-        log.registrar(url=url, metodo="HEAD", alvo=alvo, autorizacao_id=autorizacao_id,
+        log.registrar(url=url_logica, metodo="HEAD", alvo=alvo, autorizacao_id=autorizacao_id,
                       status=-1, evento=f"falha-de-rede:{type(erro).__name__}")
         return _FALHA_DE_REDE
-    log.registrar(url=url, metodo="HEAD", alvo=alvo,
+    log.registrar(url=url_logica, metodo="HEAD", alvo=alvo,
                   autorizacao_id=autorizacao_id, status=resposta.status_code)
     if not (200 <= resposta.status_code < 300):
         return None
@@ -224,7 +239,7 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
         return None
     return Finding(
         tipo=f"exposicao:{caminho.categoria}",
-        recurso=url,
+        recurso=url_logica,
         severidade=caminho.severidade,
         evidencia=f"{caminho.path} respondeu {resposta.status_code} "
                   "(existência confirmada por HEAD; corpo não lido)",
@@ -259,9 +274,12 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     require_discovery()
     require_escopo(escopo, alvo)
     host = urlsplit(alvo).hostname or ""
-    if not escopo.verificar_posse(host):
+    ips_pinados = escopo.verificar_posse(host)
+    if not ips_pinados:
         return ResultadoSondagem(alvo=alvo, esperado=esperado, executado=0,
                                  abortado_por="posse-divergente", run_id=run_id)
+    # Pina UM IP provado e conecta só nele — o probe não re-resolve o DNS.
+    ip_pinado = sorted(ips_pinados)[0]
 
     intervalo = max(intervalo_s, PISO_INTERVALO_S)   # piso não-configurável
     fechar_no_fim = client is None
@@ -278,7 +296,7 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
                 break
             if i:
                 dormir(intervalo)      # piso ENTRE requisições, nunca antes da 1ª
-            achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id)
+            achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id, ip_pinado)
             if isinstance(achado, _FalhaDeRede):
                 resultado.falhas_rede += 1     # probe não concluído: executado NÃO sobe
                 continue
