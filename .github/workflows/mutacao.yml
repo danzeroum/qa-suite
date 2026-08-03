@@ -1,0 +1,68 @@
+# Teste de MUTAÇÃO escopado na superfície de segurança — NÃO roda no PR.
+#
+# Score de mutação mede a força das ASSERÇÕES: quantos defeitos plantados a suíte
+# reprova. É outra métrica que cobertura (que só diz se a linha foi visitada). O
+# harness (scripts/mutar.py) é stdlib pura: planta um defeito por vez, roda a
+# suíte escopada, restaura o arquivo. Ver docs/handoff/HANDOFF-Q1-instrumentacao.md §Q5.
+#
+# Por que não roda no PR: é lento (~1 min por módulo, minutos para sondagem) e o
+# valor é periódico, não por-commit. Agendado no noturno + disparo manual.
+#
+# Por que o ambiente é limpo EXPLICITAMENTE: a mutação altera a lógica dos gates
+# DE PROPÓSITO. Um mutante que inverta discovery_authorized() rodaria a suíte
+# inteira com o portão aberto. A fixture autouse `_ambiente_limpo` já apaga as
+# variáveis, mas é local a um arquivo de teste e a mutação pode atingir a própria
+# lógica que a fixture exercita. Explicitar no job custa três linhas e fecha a
+# janela — a guarda `test -z` aborta o job se alguma variável vazou do ambiente.
+name: Mutação (superfície de segurança, escopado)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 04:17 UTC, fora da janela do noturno da VPS (03h) para não competir por CI.
+    - cron: "17 4 * * *"
+
+# Nenhum job deste workflow escreve no repositório: só planta defeitos em cópia
+# de trabalho efêmera e restaura ao fim.
+permissions:
+  contents: read
+
+concurrency:
+  group: mutacao
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: webqa-suite
+
+jobs:
+  mutar:
+    name: Mutação escopada (escopo + gates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: webqa-suite/requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      # Os gates NÃO podem estar autorizados quando a mutação roda: um mutante que
+      # inverta um portão passaria a suíte com o motor destravado. Limpo no `env`
+      # e reconferido no `run` — três linhas de YAML que fecham a janela.
+      - name: Mutação escopada (superfície de segurança)
+        env:
+          WEBQA_DISCOVERY_AUTHORIZED: ""
+          WEBQA_ACTIVE_PROBES_AUTHORIZED: ""
+          WEBQA_LOAD_AUTHORIZED: ""
+        run: |
+          test -z "$WEBQA_DISCOVERY_AUTHORIZED" || { echo "::error::gate discovery setado no job de mutação"; exit 1; }
+          test -z "$WEBQA_ACTIVE_PROBES_AUTHORIZED" || { echo "::error::gate active-probes setado no job de mutação"; exit 1; }
+          test -z "$WEBQA_LOAD_AUTHORIZED" || { echo "::error::gate load setado no job de mutação"; exit 1; }
+          python scripts/mutar.py . webqa/escopo.py tests/test_escopo.py tests/test_fase_c_travada.py
+          python scripts/mutar.py . webqa/gates.py  tests/test_gates.py
