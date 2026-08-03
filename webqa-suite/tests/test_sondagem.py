@@ -577,6 +577,35 @@ def test_url_pinada_ipv4_sem_colchetes():
     assert url_pinada == f"https://{IP_ALVO}:443/.env"
 
 
+def test_url_pinada_preserva_porta_nao_padrao():
+    """Q1f: alvo em porta explícita conecta NAQUELA porta, não no default do
+    esquema. Sem esta asserção, mutar `partes.port or 443` para `443` sobrevive —
+    nenhum teste usava porta explícita, e um alvo em :8443 seria sondado em :443
+    (host errado, achado silenciosamente perdido). A url_lógica também carrega a
+    porta, porque é ela que vai para o laudo e a auditoria."""
+    from webqa.sondagem import _url_pinada
+    url_logica, url_pinada, host = _url_pinada("https://alvo-fixture.exemplo:8443",
+                                               IP_ALVO, "/.env")
+    assert url_pinada == f"https://{IP_ALVO}:8443/.env"
+    assert url_logica == "https://alvo-fixture.exemplo:8443/.env"
+    assert host == "alvo-fixture.exemplo"
+
+
+@pytest.mark.parametrize("status,vira_finding", [(299, True), (300, False)])
+def test_borda_superior_do_2xx(status, vira_finding):
+    """Q1f: 299 é 2xx (existência confirmada → Finding); 300 (Multiple Choices)
+    NÃO é 2xx (é redirecionamento → ausência). Sem separar 299 de 300, mutar
+    `status < 300` para `status <= 300` sobrevive: nenhum teste cruzava a borda,
+    e um 300 viraria achado indevido."""
+    from webqa.sondagem import Finding, avaliar_resposta_em_finding
+    resultado = avaliar_resposta_em_finding(
+        status, "text/plain", C_GIT, "https://alvo-fixture.exemplo/.git/HEAD")
+    if vira_finding:
+        assert isinstance(resultado, Finding)
+    else:
+        assert resultado is None
+
+
 def test_dual_stack_conecta_no_ipv4(tmp_path, monkeypatch):
     """Host dual-stack: o probe conecta no IPv4 (a ordem de string elegeria o
     IPv6, que ainda quebraria a URL pinada)."""
