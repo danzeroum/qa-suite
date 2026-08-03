@@ -171,8 +171,11 @@ def test_so_faz_HEAD_e_nao_segue_redirect(tmp_path, monkeypatch):
     resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT, C_ENV], registro=registro)
 
     assert {metodo for metodo, _p, _r in registro} == {"HEAD"}, "só HEAD, nunca GET"
-    # o 3xx não é achado e não foi seguido (um único request por caminho)
-    assert [p for _m, p, _r in registro] == ["/.git/HEAD", "/.env"]
+    # o 3xx não é achado e não foi seguido (um único request por caminho curado).
+    # O HEAD-fantasma (baseline C2) também é HEAD, mas num caminho aleatório —
+    # filtra-se pelos caminhos curados para provar o "um request por caminho".
+    curados = [p for _m, p, _r in registro if p in ("/.git/HEAD", "/.env")]
+    assert curados == ["/.git/HEAD", "/.env"]
     assert [f.recurso for f in resultado.findings] == ["https://alvo-fixture.exemplo/.git/HEAD"]
 
 
@@ -202,10 +205,13 @@ def test_kill_switch_desde_o_inicio_aborta_sem_sondar(tmp_path, monkeypatch):
 def test_kill_switch_no_meio_do_laco_para_o_run(tmp_path, monkeypatch):
     chamadas = {"n": 0}
 
-    def _kill_na_segunda():
+    def _kill_na_terceira():
+        # C2: o kill-switch é checado 1x ANTES do HEAD-fantasma, depois a cada
+        # iteração. 1ª (pré-fantasma) e 2ª (i=0) livres; 3ª (i=1) dispara → o
+        # primeiro probe roda e o run aborta antes do segundo.
         chamadas["n"] += 1
-        return chamadas["n"] >= 2           # False, depois True
-    monkeypatch.setattr("webqa.sondagem.kill_switch_active", _kill_na_segunda)
+        return chamadas["n"] >= 3
+    monkeypatch.setattr("webqa.sondagem.kill_switch_active", _kill_na_terceira)
 
     rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"})}
     resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT, C_ENV, C_BACKUP])
@@ -234,7 +240,10 @@ def test_cada_probe_e_auditado(tmp_path, monkeypatch):
     rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"}), "/.env": (404, {})}
     resultado, log = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT, C_ENV])
 
-    assert len(log.linhas) == resultado.executado == 2
+    # C2: o baseline-soft404 (HEAD-fantasma) também é auditado, além dos probes.
+    probes = [linha for linha in log.linhas if linha["evento"] is None]
+    assert len(probes) == resultado.executado == 2
+    assert any(linha["evento"] == "baseline-soft404" for linha in log.linhas)
     for linha in log.linhas:
         assert linha["metodo"] == "HEAD"
         assert linha["alvo"] == ALVO
@@ -780,16 +789,146 @@ def test_executar_fallback_get_le_status_sem_baixar_corpo():
     def handler(request):
         pedido["method"] = request.method
         pedido["range"] = request.headers.get("range")
-        return httpx.Response(206, headers={"content-type": "application/octet-stream"})
+        return httpx.Response(206, headers={"content-type": "application/octet-stream",
+                                            "content-length": "42"})
 
     client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
     log = AuditLog(run_id="t", escopo_hash="")
     try:
-        status, ct = executar_fallback_get(
+        status, ct, cl = executar_fallback_get(
             client, "https://a/.env", "https://203.0.113.7:443/.env",
             {"Host": "a"}, {"sni_hostname": "a"}, log, "https://a", "pr#1")
     finally:
         client.close()
     assert pedido["method"] == "GET" and pedido["range"] == "bytes=0-0"
-    assert status == 206 and ct == "application/octet-stream"
+    assert status == 206 and ct == "application/octet-stream" and cl == "42"
     assert log.linhas[0]["metodo"] == "GET(range)"
+
+
+# ---------- C2 fatia 1: soft-404 dinâmico + canários A.4 + --multi-alvo ----------
+
+ALVO2 = "https://alvo2-fixture.exemplo"
+CANARIOS_A4 = ("/.git/HEAD", "/.env", "/backup.zip")   # contrato A.4 (estável)
+
+
+def _escopo_duas_origens(tmp_path, monkeypatch, ip: str = IP_ALVO):
+    p = tmp_path / "escopo-autorizado.yaml"
+    corpo = "alvos:\n"
+    for o in (ALVO, ALVO2):
+        corpo += (f'  - origem: "{o}"\n'
+                  '    autorizado_por: "danzeroum"\n'
+                  f'    data: "{date.today().isoformat()}"\n'
+                  '    evidencia: "pr#1"\n'
+                  '    ambiente: "homologacao"\n')
+    p.write_text(corpo, encoding="utf-8")
+    _resolve_para(monkeypatch, ip)
+    return escopo_mod.carregar(p)
+
+
+# --- baseline dinâmico de soft-404 (requisição-fantasma) ---
+
+def test_baseline_honesto_nao_guarda_assinatura_e_acha(tmp_path, monkeypatch):
+    """Servidor honesto (404 ao fantasma) → sem baseline; o /.env real vira
+    achado, comportamento inalterado. O fantasma consta no log."""
+    rotas = {"/.env": (200, {"content-type": "application/octet-stream", "content-length": "50"})}
+    resultado, log = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_ENV])
+    assert [f.recurso for f in resultado.findings] == [ALVO + "/.env"]
+    fantasma = [linha for linha in log.linhas if linha["evento"] == "baseline-soft404"]
+    assert fantasma and fantasma[0]["status"] == 404
+
+
+def test_catch_all_zera_findings_e_audita_o_fantasma(tmp_path, monkeypatch):
+    """Alvo catch-all (2xx a tudo, mesma assinatura não-HTML) → zero findings, e
+    a requisição-fantasma consta no AuditLog."""
+    def handler(request):
+        return httpx.Response(200, headers={"content-type": "application/json",
+                                            "content-length": "7"})
+
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    log = AuditLog(run_id="teste", escopo_hash=escopo.hash_congelado)
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, [C_ENV, C_BACKUP], client=client, log=log,
+                       dry_run=False, dormir=lambda _s: None)
+    assert resultado.findings == []
+    assert any(linha["evento"] == "baseline-soft404" for linha in log.linhas)
+
+
+def test_content_length_diferente_do_fantasma_ainda_e_achado(tmp_path, monkeypatch):
+    """O fantasma assina (json, 7); /.env responde json com length DIFERENTE →
+    não é o ruído do catch-all, segue sendo verdadeiro-positivo."""
+    def handler(request):
+        if request.url.path == "/.env":
+            return httpx.Response(200, headers={"content-type": "application/json",
+                                                "content-length": "999"})
+        return httpx.Response(200, headers={"content-type": "application/json",
+                                            "content-length": "7"})
+
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, [C_ENV], client=client, dry_run=False, dormir=lambda _s: None)
+    assert [f.recurso for f in resultado.findings] == [ALVO + "/.env"]
+
+
+# --- teste de SISTEMA: os canários do fixture, ponta a ponta (A.4) ---
+
+def test_sistema_motor_acha_os_canarios_do_fixture(tmp_path, monkeypatch):
+    """A.4: com a lista curada REAL, o motor acha as iscas que o fixture serve,
+    de ponta a ponta (gates, posse, pino, avaliação, laço). Acoplado a
+    `fixture_target.ISCAS_FASE_C` — remover uma isca de lá reprova este teste."""
+    from pathlib import Path
+
+    from fixture_target.servir import ISCAS_FASE_C
+    from webqa.sondagem import carregar_caminhos
+
+    def handler(request):
+        entrada = ISCAS_FASE_C.get(request.url.path)
+        if entrada is None:
+            return httpx.Response(404)
+        _corpo, tipo = entrada
+        return httpx.Response(200, headers={"content-type": tipo})
+
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    caminhos = carregar_caminhos(
+        Path(__file__).resolve().parent.parent / "data" / "caminhos-sensiveis.yaml")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, caminhos, client=client, dry_run=False,
+                       dormir=lambda _s: None)
+
+    achados = {f.recurso for f in resultado.findings}
+    for path in CANARIOS_A4:
+        assert ALVO + path in achados, f"motor não achou o canário {path}"
+    assert len(resultado.findings) == len(CANARIOS_A4)
+
+
+# --- --multi-alvo: só as origens do escopo carregado ---
+
+def test_multialvo_sonda_todas_as_origens_do_escopo(tmp_path, monkeypatch):
+    from webqa.sondagem import sondar_multialvo
+    escopo = _escopo_duas_origens(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"})}
+    resultados = sondar_multialvo(escopo, [C_GIT], client=_client(rotas),
+                                  dry_run=False, dormir=lambda _s: None)
+    assert {r.alvo for r in resultados} == {ALVO, ALVO2}
+    assert all(len(r.findings) == 1 for r in resultados)   # cada alvo achou a isca
+
+
+def test_multialvo_alvo_sem_posse_nao_impede_os_outros(tmp_path, monkeypatch):
+    from webqa.sondagem import sondar_multialvo
+    escopo = _escopo_duas_origens(tmp_path, monkeypatch)     # snapshot: ambos em IP_ALVO
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+
+    def _resolver(h, p, *a, **k):     # ALVO segue; ALVO2 reaponta (takeover)
+        ip = IP_ALVO if h == "alvo-fixture.exemplo" else "198.51.100.9"
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (ip, 443))]
+    monkeypatch.setattr(socket, "getaddrinfo", _resolver)
+
+    rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"})}
+    resultados = sondar_multialvo(escopo, [C_GIT], client=_client(rotas),
+                                  dry_run=False, dormir=lambda _s: None)
+    por_alvo = {r.alvo: r for r in resultados}
+    assert por_alvo[ALVO2].abortado_por == "posse-divergente"
+    assert por_alvo[ALVO].abortado_por == "" and por_alvo[ALVO].findings
