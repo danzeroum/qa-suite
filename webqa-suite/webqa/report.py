@@ -197,6 +197,10 @@ def _metadados_de_seguranca(nodeid: str) -> dict:
     meta = {"severidade": achados[0].severidade, "fase_seguranca": achados[0].fase}
     if achados[0].remediacao:
         meta["remediacao"] = achados[0].remediacao
+    # `procedencia` (OWASP/CWE) acompanha o achado quando existe; ausente, a
+    # chave nem aparece — mesmo contrato retrocompatível de `remediacao`.
+    if achados[0].procedencia:
+        meta["procedencia"] = achados[0].procedencia
     return meta
 
 

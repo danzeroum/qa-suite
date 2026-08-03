@@ -29,6 +29,7 @@ de quem opera.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -210,15 +211,34 @@ def _validar_alvo(alvo: str) -> None:
         raise ValueError(f"alvo deve ser origem sem path/query/fragment: {alvo!r}")
 
 
+def _escolher_ip(ips: frozenset[str]) -> str:
+    """Escolhe UM IP pinado de forma determinística, preferindo IPv4.
+
+    A escolha é por FAMÍLIA (`ipaddress.version`), NUNCA por ordem de string:
+    com dual-stack, `sorted()` sobre strings pode eleger o IPv6
+    ('2001:...' < '93...') e quebrar a URL pinada. IPv4 primeiro; dentro da
+    família, a ordem canônica do endereço — determinística, não lexicográfica.
+    """
+    enderecos = [ipaddress.ip_address(x) for x in ips]
+    v4 = sorted(a for a in enderecos if a.version == 4)
+    v6 = sorted(a for a in enderecos if a.version == 6)
+    return str((v4 or v6)[0])
+
+
 def _url_pinada(alvo: str, ip: str, path: str) -> tuple[str, str, str]:
     """(url_lógica, url_pinada, host). A lógica usa o hostname (para laudo e
-    auditoria); a pinada conecta no IP provado, sem re-resolver o DNS."""
+    auditoria); a pinada conecta no IP provado, sem re-resolver o DNS.
+
+    IPv6 vai entre colchetes na URL pinada (`https://[2001:db8::1]:443/…`) —
+    sem eles o `:` do endereço se confunde com o separador de porta e a URL fica
+    malformada (era falha silenciosa antes do G2)."""
     partes = urlsplit(alvo)
     host = partes.hostname or ""
     porta = partes.port or (443 if partes.scheme == "https" else 80)
     caminho_norm = path if path.startswith("/") else "/" + path
     url_logica = f"{partes.scheme}://{partes.netloc}{caminho_norm}"
-    url_pinada = f"{partes.scheme}://{ip}:{porta}{caminho_norm}"
+    ip_para_url = f"[{ip}]" if ipaddress.ip_address(ip).version == 6 else ip
+    url_pinada = f"{partes.scheme}://{ip_para_url}:{porta}{caminho_norm}"
     return url_logica, url_pinada, host
 
 
@@ -283,6 +303,7 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
                   "(existência confirmada; corpo não lido)",
         fase="C",
         remediacao=caminho.remediacao,
+        procedencia=caminho.procedencia,
     )
 
 
@@ -317,7 +338,8 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
         return ResultadoSondagem(alvo=alvo, esperado=esperado, executado=0,
                                  abortado_por="posse-divergente", run_id=run_id)
     # Pina UM IP provado e conecta só nele — o probe não re-resolve o DNS.
-    ip_pinado = sorted(ips_pinados)[0]
+    # Por família (IPv4 primeiro), nunca por ordem de string (G2/dual-stack).
+    ip_pinado = _escolher_ip(ips_pinados)
 
     intervalo = max(intervalo_s, PISO_INTERVALO_S)   # piso não-configurável
     fechar_no_fim = client is None
