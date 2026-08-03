@@ -14,8 +14,8 @@ from bs4 import BeautifulSoup
 from webqa import metricas
 from webqa.auth import (
     aviso_de_senha_curta,
-    credencial_do_ambiente,
     credenciais_para_playwright,
+    credencial_do_ambiente,
     origem_de,
     verificar_desafio_de_autenticacao,
 )
@@ -24,6 +24,7 @@ from webqa.dominio import Recurso
 from webqa.etiqueta import PoliteFetcher
 from webqa.http_utils import Timing, make_client, timed_get
 from webqa.navegacao import percorrer
+from webqa.navegador import engines_configurados
 from webqa.trackers import LoggedRequest, NetworkLog
 
 
@@ -101,11 +102,24 @@ def soup(home_response) -> BeautifulSoup:
 
 # ---------- Navegador (Playwright) ----------
 
-@pytest.fixture(scope="session")
-def browser(settings):
-    """Instância única de Chromium por sessão (contextos é que são isolados).
-    Se o Playwright/Chromium não estiver instalado, os testes 'browser'
-    são pulados com instrução clara (falha explicada > falha misteriosa)."""
+# As engines a exercitar são decididas no import (WEBQA_BROWSER_ENGINES; default
+# chromium). Parametriza-se SÓ quando há mais de uma: com uma engine, o fixture
+# não é parametrizado e os node ids ficam limpos (`::test_x`, não `::test_x[chromium]`),
+# preservando o contrato 1:1 do alvo fixture (esperado.json, §2.8) sem tocá-lo. A
+# matriz completa (noturno) aceita o sufixo `[engine]` — é onde ele faz sentido.
+_ENGINES = engines_configurados()
+
+
+@pytest.fixture(scope="session", params=_ENGINES if len(_ENGINES) > 1 else None)
+def browser(request, settings):
+    """Instância de navegador por sessão, uma por engine configurada (contextos é
+    que são isolados). As engines vêm de `WEBQA_BROWSER_ENGINES` (default só
+    `chromium`; o noturno roda a matriz chromium/firefox/webkit — C3).
+
+    Playwright ausente ou engine sem binário instalado vira SKIP com instrução
+    (falha explicada > falha misteriosa). Engine não instalada nunca conta como
+    aprovação — o teste é pulado, não passa em silêncio."""
+    engine = getattr(request, "param", _ENGINES[0])
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -113,9 +127,10 @@ def browser(settings):
 
     with sync_playwright() as p:
         try:
-            instance = p.chromium.launch()
-        except Exception as exc:  # navegador ausente
-            pytest.skip(f"Chromium indisponível: rode `python -m playwright install chromium` ({exc}).")
+            instance = getattr(p, engine).launch()
+        except Exception as exc:  # engine ausente/sem binário
+            pytest.skip(f"{engine} indisponível: rode "
+                        f"`python -m playwright install {engine}` ({exc}).")
         yield instance
         instance.close()
 
