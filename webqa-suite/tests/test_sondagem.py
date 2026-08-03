@@ -1025,3 +1025,41 @@ def test_cli_sarif_nao_vaza_ip_cru_no_laudo(tmp_path, monkeypatch):
     sondagem_mod.main(base + ["--saida", str(saida), "--sarif", str(sarif)])
     for arq in (saida, sarif):
         assert IP_ALVO not in arq.read_text()            # IP pinado nunca no laudo
+
+
+# ---------- C3b: laudo inclui correlação de risco composto ----------
+
+def test_cli_laudo_inclui_risco_composto_git_mais_env(tmp_path, monkeypatch):
+    """.git + .env no mesmo alvo → o laudo (--saida) traz 1 anotação composta,
+    e as severidades individuais dos findings ficam inalteradas."""
+    _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    caminhos = tmp_path / "caminhos.yaml"
+    caminhos.write_text(
+        '- path: "/.git/HEAD"\n  categoria: "vcs"\n  severidade: "alta"\n'
+        '  content_type_esperado: "text/plain"\n  remediacao: "Remova o .git."\n'
+        '  procedencia: "OWASP WSTG-CONF-004"\n'
+        '- path: "/.env"\n  categoria: "configuracao"\n  severidade: "alta"\n'
+        '  content_type_esperado: "application/octet-stream"\n  remediacao: "Bloqueie."\n'
+        '  procedencia: "CWE-538"\n', encoding="utf-8")
+    rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"}),
+             "/.env": (200, {"content-type": "application/octet-stream"})}
+    monkeypatch.setattr(
+        "webqa.sondagem._cliente_padrao",
+        lambda: httpx.Client(transport=_transporte(rotas), follow_redirects=False))
+    saida = tmp_path / "r.json"
+    sondagem_mod.main(["--alvo", ALVO, "--executar",
+                       "--escopo", str(tmp_path / "escopo-autorizado.yaml"),
+                       "--caminhos", str(caminhos), "--saida", str(saida)])
+    dados = json.loads(saida.read_text())
+    assert len(dados["correlacoes"]) == 1
+    assert dados["correlacoes"][0]["tipo"] == "risco-composto:codigo-fonte-e-segredos"
+    # severidades dos findings individuais intactas (nada de auto-escalar)
+    assert {f["severidade"] for f in dados["alvos"][0]["findings"]} == {"alta"}
+
+
+def test_cli_laudo_sem_combo_nao_tem_correlacao(tmp_path, monkeypatch):
+    base = _cli_setup(tmp_path, monkeypatch, {"/.git/HEAD": (200, {"content-type": "text/plain"})})
+    saida = tmp_path / "r.json"
+    sondagem_mod.main(base + ["--saida", str(saida)])
+    assert json.loads(saida.read_text())["correlacoes"] == []
