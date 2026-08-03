@@ -126,17 +126,18 @@ class ResultadoSondagem:
     abortado_por: str = ""
     run_id: str = ""
     falhas_rede: int = 0
+    recuos: int = 0
 
     @property
     def inconclusivo(self) -> bool:
         """Run parcial NÃO é 'tudo limpo'.
 
-        Abortado (kill-switch, posse), falha de rede em algum probe, ou com menos
-        probes que o esperado: o resultado não cobre a superfície declarada, e
-        tratá-lo como conclusivo seria a falha de infra que parece 'zero
-        exposições'.
+        Abortado (kill-switch, posse), falha de rede, recuo do servidor (429/503),
+        ou com menos probes que o esperado: o resultado não cobre a superfície
+        declarada, e tratá-lo como conclusivo seria a falha de infra que parece
+        'zero exposições'.
         """
-        return (bool(self.abortado_por) or self.falhas_rede > 0
+        return (bool(self.abortado_por) or self.falhas_rede > 0 or self.recuos > 0
                 or self.executado < self.esperado)
 
 
@@ -180,6 +181,19 @@ class _FalhaDeRede:
 _FALHA_DE_REDE = _FalhaDeRede()
 
 
+class _PedeRecuo:
+    """Sinal interno: o servidor pediu recuo (429/503) — não conclui o caminho."""
+
+
+_PEDE_RECUO = _PedeRecuo()
+
+# Status em que o servidor pede para desacelerar: o laço faz backoff e NÃO conta
+# o probe como concluído (o caminho fica inconclusivo, nunca 'limpo').
+STATUS_DE_RECUO = frozenset({429, 503})
+BACKOFF_FATOR = 4
+TETO_BACKOFF_S = 30.0
+
+
 def _validar_alvo(alvo: str) -> None:
     """Rejeita alvo malformado ANTES dos portões — fail-fast e claro.
 
@@ -210,7 +224,7 @@ def _url_pinada(alvo: str, ip: str, path: str) -> tuple[str, str, str]:
 
 def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
                    log: AuditLog, autorizacao_id: str,
-                   ip_pinado: str) -> Finding | None | _FalhaDeRede:
+                   ip_pinado: str) -> Finding | None | _FalhaDeRede | _PedeRecuo:
     """UM probe: HEAD no caminho, conectando ao IP PINADO, com TLS pelo hostname.
 
     Conecta ao `ip_pinado` (o IP provado por `verificar_posse`), NÃO ao que o DNS
@@ -219,30 +233,54 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
     certificado continua contra o host (nunca `verify=False`). Laudo e auditoria
     registram a URL LÓGICA (hostname), não o IP.
 
-    Nunca lê corpo nem segue redirect. Falha de rede → `_FALHA_DE_REDE` e o laço
-    segue; o resultado fica inconclusivo, nunca um silêncio que pareça 'limpo'.
+    Servidor que rejeita HEAD (405) é reprovado por um GET mínimo (`Range:
+    bytes=0-0`) — lê no máximo 1 byte, nunca o corpo. Recuo (429/503) devolve
+    `_PEDE_RECUO`: o caminho não é concluído e o laço desacelera. Falha de rede →
+    `_FALHA_DE_REDE`. Nunca segue redirect. Em qualquer caso, run parcial fica
+    inconclusivo — nunca um silêncio que pareça 'limpo'.
     """
     url_logica, url_pinada, host = _url_pinada(alvo, ip_pinado, caminho.path)
+    cabecalhos = {"Host": host}
+    extensoes = {"sni_hostname": host}
     try:
-        resposta = client.head(url_pinada, headers={"Host": host},
-                               extensions={"sni_hostname": host})
+        resposta = client.head(url_pinada, headers=cabecalhos, extensions=extensoes)
     except httpx.RequestError as erro:
         log.registrar(url=url_logica, metodo="HEAD", alvo=alvo, autorizacao_id=autorizacao_id,
                       status=-1, evento=f"falha-de-rede:{type(erro).__name__}")
         return _FALHA_DE_REDE
     log.registrar(url=url_logica, metodo="HEAD", alvo=alvo,
                   autorizacao_id=autorizacao_id, status=resposta.status_code)
-    if not (200 <= resposta.status_code < 300):
-        return None
+    status = resposta.status_code
     content_type = resposta.headers.get("content-type", "")
+
+    # 405 (HEAD não permitido): confirma existência com GET mínimo, `Range:
+    # bytes=0-0` — stream sem iterar lê no máximo 1 byte, nunca o corpo.
+    if status == 405:
+        try:
+            with client.stream("GET", url_pinada, extensions=extensoes,
+                               headers={**cabecalhos, "Range": "bytes=0-0"}) as r:
+                status = r.status_code
+                content_type = r.headers.get("content-type", "")
+        except httpx.RequestError as erro:
+            log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
+                          autorizacao_id=autorizacao_id, status=-1,
+                          evento=f"falha-de-rede:{type(erro).__name__}")
+            return _FALHA_DE_REDE
+        log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
+                      autorizacao_id=autorizacao_id, status=status)
+
+    if status in STATUS_DE_RECUO:      # 429/503: não conclui, sinaliza backoff
+        return _PEDE_RECUO
+    if not (200 <= status < 300):
+        return None
     if _e_soft_404(caminho.content_type_esperado, content_type):
         return None
     return Finding(
         tipo=f"exposicao:{caminho.categoria}",
         recurso=url_logica,
         severidade=caminho.severidade,
-        evidencia=f"{caminho.path} respondeu {resposta.status_code} "
-                  "(existência confirmada por HEAD; corpo não lido)",
+        evidencia=f"{caminho.path} respondeu {status} "
+                  "(existência confirmada; corpo não lido)",
         fase="C",
         remediacao=caminho.remediacao,
     )
@@ -289,14 +327,23 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     autorizacao_id = escopo.entrada(alvo).evidencia
 
     resultado = ResultadoSondagem(alvo=alvo, esperado=esperado, run_id=run_id)
+    recuos_seguidos = 0
     try:
         for i, caminho in enumerate(caminhos):
             if kill_switch_active():
                 resultado.abortado_por = "kill-switch"
                 break
             if i:
-                dormir(intervalo)      # piso ENTRE requisições, nunca antes da 1ª
+                # Piso entre requisições; após recuo (429/503), backoff exponencial
+                # com teto. Nunca antes da 1ª, e nunca abaixo do piso.
+                espera = min(intervalo * (BACKOFF_FATOR ** recuos_seguidos), TETO_BACKOFF_S)
+                dormir(espera)
             achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id, ip_pinado)
+            if isinstance(achado, _PedeRecuo):
+                resultado.recuos += 1
+                recuos_seguidos += 1       # probe não concluído: executado NÃO sobe
+                continue
+            recuos_seguidos = 0            # resposta normal: zera o backoff
             if isinstance(achado, _FalhaDeRede):
                 resultado.falhas_rede += 1     # probe não concluído: executado NÃO sobe
                 continue

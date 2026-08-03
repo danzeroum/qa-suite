@@ -459,12 +459,11 @@ def test_tls_nunca_e_desabilitado_no_motor():
         assert not _desliga_tls(fonte), f"{modulo} desliga a verificação TLS"
 
 
-# ---------- specs adiadas ao C1b (contrato registrado, ainda não implementado) ----------
+# ---------- C1b fatia 2: HEAD 405 → GET Range, e backoff 429/503 ----------
 
-@pytest.mark.xfail(strict=True, reason="C1b: fallback GET Range: bytes=0-0 quando HEAD é 405")
 def test_head_405_faz_fallback_range_get(tmp_path, monkeypatch):
-    """Servidor que rejeita HEAD (405) deve ser reprovado por um GET mínimo
-    (`Range: bytes=0-0`), sem baixar o corpo. Ainda não implementado."""
+    """Servidor que rejeita HEAD (405) é reprovado por um GET mínimo
+    (`Range: bytes=0-0`), sem baixar o corpo."""
     registro = []
     rotas = {"/.git/HEAD": (405, {})}
     _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT], registro=registro)
@@ -473,11 +472,37 @@ def test_head_405_faz_fallback_range_get(tmp_path, monkeypatch):
     assert "GET" in metodos and "bytes=0-0" in ranges
 
 
-@pytest.mark.xfail(strict=True, reason="C1b: backoff em 429/503 antes de continuar")
+def test_405_fallback_get_range_confirma_existencia(tmp_path, monkeypatch):
+    """HEAD 405 e GET Range 206 → existência confirmada, vira Finding fase=C."""
+    def handler(request):
+        if request.method == "HEAD":
+            return httpx.Response(405)
+        assert request.headers.get("range") == "bytes=0-0", "GET tem de pedir 1 byte"
+        return httpx.Response(206, headers={"content-type": "application/octet-stream"})
+
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, [C_ENV], client=client, dry_run=False, dormir=lambda _s: None)
+
+    assert [f.fase for f in resultado.findings] == ["C"]
+    assert resultado.executado == 1
+
+
 def test_429_dispara_backoff(tmp_path, monkeypatch):
-    """Um 429 deve disparar uma espera MAIOR que o piso antes do próximo probe.
-    Ainda não implementado (hoje o intervalo é sempre o piso)."""
+    """Um 429 dispara uma espera MAIOR que o piso antes do próximo probe."""
     intervalos = []
     rotas = {"/.git/HEAD": (429, {}), "/.env": (404, {})}
     _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT, C_ENV], dormir=intervalos.append)
     assert any(i > PISO_INTERVALO_S for i in intervalos), "429 deveria ampliar a espera"
+
+
+def test_429_e_inconclusivo_e_nao_conta_como_executado(tmp_path, monkeypatch):
+    """Recuo do servidor não conclui o caminho: conta em `recuos`, não em
+    `executado`, e o run fica inconclusivo (não vira 'zero exposições')."""
+    rotas = {"/.git/HEAD": (429, {})}
+    resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT])
+    assert resultado.recuos == 1
+    assert resultado.executado == 0
+    assert resultado.findings == []
+    assert resultado.inconclusivo is True
