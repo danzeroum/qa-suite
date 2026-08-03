@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import json
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -534,6 +535,20 @@ def sondar_multialvo(escopo, caminhos: list[CaminhoSensivel],
             for entrada in escopo.entradas]
 
 
+def _finding_para_dict(f: Finding) -> dict:
+    """Finding → dict serializável. SÓ campos JÁ mascarados (o Finding os mascara
+    no construtor) — nada de host/IP cru chega ao laudo em disco."""
+    return {"tipo": f.tipo, "recurso": f.recurso, "severidade": f.severidade,
+            "evidencia": f.evidencia, "fase": f.fase,
+            "remediacao": f.remediacao, "procedencia": f.procedencia}
+
+
+def _resultado_para_dict(r: ResultadoSondagem) -> dict:
+    return {"alvo": r.alvo, "esperado": r.esperado, "executado": r.executado,
+            "inconclusivo": r.inconclusivo, "abortado_por": r.abortado_por,
+            "run_id": r.run_id, "findings": [_finding_para_dict(f) for f in r.findings]}
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI. `--dry-run` é o padrão; sondar de verdade exige `--executar`.
 
@@ -551,6 +566,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--caminhos", type=Path, default=Path("data/caminhos-sensiveis.yaml"))
     parser.add_argument("--executar", action="store_true",
                         help="sonda de verdade; sem esta flag, só planeja (dry-run)")
+    parser.add_argument("--saida", type=Path, help="grava o laudo (JSON) neste arquivo")
+    parser.add_argument("--sarif", type=Path, help="grava SARIF 2.1.0 (aba Security) neste arquivo")
+    parser.add_argument("--baseline", type=Path,
+                        help="classifica os achados contra este baseline.yaml; "
+                             "achado novo/reaberto reprova (exit 3)")
     args = parser.parse_args(argv)
     if not args.alvo and not args.multi_alvo:
         parser.error("informe --alvo ou --multi-alvo")
@@ -582,6 +602,36 @@ def main(argv: list[str] | None = None) -> int:
             print("  Resultado INCONCLUSIVO: o run não cobriu a superfície declarada.")
         for f in resultado.findings:
             print(f"  [{f.severidade}] {f.tipo} — {f.recurso}")
+
+    todos_os_findings = [f for r in resultados for f in r.findings]
+
+    # --saida: laudo JSON em disco (só campos já mascarados do Finding).
+    if args.saida:
+        args.saida.write_text(
+            json.dumps({"alvos": [_resultado_para_dict(r) for r in resultados]},
+                       ensure_ascii=False, indent=2),
+            encoding="utf-8")
+        print(f"Laudo gravado em {args.saida}")
+
+    # --sarif: SARIF 2.1.0 para a aba Security do GitHub.
+    if args.sarif:
+        from webqa.sarif import serializar_sarif
+        args.sarif.write_text(serializar_sarif(todos_os_findings), encoding="utf-8")
+        print(f"SARIF gravado em {args.sarif}")
+
+    # --baseline: ciclo de vida. Achado NOVO ou REABERTO reprova (exit 3);
+    # desaparecido é "possível correção" (revisão manual), NUNCA removido daqui.
+    if args.baseline:
+        from webqa.baseline import carregar_baseline, classificar
+        ciclo = classificar(todos_os_findings, carregar_baseline(args.baseline))
+        print(f"Baseline: {len(ciclo.novos)} novo(s), {len(ciclo.reabertos)} reaberto(s), "
+              f"{len(ciclo.persistentes)} persistente(s), "
+              f"{len(ciclo.desaparecidos)} desaparecido(s).")
+        for k in ciclo.desaparecidos:
+            print(f"  possível correção (revisão manual, não removido): {k}")
+        if ciclo.reprova:
+            print("Achado NOVO ou REABERTO — reprovando o run (exit 3).")
+            return 3
     return 0
 
 

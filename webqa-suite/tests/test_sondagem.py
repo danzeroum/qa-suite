@@ -12,6 +12,7 @@ remover o marcador.
 """
 from __future__ import annotations
 
+import json
 import socket
 from datetime import date
 
@@ -20,6 +21,7 @@ import pytest
 
 from webqa import escopo as escopo_mod
 from webqa import gates
+from webqa import sondagem as sondagem_mod
 from webqa.audit import AuditLog
 from webqa.sondagem import (
     MAX_CAMINHOS,
@@ -965,3 +967,61 @@ def test_categoria_fonte_e_valida_para_source_map(tmp_path):
     """A poda introduziu a categoria 'fonte' (source maps)."""
     c = CaminhoSensivel("/x.map", "fonte", "media", "application/json", "r", procedencia="CWE-540")
     assert c.categoria == "fonte"
+
+
+# ---------- C3a: liga SARIF + baseline + laudo ao CLI (main) ----------
+
+def _cli_setup(tmp_path, monkeypatch, rotas):
+    """Escopo+caminhos em disco, posse dublada, e `_cliente_padrao` → MockTransport.
+    Devolve os argumentos base do CLI (sem os flags de saída)."""
+    _escopo_valido(tmp_path, monkeypatch)                 # escreve yaml + dubla getaddrinfo
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    caminhos = tmp_path / "caminhos.yaml"
+    caminhos.write_text(
+        '- path: "/.git/HEAD"\n  categoria: "vcs"\n  severidade: "alta"\n'
+        '  content_type_esperado: "text/plain"\n  remediacao: "Remova o .git."\n'
+        '  procedencia: "OWASP WSTG-CONF-004"\n', encoding="utf-8")
+    monkeypatch.setattr(
+        "webqa.sondagem._cliente_padrao",
+        lambda: httpx.Client(transport=_transporte(rotas), follow_redirects=False))
+    return ["--alvo", ALVO, "--executar",
+            "--escopo", str(tmp_path / "escopo-autorizado.yaml"),
+            "--caminhos", str(caminhos)]
+
+
+_CHAVE_GIT = f"exposicao:vcs|{ALVO}/.git/HEAD"
+
+
+def test_cli_grava_saida_e_sarif_e_reprova_achado_novo(tmp_path, monkeypatch):
+    base = _cli_setup(tmp_path, monkeypatch, {"/.git/HEAD": (200, {"content-type": "text/plain"})})
+    saida, sarif, baseline = (tmp_path / "r.json", tmp_path / "r.sarif", tmp_path / "b.yaml")
+    rc = sondagem_mod.main(base + ["--saida", str(saida), "--sarif", str(sarif),
+                                   "--baseline", str(baseline)])
+    assert rc == 3                                        # baseline ausente → achado NOVO reprova
+    dados = json.loads(saida.read_text())
+    assert dados["alvos"][0]["findings"][0]["recurso"] == ALVO + "/.git/HEAD"
+    assert json.loads(sarif.read_text())["version"] == "2.1.0"
+
+
+def test_cli_baseline_persistente_nao_reprova(tmp_path, monkeypatch):
+    base = _cli_setup(tmp_path, monkeypatch, {"/.git/HEAD": (200, {"content-type": "text/plain"})})
+    baseline = tmp_path / "b.yaml"
+    baseline.write_text(f'achados:\n  - chave: "{_CHAVE_GIT}"\n    estado: "persistente"\n',
+                        encoding="utf-8")
+    assert sondagem_mod.main(base + ["--baseline", str(baseline)]) == 0
+
+
+def test_cli_sem_flags_de_saida_sai_0_e_nao_grava(tmp_path, monkeypatch):
+    base = _cli_setup(tmp_path, monkeypatch, {"/.git/HEAD": (200, {"content-type": "text/plain"})})
+    assert sondagem_mod.main(base) == 0
+    assert not (tmp_path / "r.json").exists()
+    assert not (tmp_path / "r.sarif").exists()
+
+
+def test_cli_sarif_nao_vaza_ip_cru_no_laudo(tmp_path, monkeypatch):
+    """O laudo/SARIF usa a URL LÓGICA (hostname), nunca o IP pinado."""
+    base = _cli_setup(tmp_path, monkeypatch, {"/.git/HEAD": (200, {"content-type": "text/plain"})})
+    saida, sarif = tmp_path / "r.json", tmp_path / "r.sarif"
+    sondagem_mod.main(base + ["--saida", str(saida), "--sarif", str(sarif)])
+    for arq in (saida, sarif):
+        assert IP_ALVO not in arq.read_text()            # IP pinado nunca no laudo
