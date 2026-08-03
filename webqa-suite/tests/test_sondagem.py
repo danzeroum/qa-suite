@@ -1063,3 +1063,35 @@ def test_cli_laudo_sem_combo_nao_tem_correlacao(tmp_path, monkeypatch):
     saida = tmp_path / "r.json"
     sondagem_mod.main(base + ["--saida", str(saida)])
     assert json.loads(saida.read_text())["correlacoes"] == []
+
+
+# ---------- C3c: curl reproduzível por achado ----------
+
+def test_finding_carrega_metodo_head_por_padrao(tmp_path, monkeypatch):
+    rotas = {"/.git/HEAD": (200, {"content-type": "text/plain"})}
+    resultado, _ = _sondar_ativo(tmp_path, monkeypatch, rotas, [C_GIT])
+    assert resultado.findings[0].metodo == "HEAD"
+    assert resultado.ip_pinado == IP_ALVO           # C3c: run guarda o IP pinado
+
+
+def test_finding_via_405_carrega_metodo_get_range(tmp_path, monkeypatch):
+    """HEAD 405 → GET Range confirma → o finding registra metodo GET(range),
+    para o curl reproduzível sair com -r 0-0."""
+    def handler(request):
+        if request.method == "HEAD":
+            return httpx.Response(405)
+        return httpx.Response(206, headers={"content-type": "application/octet-stream"})
+
+    escopo = _escopo_valido(tmp_path, monkeypatch)
+    monkeypatch.setenv(gates.DISCOVERY_ENV, "1")
+    client = httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=False)
+    resultado = sondar(escopo, ALVO, [C_ENV], client=client, dry_run=False, dormir=lambda _s: None)
+    assert resultado.findings[0].metodo == "GET(range)"
+
+
+def test_cli_curl_imprime_resolve_e_nao_ip_na_url(tmp_path, monkeypatch, capsys):
+    base = _cli_setup(tmp_path, monkeypatch, {"/.git/HEAD": (200, {"content-type": "text/plain"})})
+    sondagem_mod.main(base + ["--curl"])
+    saida = capsys.readouterr().out
+    assert f"--resolve alvo-fixture.exemplo:443:{IP_ALVO}" in saida
+    assert f"https://{IP_ALVO}" not in saida         # IP nunca na URL do curl

@@ -148,6 +148,9 @@ class ResultadoSondagem:
     run_id: str = ""
     falhas_rede: int = 0
     recuos: int = 0
+    # IP efetivamente pinado no run (C1c). Diagnóstico interno para o curl
+    # reproduzível (C3c, via --resolve); NÃO entra no laudo results.json.
+    ip_pinado: str = ""
 
     @property
     def inconclusivo(self) -> bool:
@@ -282,7 +285,8 @@ def calcular_espera_backoff(recuos_seguidos: int, intervalo: float) -> float:
 def avaliar_resposta_em_finding(status: int, content_type: str,
                                 caminho: CaminhoSensivel, url_logica: str, *,
                                 content_length: str | None = None,
-                                baseline_catch_all: tuple | None = None):
+                                baseline_catch_all: tuple | None = None,
+                                metodo_usado: str = "HEAD"):
     """PURA: classifica a resposta FINAL do probe, sem I/O nem log.
 
     `_PEDE_RECUO` (429/503) · `None` (não-2xx: ausência) · `_SOFT_404` (2xx mas
@@ -311,6 +315,7 @@ def avaliar_resposta_em_finding(status: int, content_type: str,
         fase="C",
         remediacao=caminho.remediacao,
         procedencia=caminho.procedencia,
+        metodo=metodo_usado,
     )
 
 
@@ -406,7 +411,8 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
 
     veredito = avaliar_resposta_em_finding(
         status, content_type, caminho, url_logica,
-        content_length=content_length, baseline_catch_all=baseline_catch_all)
+        content_length=content_length, baseline_catch_all=baseline_catch_all,
+        metodo_usado=metodo_usado)
     if veredito is _SOFT_404:
         # Descarte auditado: sem isto o log mostra 200 sem finding e sem motivo,
         # indistinguível de bug (G5). Nenhuma requisição nova — só a decisão.
@@ -468,7 +474,8 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     fechar_no_fim = client is None
     client = client or _cliente_padrao()
 
-    resultado = ResultadoSondagem(alvo=alvo, esperado=esperado, run_id=run_id)
+    resultado = ResultadoSondagem(alvo=alvo, esperado=esperado, run_id=run_id,
+                                  ip_pinado=ip_pinado)
     recuos_seguidos = 0
     falhas_consecutivas = 0
     try:
@@ -571,6 +578,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--baseline", type=Path,
                         help="classifica os achados contra este baseline.yaml; "
                              "achado novo/reaberto reprova (exit 3)")
+    parser.add_argument("--curl", action="store_true",
+                        help="imprime um curl reproduzível por achado (IP só no --resolve)")
     args = parser.parse_args(argv)
     if not args.alvo and not args.multi_alvo:
         parser.error("informe --alvo ou --multi-alvo")
@@ -604,6 +613,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  [{f.severidade}] {f.tipo} — {f.recurso}")
 
     todos_os_findings = [f for r in resultados for f in r.findings]
+
+    # --curl: comando de reprodução por achado (IP só no --resolve, nunca na URL).
+    if args.curl:
+        from webqa.curl_repro import curl_de
+        print("Reprodução (curl):")
+        for r in resultados:
+            for f in r.findings:
+                print(f"  {curl_de(f, r.ip_pinado)}")
 
     # --saida: laudo JSON em disco (só campos já mascarados do Finding). Inclui as
     # anotações de risco composto (C3b) — agrupamento, NUNCA severidade nova.
