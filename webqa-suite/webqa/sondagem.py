@@ -199,6 +199,14 @@ class _PedeRecuo:
 
 _PEDE_RECUO = _PedeRecuo()
 
+
+class _Soft404:
+    """Sinal interno: 2xx, mas provável soft-404 — descartado, e o descarte é
+    auditado pelo chamador (a avaliação é pura; o log é efeito, fica fora dela)."""
+
+
+_SOFT_404 = _Soft404()
+
 # Status em que o servidor pede para desacelerar: o laço faz backoff e NÃO conta
 # o probe como concluído (o caminho fica inconclusivo, nunca 'limpo').
 STATUS_DE_RECUO = frozenset({429, 503})
@@ -253,6 +261,61 @@ def _url_pinada(alvo: str, ip: str, path: str) -> tuple[str, str, str]:
     return url_logica, url_pinada, host
 
 
+def calcular_espera_backoff(recuos_seguidos: int, intervalo: float) -> float:
+    """Espera ENTRE requisições: o piso, ampliado por backoff exponencial após
+    recuo (429/503), com teto. `intervalo` já vem pisado (>= PISO_INTERVALO_S),
+    então o resultado nunca fica abaixo do piso — invariante isolado num só lugar
+    (higiene), sem mudar o cálculo do laço."""
+    return min(intervalo * (BACKOFF_FATOR ** recuos_seguidos), TETO_BACKOFF_S)
+
+
+def avaliar_resposta_em_finding(status: int, content_type: str,
+                                caminho: CaminhoSensivel, url_logica: str):
+    """PURA: classifica a resposta FINAL do probe, sem I/O nem log.
+
+    `_PEDE_RECUO` (429/503) · `None` (não-2xx: ausência) · `_SOFT_404` (2xx mas
+    provável soft-404 — o chamador audita o descarte) · `Finding` (2xx legítimo).
+    Isolar aqui a decisão a torna testável sem mockar httpx nem AuditLog."""
+    if status in STATUS_DE_RECUO:
+        return _PEDE_RECUO
+    if not (200 <= status < 300):
+        return None
+    if _e_soft_404(caminho.content_type_esperado, content_type):
+        return _SOFT_404
+    return Finding(
+        tipo=f"exposicao:{caminho.categoria}",
+        recurso=url_logica,
+        severidade=caminho.severidade,
+        evidencia=f"{caminho.path} respondeu {status} "
+                  "(existência confirmada; corpo não lido)",
+        fase="C",
+        remediacao=caminho.remediacao,
+        procedencia=caminho.procedencia,
+    )
+
+
+def executar_fallback_get(client: httpx.Client, url_logica: str, url_pinada: str,
+                          cabecalhos: dict, extensoes: dict, log: AuditLog,
+                          alvo: str, autorizacao_id: str) -> tuple[int, str] | _FalhaDeRede:
+    """A ÚNICA exceção ao HEAD-only, isolada para o CODEOWNER auditar num só lugar
+    que 'nunca baixa o recurso' é mantido: 405 → GET com `Range: bytes=0-0`, em
+    stream SEM iterar (lê no máximo 1 byte). Devolve (status, content_type) ou
+    `_FALHA_DE_REDE`; audita a requisição (ou a falha) como qualquer probe."""
+    try:
+        with client.stream("GET", url_pinada, extensions=extensoes,
+                           headers={**cabecalhos, "Range": "bytes=0-0"}) as r:
+            status = r.status_code
+            content_type = r.headers.get("content-type", "")
+    except httpx.RequestError as erro:
+        log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
+                      autorizacao_id=autorizacao_id, status=-1,
+                      evento=f"falha-de-rede:{type(erro).__name__}")
+        return _FALHA_DE_REDE
+    log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
+                  autorizacao_id=autorizacao_id, status=status)
+    return status, content_type
+
+
 def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
                    log: AuditLog, autorizacao_id: str,
                    ip_pinado: str) -> Finding | None | _FalhaDeRede | _PedeRecuo:
@@ -285,44 +348,25 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
     status = resposta.status_code
     content_type = resposta.headers.get("content-type", "")
 
-    # 405 (HEAD não permitido): confirma existência com GET mínimo, `Range:
-    # bytes=0-0` — stream sem iterar lê no máximo 1 byte, nunca o corpo.
+    # 405 (HEAD não permitido): confirma existência com GET mínimo (Range), na
+    # função isolada que o CODEOWNER audita como a única exceção ao HEAD-only.
     if status == 405:
         metodo_usado = "GET(range)"
-        try:
-            with client.stream("GET", url_pinada, extensions=extensoes,
-                               headers={**cabecalhos, "Range": "bytes=0-0"}) as r:
-                status = r.status_code
-                content_type = r.headers.get("content-type", "")
-        except httpx.RequestError as erro:
-            log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
-                          autorizacao_id=autorizacao_id, status=-1,
-                          evento=f"falha-de-rede:{type(erro).__name__}")
+        fallback = executar_fallback_get(client, url_logica, url_pinada,
+                                         cabecalhos, extensoes, log, alvo, autorizacao_id)
+        if isinstance(fallback, _FalhaDeRede):
             return _FALHA_DE_REDE
-        log.registrar(url=url_logica, metodo="GET(range)", alvo=alvo,
-                      autorizacao_id=autorizacao_id, status=status)
+        status, content_type = fallback
 
-    if status in STATUS_DE_RECUO:      # 429/503: não conclui, sinaliza backoff
-        return _PEDE_RECUO
-    if not (200 <= status < 300):
-        return None
-    if _e_soft_404(caminho.content_type_esperado, content_type):
+    veredito = avaliar_resposta_em_finding(status, content_type, caminho, url_logica)
+    if veredito is _SOFT_404:
         # Descarte auditado: sem isto o log mostra 200 sem finding e sem motivo,
         # indistinguível de bug (G5). Nenhuma requisição nova — só a decisão.
         log.registrar(url=url_logica, metodo=metodo_usado, alvo=alvo,
                       autorizacao_id=autorizacao_id, status=status,
                       evento="descartado:soft-404")
         return None
-    return Finding(
-        tipo=f"exposicao:{caminho.categoria}",
-        recurso=url_logica,
-        severidade=caminho.severidade,
-        evidencia=f"{caminho.path} respondeu {status} "
-                  "(existência confirmada; corpo não lido)",
-        fase="C",
-        remediacao=caminho.remediacao,
-        procedencia=caminho.procedencia,
-    )
+    return veredito
 
 
 def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
@@ -389,8 +433,7 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
             if i:
                 # Piso entre requisições; após recuo (429/503), backoff exponencial
                 # com teto. Nunca antes da 1ª, e nunca abaixo do piso.
-                espera = min(intervalo * (BACKOFF_FATOR ** recuos_seguidos), TETO_BACKOFF_S)
-                dormir(espera)
+                dormir(calcular_espera_backoff(recuos_seguidos, intervalo))
             achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id, ip_pinado)
             if isinstance(achado, _PedeRecuo | _FalhaDeRede):
                 # Probe NÃO concluído (executado não sobe). Recuo amplia o backoff;
