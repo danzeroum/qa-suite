@@ -54,8 +54,18 @@ MAX_CAMINHOS = 200
 # quem chama pode ser mais lento, nunca mais rápido (respeito ao alvo é invariante).
 PISO_INTERVALO_S = 1.0
 
-TIMEOUT_S = 10.0
+# Timeout granular: connect baixo (host inacessível não come o orçamento) e read
+# maior (host lento, mas dentro do orçamento, ainda responde). Escalar único
+# forçava escolher entre abortar cedo demais ou cortar probe legítimo (G6).
+TIMEOUT_CONNECT_S = 5.0
+TIMEOUT_READ_S = 10.0
 USER_AGENT = "WebQA-FaseC/1.0 (auditoria autorizada; detectar-nao-explorar)"
+
+# Circuit breaker: N recuos/falhas de rede CONSECUTIVOS abortam o alvo. Um alvo
+# que responde 429 a cada probe faria o run dormir minutos e terminar inconclusivo
+# do mesmo jeito — falhar rápido é mais honesto e respeita o alvo (G1). Uma
+# resposta válida no meio zera a contagem.
+MAX_FALHAS_CONSECUTIVAS = 5
 
 
 @dataclass(frozen=True)
@@ -149,7 +159,8 @@ def _cliente_padrao() -> httpx.Client:
     que o alvo não ofereceu para aquele caminho — e poderia sair do escopo.
     """
     return httpx.Client(
-        timeout=TIMEOUT_S,
+        timeout=httpx.Timeout(connect=TIMEOUT_CONNECT_S, read=TIMEOUT_READ_S,
+                              write=TIMEOUT_CONNECT_S, pool=TIMEOUT_CONNECT_S),
         follow_redirects=False,
         http2=True,
         headers={"User-Agent": USER_AGENT},
@@ -262,6 +273,7 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
     url_logica, url_pinada, host = _url_pinada(alvo, ip_pinado, caminho.path)
     cabecalhos = {"Host": host}
     extensoes = {"sni_hostname": host}
+    metodo_usado = "HEAD"
     try:
         resposta = client.head(url_pinada, headers=cabecalhos, extensions=extensoes)
     except httpx.RequestError as erro:
@@ -276,6 +288,7 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
     # 405 (HEAD não permitido): confirma existência com GET mínimo, `Range:
     # bytes=0-0` — stream sem iterar lê no máximo 1 byte, nunca o corpo.
     if status == 405:
+        metodo_usado = "GET(range)"
         try:
             with client.stream("GET", url_pinada, extensions=extensoes,
                                headers={**cabecalhos, "Range": "bytes=0-0"}) as r:
@@ -294,6 +307,11 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
     if not (200 <= status < 300):
         return None
     if _e_soft_404(caminho.content_type_esperado, content_type):
+        # Descarte auditado: sem isto o log mostra 200 sem finding e sem motivo,
+        # indistinguível de bug (G5). Nenhuma requisição nova — só a decisão.
+        log.registrar(url=url_logica, metodo=metodo_usado, alvo=alvo,
+                      autorizacao_id=autorizacao_id, status=status,
+                      evento="descartado:soft-404")
         return None
     return Finding(
         tipo=f"exposicao:{caminho.categoria}",
@@ -316,7 +334,9 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     O caminho ativo (`dry_run=False`) é gated em três portões antes de qualquer
     requisição: `require_discovery` (opt-in C1), `require_escopo` (host na
     allowlist) e `verificar_posse` (IP não divergiu do carregamento). Depois,
-    o laço respeita o piso de rate-limit e checa o kill-switch a cada iteração.
+    o laço respeita o piso de rate-limit e checa o kill-switch a cada iteração,
+    e aborta o alvo após `MAX_FALHAS_CONSECUTIVAS` recuos/falhas seguidos
+    (circuit breaker). Todos os abortos deixam evento no `AuditLog`.
     """
     _validar_alvo(alvo)          # fail-fast antes de qualquer portão ou requisição
     esperado = len(caminhos)
@@ -333,8 +353,17 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     require_discovery()
     require_escopo(escopo, alvo)
     host = urlsplit(alvo).hostname or ""
+    # require_escopo já abortou se fora do escopo: aqui o alvo está no escopo.
+    autorizacao_id = escopo.entrada(alvo).evidencia
+    # Log criado DEPOIS dos portões (que decidem SE roda) e ANTES de verificar_posse,
+    # para o aborto por posse-divergente deixar rastro. Antes de require_discovery
+    # faria um run não-autorizado criar o log (G4).
+    log = log or AuditLog(run_id=run_id, escopo_hash=getattr(escopo, "hash_congelado", ""))
+
     ips_pinados = escopo.verificar_posse(host)
     if not ips_pinados:
+        log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
+                             evento="abortado:posse-divergente")
         return ResultadoSondagem(alvo=alvo, esperado=esperado, executado=0,
                                  abortado_por="posse-divergente", run_id=run_id)
     # Pina UM IP provado e conecta só nele — o probe não re-resolve o DNS.
@@ -344,16 +373,16 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
     intervalo = max(intervalo_s, PISO_INTERVALO_S)   # piso não-configurável
     fechar_no_fim = client is None
     client = client or _cliente_padrao()
-    log = log or AuditLog(run_id=run_id, escopo_hash=getattr(escopo, "hash_congelado", ""))
-    # require_escopo já abortou se fora do escopo: aqui o alvo está no escopo.
-    autorizacao_id = escopo.entrada(alvo).evidencia
 
     resultado = ResultadoSondagem(alvo=alvo, esperado=esperado, run_id=run_id)
     recuos_seguidos = 0
+    falhas_consecutivas = 0
     try:
         for i, caminho in enumerate(caminhos):
             if kill_switch_active():
                 resultado.abortado_por = "kill-switch"
+                log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
+                                     evento="abortado:kill-switch")
                 break
             if i:
                 # Piso entre requisições; após recuo (429/503), backoff exponencial
@@ -361,14 +390,25 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
                 espera = min(intervalo * (BACKOFF_FATOR ** recuos_seguidos), TETO_BACKOFF_S)
                 dormir(espera)
             achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id, ip_pinado)
-            if isinstance(achado, _PedeRecuo):
-                resultado.recuos += 1
-                recuos_seguidos += 1       # probe não concluído: executado NÃO sobe
+            if isinstance(achado, _PedeRecuo | _FalhaDeRede):
+                # Probe NÃO concluído (executado não sobe). Recuo amplia o backoff;
+                # ambos contam para o circuit breaker (G1).
+                if isinstance(achado, _PedeRecuo):
+                    resultado.recuos += 1
+                    recuos_seguidos += 1
+                else:
+                    resultado.falhas_rede += 1
+                    recuos_seguidos = 0    # falha de rede não é recuo: não amplia backoff
+                falhas_consecutivas += 1
+                if falhas_consecutivas >= MAX_FALHAS_CONSECUTIVAS:
+                    resultado.abortado_por = "circuit-breaker"
+                    log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
+                                         evento="abortado:circuit-breaker")
+                    break
                 continue
-            recuos_seguidos = 0            # resposta normal: zera o backoff
-            if isinstance(achado, _FalhaDeRede):
-                resultado.falhas_rede += 1     # probe não concluído: executado NÃO sobe
-                continue
+            # Resposta válida: probe concluído, zera backoff e breaker.
+            recuos_seguidos = 0
+            falhas_consecutivas = 0
             resultado.executado += 1
             if achado is not None:
                 resultado.findings.append(achado)
