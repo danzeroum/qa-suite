@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="theme-color" content="#FFFFFF">
+<style>
+  body{margin:0;background:#F5F3EF;color:#1C2228}
+  a{color:#1E5A8A;text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+  a:hover{text-decoration-thickness:2px}
+  @keyframes acende{to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+  ::selection{background:#1E5A8A;color:#FFFFFF}
+  .cel:focus-visible{outline:2px solid #8A5800;outline-offset:1px}
+  button:focus-visible,input:focus-visible{outline:2px solid #8A5800;outline-offset:2px}
+</style>
+</helmet>
+
+<!-- escala tipográfica: 11 · 12 · 13.5 · 15 · 19 · 27 · 34(só numérico) -->
+<div style="display:flex;min-height:100vh;font:400 15px/1.55 ui-sans-serif,system-ui,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased">
+
+  <!-- trilho: procedência em uma linha + navegação -->
+  <nav aria-label="Módulos do cockpit" style="width:230px;flex:0 0 230px;border-right:1px solid #DED9D1;padding:24px 18px 18px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:20px;overflow:auto">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font:700 19px/1 ui-monospace,'SF Mono','Cascadia Mono',Menlo,Consolas,monospace;letter-spacing:-.02em">cockpit<b style="color:#1E5A8A">/</b>testes</span>
+      <span style="font:400 11px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#4A5560" title="{{ procCompleta }}">{{ procLinha }}</span>
+      <button onClick="{{ irRegua }}" aria-label="Abrir A régua — modo de execução e comparabilidade" style="display:flex;flex-direction:column;gap:4px;text-align:left;border:0;border-left:3px solid {{ seloCor }};background:#EDF2F7;padding:7px 10px;cursor:pointer;border-radius:0 2px 2px 0" style-hover="background:#E4EAF1">
+        <span style="font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560">modo de execução</span>
+        <span style="font:700 12px/1 ui-monospace,Menlo,monospace;color:#1C2228">{{ seloModo }}</span>
+        <span style="font:400 10.5px/1.3 ui-monospace,Menlo,monospace;color:#4A5560">{{ seloGates }}</span>
+      </button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:4px" data-screen-label="Navegação">
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin-bottom:4px">o todo</span>
+      <button onClick="{{ irVisao }}" style="{{ navVisao }}" style-hover="border-color:#DED9D1"><span>Visão geral</span><span style="opacity:.6">{{ nCasos }}</span></button>
+      <button onClick="{{ irExecucao }}" style="{{ navExecucao }}" style-hover="border-color:#DED9D1"><span>Execução &amp; descritiva</span><span style="opacity:.6">{{ nExe }}</span></button>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:14px 0 4px">o instrumento</span>
+      <button onClick="{{ irMotor }}" style="{{ navMotor }}" style-hover="border-color:#DED9D1"><span>O motor &amp; maturidade</span><span style="opacity:.6">{{ covGeral }}</span></button>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:14px 0 4px">as partes</span>
+      <button onClick="{{ irCatalogo }}" style="{{ navCatalogo }}" style-hover="border-color:#DED9D1"><span>Catálogo</span><span style="opacity:.6">{{ nTestes }}</span></button>
+      <button onClick="{{ irLeitura }}" style="{{ navLeitura }}" style-hover="border-color:#DED9D1"><span>Modo leitura</span><span style="opacity:.6">{{ nArquivos }}</span></button>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:14px 0 4px">sob que régua</span>
+      <button onClick="{{ irRegua }}" style="{{ navRegua }}" style-hover="border-color:#DED9D1"><span>A régua · modo</span><span style="opacity:.6">{{ seloModo }}</span></button>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:14px 0 4px">gestão da suíte</span>
+      <button onClick="{{ irEntrega }}" style="{{ navEntrega }}" style-hover="border-color:#DED9D1"><span>Entrega &amp; saúde</span><span style="opacity:.6">16 PR</span></button>
+      <button onClick="{{ irGov }}" style="{{ navGov }}" style-hover="border-color:#DED9D1"><span>Governança &amp; fronteira</span></button>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:14px 0 4px">para o desenvolvedor</span>
+      <button onClick="{{ irDev }}" style="{{ navDev }}" style-hover="border-color:#DED9D1"><span>Contrato de dados</span><span style="opacity:.6">--json</span></button>
+      <span style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:14px 0 4px">para quem aprova</span>
+      <button onClick="{{ irLaudo }}" style="{{ navLaudo }}" style-hover="border-color:#DED9D1"><span>Laudo · humano ou IA</span></button>
+      <button onClick="{{ irDiff }}" style="{{ navDiff }}" style-hover="border-color:#DED9D1"><span>Entre leituras</span></button>
+      <button onClick="{{ irModulos }}" style="{{ navModulos }}" style-hover="border-color:#DED9D1"><span>Módulos &amp; customização</span></button>
+    </div>
+
+    <sc-if value="{{ semRun }}" hint-placeholder-val="{{ false }}">
+      <p style="margin-top:auto;font:600 11px/1.5 ui-monospace,Menlo,monospace;color:#1C2228;background:#EDF2F7;border-left:3px solid #1C2228;padding:8px 10px">cenário: nenhum run conhecido — o painel mostra só o que está escrito</p>
+    </sc-if>
+    <p style="margin-top:{{ mtRodape }};font:400 11px/1.6 ui-monospace,Menlo,monospace;color:#4A5560">leitura estática · nada importado · nada persistido · lido em {{ lidoEm }}</p>
+  </nav>
+
+  <!-- palco -->
+  <main style="flex:1;min-width:0;padding:30px 40px 110px;max-width:1120px">
+
+    <sc-if value="{{ erro }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:14px 18px;font-size:13.5px;max-width:74ch">
+        <b>uploads/catalogo.json não foi encontrado</b> — e o cockpit não inventa números.<br>
+        Regenere o catálogo e recarregue:<br>
+        <code style="font:400 12px ui-monospace,Menlo,monospace;display:inline-block;margin-top:6px;background:#FFFFFF;border:1px solid #DED9D1;padding:4px 8px">python scripts/cockpit.py --json uploads/catalogo.json</code>
+      </div>
+    </sc-if>
+
+    <!-- ======================= TELA · VISÃO GERAL ======================= -->
+    <sc-if value="{{ telaVisao }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Visão geral">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:34px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">a pergunta que este painel responde</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:34ch;text-wrap:pretty">O que esta suíte testa, e quanto disso o último run <em style="font-style:normal;font-family:ui-monospace,Menlo,monospace;font-weight:700;border-bottom:3px solid #8A5800">realmente tocou</em>.</h1>
+        <p style="font:400 12px/1.6 ui-monospace,Menlo,monospace;color:#4A5560;margin:12px 0 0">{{ nTestes }} testes · {{ nCasos }} casos · <b style="color:#2F6B4F">{{ nExe }} executados ({{ pctExe }})</b> · {{ nBuraco }} sem opinião — <button onClick="{{ irExecucao }}" style="font:400 12px ui-monospace,Menlo,monospace;background:none;border:0;padding:0;color:#1E5A8A;text-decoration:underline;text-underline-offset:2px;cursor:pointer">ver a reconciliação →</button></p>
+      </header>
+
+      <sc-if value="{{ modMapa }}" hint-placeholder-val="{{ true }}">
+      <section style="margin-bottom:48px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Mapa do lote <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">1 célula = 1 caso coletável</span></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:16px;align-items:start">
+          <div style="border-left:2px solid #DED9D1;padding-left:14px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">checks/ · julga o alvo · {{ casosAlvo }} casos</p>
+            {{ mapaAlvo }}
+          </div>
+          <div style="border-left:2px solid #DED9D1;padding-left:14px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">tests/ · verifica a suíte · {{ casosSuite }} casos</p>
+            {{ mapaSuite }}
+          </div>
+        </div>
+        <p ref="{{ refRegiao }}" aria-live="polite" style="font:400 12px/1.5 ui-monospace,Menlo,monospace;color:#1C2228;background:#EDF2F7;padding:7px 12px;margin:16px 0 0;min-height:32px">passe o mouse ou navegue por Tab pelas células — cada uma é um caso, com nome e veredito</p>
+        <div style="display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:12px">
+          <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:1px;background:#2F6B4F;display:inline-block"></span>passou</span>
+          <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:1px;background:#8A5800;display:inline-block"></span>condicional (xfail)</span>
+          <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:1px;background:#9E2222;display:inline-block"></span>falhou</span>
+          <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:1px;background:#DED9D1;display:inline-block"></span>pulado</span>
+          <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:1px;{{ swVazio }}display:inline-block"></span>nunca executado</span>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:70ch;margin:12px 0 0">As células vazadas não são erro: são a parte da suíte sobre a qual este run <b style="color:#1C2228;font-weight:600">não tem opinião</b>. Se sumissem da tela, a ausência seria lida como aprovação.</p>
+      </section>
+      </sc-if>
+
+      <sc-if value="{{ modPopulacoes }}" hint-placeholder-val="{{ true }}">
+      <section style="margin-bottom:48px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Duas populações <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">que nunca se somam</span></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <div style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">população A · validação</p>
+            <h3 style="margin:6px 0 2px;font-size:15px">Julga o alvo</h3>
+            <p style="margin:0 0 12px;color:#4A5560;font-size:13.5px"><code style="font:12px ui-monospace,Menlo,monospace">checks/</code> — o site auditado faz o que deveria?</p>
+            <span style="font:700 27px/1 ui-monospace,Menlo,monospace">{{ nAlvo }}</span>
+            <p style="font:600 11px/1.5 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:8px 0 0">falha aqui é achado sobre o alvo</p>
+          </div>
+          <div style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">população B · verificação</p>
+            <h3 style="margin:6px 0 2px;font-size:15px">Verifica a suíte</h3>
+            <p style="margin:0 0 12px;color:#4A5560;font-size:13.5px"><code style="font:12px ui-monospace,Menlo,monospace">tests/</code> — o próprio motor está correto?</p>
+            <span style="font:700 27px/1 ui-monospace,Menlo,monospace">{{ nSuite }}</span>
+            <p style="font:600 11px/1.5 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:8px 0 0">falha aqui é bug na ferramenta</p>
+          </div>
+        </div>
+      </section>
+      </sc-if>
+
+      <sc-if value="{{ modNiveis }}" hint-placeholder-val="{{ true }}">
+      <section style="margin-bottom:48px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Níveis de teste <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">1 célula = 1 teste · derivado do código, não digitado</span></h2>
+        <div style="display:grid;gap:14px;margin-top:16px">
+          <sc-for list="{{ niveisLinhas }}" as="nv" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:150px 1fr 110px;gap:14px;align-items:start">
+              <span style="font:400 12px/1.4 ui-monospace,Menlo,monospace;padding-top:1px">{{ nv.k }}</span>
+              {{ nv.grade }}
+              <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;text-align:right;padding-top:1px">{{ nv.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:13px 17px;font-size:13.5px;margin:18px 0 0;max-width:76ch">{{ alertaPiramide }}</div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:70ch;margin:12px 0 0">A mesma célula do mapa, agora agrupada por nível: <code style="font:12px ui-monospace,Menlo,monospace">aceitacao</code> não é uma barra de 0,1% — é <b style="color:#1C2228;font-weight:600">uma célula sozinha na linha</b>.</p>
+      </section>
+      </sc-if>
+
+      <sc-if value="{{ modDimensoes }}" hint-placeholder-val="{{ true }}">
+      <section style="margin-bottom:48px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Dimensões de qualidade <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">somente a população que julga o alvo</span></h2>
+        <div style="display:grid;gap:14px;margin-top:16px">
+          <sc-for list="{{ dimsLinhas }}" as="d" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:150px 1fr 110px;gap:14px;align-items:start">
+              <span style="font:400 12px/1.4 ui-monospace,Menlo,monospace;padding-top:1px">{{ d.k }}</span>
+              {{ d.grade }}
+              <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;text-align:right;padding-top:1px">{{ d.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:70ch;margin:12px 0 0">As dimensões espelham os <code style="font:12px ui-monospace,Menlo,monospace">markers</code> do <code style="font:12px ui-monospace,Menlo,monospace">pytest.ini</code>. Marcador novo aparece aqui sozinho; dimensão vazia some.</p>
+      </section>
+      </sc-if>
+
+      <sc-if value="{{ modLeitura }}" hint-placeholder-val="{{ true }}">
+      <section>
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Como ler este painel <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">e o que ele não diz</span></h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <article style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">verificação × validação</p>
+            <h4 style="margin:8px 0 6px;font-size:15px">São perguntas diferentes</h4>
+            <p style="margin:0;font-size:13.5px;color:#4A5560">Verificação pergunta "está correto?"; validação, "faz o que deveria?". O painel respeita a separação em vez de dissolvê-la num total único.</p>
+            <cite style="display:block;margin-top:12px;font:400 11px ui-monospace,Menlo,monospace;font-style:normal;color:#4A5560;border-top:1px solid #DED9D1;padding-top:8px">Garantia e Controle de Qualidade — Jeniffer Deus</cite>
+          </article>
+          <article style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">amostra × população</p>
+            <h4 style="margin:8px 0 6px;font-size:15px">Um run é uma amostra</h4>
+            <p style="margin:0;font-size:13.5px;color:#4A5560">Filtrar por marcador ou faltar Chromium muda a amostra sem avisar. Sem a cobertura de execução, "tudo verde" descreve uma população que ninguém contou.</p>
+            <cite style="display:block;margin-top:12px;font:400 11px ui-monospace,Menlo,monospace;font-style:normal;color:#4A5560;border-top:1px solid #DED9D1;padding-top:8px">Analytics em Negócios — Marcelo H. de Araujo</cite>
+          </article>
+          <article style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">visibilidade do estado</p>
+            <h4 style="margin:8px 0 6px;font-size:15px">O vazio é informação</h4>
+            <p style="margin:0;font-size:13.5px;color:#4A5560">A 1ª heurística de Nielsen pede que o sistema mostre o próprio estado. Teste não executado tem aparência própria — sumir da tela seria lido como aprovação.</p>
+            <cite style="display:block;margin-top:12px;font:400 11px ui-monospace,Menlo,monospace;font-style:normal;color:#4A5560;border-top:1px solid #DED9D1;padding-top:8px">UX no Desenvolvimento de Software — Paula A. Macedo</cite>
+          </article>
+          <article style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">limite</p>
+            <h4 style="margin:8px 0 6px;font-size:15px">O que este painel não sabe</h4>
+            <p style="margin:0;font-size:13.5px;color:#4A5560">Não mede cobertura de linhas, não julga se o teste é bom, não vê o que o <code style="font:12px ui-monospace,Menlo,monospace">skipif</code> decidirá em runtime. Descreve o que está escrito e o que rodou.</p>
+            <cite style="display:block;margin-top:12px;font:400 11px ui-monospace,Menlo,monospace;font-style:normal;color:#4A5560;border-top:1px solid #DED9D1;padding-top:8px">leitura estática · sem importar módulos</cite>
+          </article>
+        </div>
+      </section>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · CATÁLOGO (+ painel de detalhe) ======================= -->
+    <sc-if value="{{ telaCatalogo }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Catálogo">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:22px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">catálogo completo · <span style="color:#1C2228">{{ contador }}</span></p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:38ch;text-wrap:pretty">Todos os testes que existem no código — executados ou não.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:74ch;margin:10px 0 0">{{ semContrato }} de {{ nTestes }} não têm docstring; o painel mostra o nome da função no lugar — mas nome de função não é contrato. Clique numa linha para abrir a ficha sem perder os filtros.</p>
+      </header>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 16px">
+        <sc-for list="{{ chips }}" as="ch" hint-placeholder-count="8">
+          <button onClick="{{ ch.on }}" aria-pressed="{{ ch.ativo }}" style="{{ ch.estilo }}" style-hover="border-color:#4A5560">{{ ch.rotulo }}</button>
+        </sc-for>
+        <input type="search" value="{{ busca }}" onInput="{{ aoBuscar }}" placeholder="buscar por nome, contrato, dimensão…" aria-label="Buscar no catálogo" style="font:400 12px ui-monospace,Menlo,monospace;padding:6px 10px;flex:1;min-width:200px;border:1px solid #DED9D1;background:#FFFFFF;color:#1C2228;border-radius:2px">
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px">
+        <thead><tr>
+          <th style="text-align:left;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 10px 7px;width:46%">Teste e o que ele garante</th>
+          <th style="text-align:left;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 10px 7px;width:24%">Classificação</th>
+          <th style="text-align:left;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 10px 7px;width:16%">Último run</th>
+          <th style="text-align:left;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 10px 7px;width:14%">Duração</th>
+        </tr></thead>
+        <tbody>
+          <sc-for list="{{ linhas }}" as="t" hint-placeholder-count="10">
+            <tr onClick="{{ t.on }}" style="cursor:pointer" style-hover="background:#EDF2F7" title="abrir ficha do teste">
+              <td style="padding:{{ padTd }};border-bottom:1px solid #DED9D1;vertical-align:top">
+                <span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word">{{ t.funcao }}</span>
+                <small style="display:block;color:#4A5560;font-size:12px;margin-top:3px;max-width:62ch">{{ t.contrato }}</small>
+                <small style="display:block;color:#4A5560;opacity:.65;font:400 11px ui-monospace,Menlo,monospace;margin-top:3px">{{ t.onde }}</small>
+              </td>
+              <td style="padding:{{ padTd }};border-bottom:1px solid #DED9D1;vertical-align:top">
+                <span style="display:inline-flex;flex-wrap:wrap;gap:4px">
+                  <sc-for list="{{ t.tags }}" as="tg" hint-placeholder-count="1">
+                    <span style="font:400 11px ui-monospace,Menlo,monospace;padding:2px 6px;border:1px solid #DED9D1;color:#4A5560;border-radius:2px;white-space:nowrap">{{ tg }}</span>
+                  </sc-for>
+                </span>
+              </td>
+              <td style="padding:{{ padTd }};border-bottom:1px solid #DED9D1;vertical-align:top"><span style="font:700 11px ui-monospace,Menlo,monospace;white-space:nowrap;color:{{ t.cor }}">{{ t.estadoRotulo }}</span></td>
+              <td style="padding:{{ padTd }};border-bottom:1px solid #DED9D1;vertical-align:top;font:400 11px ui-monospace,Menlo,monospace;color:#4A5560">{{ t.dur }}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+      <sc-if value="{{ vazioCatalogo }}" hint-placeholder-val="{{ false }}">
+        <p style="padding:26px 10px;color:#4A5560;font:400 12px ui-monospace,Menlo,monospace">Nenhum teste com esses filtros.</p>
+      </sc-if>
+      <sc-if value="{{ temMais }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ maisLinhas }}" style="margin-top:14px;font:400 12px ui-monospace,Menlo,monospace;padding:8px 16px;border:1px solid #DED9D1;background:#FFFFFF;color:#1C2228;cursor:pointer;border-radius:2px" style-hover="border-color:#4A5560">mostrar mais {{ resta }} …</button>
+      </sc-if>
+
+      <!-- ficha do teste: painel lateral sobreposto, catálogo e filtros permanecem atrás -->
+      <sc-if value="{{ temSel }}" hint-placeholder-val="{{ false }}">
+        <div data-screen-label="Ficha do teste" role="dialog" aria-label="Ficha do teste" style="position:fixed;top:0;right:0;bottom:0;width:min(480px,92vw);background:#FFFFFF;border-left:2px solid #1C2228;box-shadow:-18px 0 40px rgba(18,33,31,.14);z-index:40;overflow:auto;padding:24px 26px 40px">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:2px solid #1C2228;padding-bottom:14px;margin-bottom:20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0;padding-top:4px">ficha do teste · o que o AST leu</p>
+            <button onClick="{{ fecharSel }}" aria-label="Fechar ficha" style="font:700 12px ui-monospace,Menlo,monospace;padding:6px 10px;border:1px solid #DED9D1;background:#FFFFFF;color:#1C2228;cursor:pointer;border-radius:2px" style-hover="border-color:#1C2228">fechar ✕</button>
+          </div>
+          <h2 style="font:700 15px/1.5 ui-monospace,Menlo,monospace;letter-spacing:-.01em;margin:0 0 18px;word-break:break-word;border:0;padding:0">{{ selId }}</h2>
+          <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">o que ele garante — docstring como contrato</p>
+          <p style="font:400 19px/1.5 Charter,'Sitka Text',Cambria,Georgia,serif;margin:0 0 20px;text-wrap:pretty">{{ selGarante }}</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-bottom:20px">
+            <div style="background:#FFFFFF;padding:12px 14px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">população</span><b style="font:700 13.5px ui-monospace,Menlo,monospace">{{ selPop }}</b></div>
+            <div style="background:#FFFFFF;padding:12px 14px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">nível</span><b style="font:700 13.5px ui-monospace,Menlo,monospace">{{ selNivel }}</b></div>
+            <div style="background:#FFFFFF;padding:12px 14px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">casos</span><b style="font:700 13.5px ui-monospace,Menlo,monospace">{{ selCasos }}</b></div>
+            <div style="background:#FFFFFF;padding:12px 14px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">último run</span><b style="font:700 13.5px ui-monospace,Menlo,monospace;color:{{ selCor }}">{{ selEstado }}</b></div>
+            <div style="background:#FFFFFF;padding:12px 14px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">duração</span><b style="font:700 13.5px ui-monospace,Menlo,monospace">{{ selDur }}</b></div>
+            <div style="background:#FFFFFF;padding:12px 14px"><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">dimensões</span><b style="font:700 13.5px ui-monospace,Menlo,monospace">{{ selDims }}</b></div>
+          </div>
+          <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">para quem aprova</p>
+          <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:13px 17px;font-size:13.5px;margin-bottom:20px">{{ selVeredicto }}</div>
+          <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">proveniência</p>
+          <p style="font:400 12px/1.8 ui-monospace,Menlo,monospace;margin:0;color:#1C2228">{{ selOnde }}<br><span style="color:#4A5560">commit {{ commit }} · ramo {{ ramo }} · origem: {{ selOrigem }}</span></p>
+          <button onClick="{{ selLerArquivo }}" style="margin-top:16px;font:400 12px ui-monospace,Menlo,monospace;padding:8px 14px;border:1px solid #DED9D1;background:#FFFFFF;color:#1C2228;cursor:pointer;border-radius:2px" style-hover="border-color:#1C2228">ler o arquivo inteiro no modo leitura →</button>
+        </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · MODO LEITURA ======================= -->
+    <sc-if value="{{ telaLeitura }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Modo leitura">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:22px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">modo leitura · o código como documento · <span style="color:#1C2228;text-transform:none;letter-spacing:0">{{ resumoLeitura }}</span></p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:38ch;text-wrap:pretty">Ler a suíte inteira, em graus: arquivos, contratos, tudo.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:74ch;margin:10px 0 0">O grau 1 é o índice holístico; o grau 2 lê só o que tem contrato escrito; o grau 3 abre tudo, função a função. Clicar num arquivo foca só nele, no grau 3 — o caminho inverso do mapa: do todo para uma função.</p>
+      </header>
+      <div style="display:flex;gap:8px;align-items:center;margin:0 0 20px;flex-wrap:wrap">
+        <sc-for list="{{ grausLeitura }}" as="g" hint-placeholder-count="3">
+          <button onClick="{{ g.on }}" aria-pressed="{{ g.ativo }}" style="{{ g.estilo }}" style-hover="border-color:#4A5560">{{ g.rot }}</button>
+        </sc-for>
+        <sc-if value="{{ temFoco }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ limparFoco }}" style="font:400 12px ui-monospace,Menlo,monospace;background:none;border:0;padding:0;color:#1E5A8A;text-decoration:underline;text-underline-offset:2px;cursor:pointer">← voltar a todos os arquivos</button>
+        </sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ arquivosLeitura }}" as="aq" hint-placeholder-count="6">
+          <section style="border:1px solid #DED9D1;background:#FFFFFF">
+            <button onClick="{{ aq.on }}" title="focar só neste arquivo" style="width:100%;display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;text-align:left;background:none;border:0;cursor:pointer;padding:12px 16px;font:700 12px ui-monospace,Menlo,Consolas,monospace;color:#1C2228" style-hover="background:#EDF2F7">
+              <span style="word-break:break-word">{{ aq.nome }}</span>
+              <span style="font-weight:400;color:#4A5560;white-space:nowrap">{{ aq.resumo }}</span>
+            </button>
+            <sc-if value="{{ aq.temNota }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:0;padding:0 16px 12px;font:400 11px ui-monospace,Menlo,monospace;color:#4A5560">{{ aq.nota }}</p>
+            </sc-if>
+            <sc-for list="{{ aq.entradas }}" as="e" hint-placeholder-count="1">
+              <div style="border-top:1px solid #DED9D1;padding:12px 16px 14px">
+                <p style="margin:0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word">{{ e.funcao }}</span><span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;white-space:nowrap">{{ e.linha }}</span></p>
+                <p style="font:400 15px/1.6 Charter,'Sitka Text',Cambria,Georgia,serif;margin:6px 0 0;max-width:66ch;text-wrap:pretty;color:{{ e.corGarante }}">{{ e.garante }}</p>
+                <sc-if value="{{ e.temMeta }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:8px 0 0;font:400 11px ui-monospace,Menlo,monospace;color:#4A5560">{{ e.meta }}<b style="color:{{ e.cor }}">{{ e.estadoRotulo }}</b></p>
+                </sc-if>
+              </div>
+            </sc-for>
+          </section>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · EXECUÇÃO ======================= -->
+    <sc-if value="{{ telaExecucao }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Execução e descritiva">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:26px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">reconciliação · catálogo × execução</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:36ch;text-wrap:pretty">O catálogo é a população; o run é a amostra.</h1>
+      </header>
+      <section style="margin-bottom:44px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#DED9D1;border:1px solid #DED9D1">
+          <div style="background:#FFFFFF;padding:16px 18px"><b style="display:block;font:700 34px/1 ui-monospace,Menlo,monospace;letter-spacing:-.03em;color:#1E5A8A">{{ nTestes }}</b><small style="display:block;color:#4A5560;font-size:12px;margin-top:5px;max-width:24ch">testes escritos no repositório ({{ nCasos }} casos)</small></div>
+          <div style="background:#FFFFFF;padding:16px 18px"><b style="display:block;font:700 34px/1 ui-monospace,Menlo,monospace;letter-spacing:-.03em;color:#2F6B4F">{{ nExe }}</b><small style="display:block;color:#4A5560;font-size:12px;margin-top:5px;max-width:24ch">executados no último run — {{ pctExe }} do catálogo</small></div>
+          <div style="background:#FFFFFF;padding:16px 18px"><b style="display:block;font:700 34px/1 ui-monospace,Menlo,monospace;letter-spacing:-.03em">{{ nBuraco }}</b><small style="display:block;color:#4A5560;font-size:12px;margin-top:5px;max-width:24ch">nunca executados: o run não diz nada sobre eles</small></div>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:76ch;margin:14px 0 0"><b style="color:#1C2228;font-weight:600">Por que não chamar isso de "cobertura".</b> Cobertura de código mede linhas atingidas. Isto mede algo anterior e mais grosseiro: quantos dos testes que existem foram sequer <b style="color:#1C2228;font-weight:600">coletados</b>. Um run com 100% de aprovação e {{ pctExe }} de execução não é uma suíte verde — é uma amostra pequena de uma população que ninguém contou.</p>
+        <sc-if value="{{ temOrfaos }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:13px 17px;font-size:13.5px;margin:16px 0 0;max-width:76ch"><b>{{ nOrfaos }} resultado(s) órfão(s)</b> — presentes no último run e ausentes do código. Ou o teste foi apagado, ou o relatório é de outro commit.</div>
+        </sc-if>
+      </section>
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Descritiva de duração <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">posição, dispersão e outliers — por população</span></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <article style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">suíte · tests/</p>
+            <sc-if value="{{ temDescSuite }}" hint-placeholder-val="{{ true }}">
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;margin:0 0 12px">
+                <sc-for list="{{ descSuite }}" as="m" hint-placeholder-count="6">
+                  <div><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">{{ m.k }}</span><b style="display:block;font:700 19px/1.2 ui-monospace,Menlo,monospace">{{ m.v }}</b></div>
+                </sc-for>
+              </div>
+              <p style="margin:0;font-size:13.5px;color:#4A5560">{{ obsSuite }}</p>
+            </sc-if>
+            <sc-if value="{{ semDescSuite }}" hint-placeholder-val="{{ false }}">
+              <p style="margin:6px 0;font:400 15px ui-monospace,Menlo,monospace;color:#4A5560">sem execução</p>
+              <p style="margin:0;font-size:13.5px;color:#4A5560">Nenhum teste de tests/ rodou no último run. Zero medições não é "rápido".</p>
+            </sc-if>
+          </article>
+          <article style="background:#FFFFFF;padding:18px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">alvo · checks/</p>
+            <sc-if value="{{ temDescAlvo }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px 6px;margin:0 0 12px">
+                <sc-for list="{{ descAlvo }}" as="m" hint-placeholder-count="6">
+                  <div><span style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;display:block">{{ m.k }}</span><b style="display:block;font:700 19px/1.2 ui-monospace,Menlo,monospace">{{ m.v }}</b></div>
+                </sc-for>
+              </div>
+              <p style="margin:0;font-size:13.5px;color:#4A5560">{{ obsAlvo }}</p>
+            </sc-if>
+            <sc-if value="{{ semDescAlvo }}" hint-placeholder-val="{{ true }}">
+              <p style="margin:6px 0;font:400 15px ui-monospace,Menlo,monospace;color:#4A5560">sem execução</p>
+              <p style="margin:0;font-size:13.5px;color:#4A5560">Nenhum check rodou no último run. Sobre o alvo, este run não tem nenhuma opinião — e o painel diz isso em vez de esconder.</p>
+            </sc-if>
+          </article>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:76ch;margin:14px 0 0"><b style="color:#1C2228;font-weight:600">Mediana antes de média.</b> Duração tem cauda longa: um timeout puxa a média e some na mediana. O p95 é o que a pessoa sente esperando o CI; outlier pela regra de Tukey (Q3 + 1,5·IQR), que não assume normalidade — e latência não é normal.</p>
+      </section>
+      <section>
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Sinais que só a leitura do código vê <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">invisíveis ao summary.json</span></h2>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <div style="background:#FFFFFF;padding:14px 16px"><b style="display:block;font:700 27px/1 ui-monospace,Menlo,monospace">{{ nCondicionais }}</b><small style="display:block;color:#4A5560;font-size:12px;margin-top:5px">veredito de 3 estados — xfail chamado no corpo, invisível a decorators</small></div>
+          <div style="background:#FFFFFF;padding:14px 16px"><b style="display:block;font:700 27px/1 ui-monospace,Menlo,monospace">{{ nGherkin }}</b><small style="display:block;color:#4A5560;font-size:12px;margin-top:5px">de origem Gherkin — zero def test_ no arquivo, lidos do .feature</small></div>
+          <div style="background:#FFFFFF;padding:14px 16px"><b style="display:block;font:700 27px/1 ui-monospace,Menlo,monospace">{{ semContrato }}</b><small style="display:block;color:#4A5560;font-size:12px;margin-top:5px">sem docstring — o contrato não está escrito</small></div>
+          <div style="background:#FFFFFF;padding:14px 16px"><b style="display:block;font:700 27px/1 ui-monospace,Menlo,monospace">{{ nParametrizados }}</b><small style="display:block;color:#4A5560;font-size:12px;margin-top:5px">parametrizados — {{ nCasos }} casos a partir de {{ nTestes }} funções</small></div>
+        </div>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · LAUDO ======================= -->
+    <sc-if value="{{ telaLaudo }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Laudo para aprovador">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:26px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">laudo de leitura · para aprovador humano ou IA</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:36ch;text-wrap:pretty">O que foi feito, o que não foi, e onde está escrito.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:74ch;margin:10px 0 0">A mesma leitura, em duas línguas: prosa citável para gente, JSON estável para máquina. Nenhuma frase abaixo foi digitada — todas derivam do catálogo.</p>
+      </header>
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:28px;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:16px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">1 · o que existe</p>
+            <p style="font:400 15px/1.6 Charter,'Sitka Text',Cambria,Georgia,serif;margin:0;text-wrap:pretty">{{ laudoExiste }}</p>
+          </div>
+          <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:16px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">2 · o que o último run tocou</p>
+            <p style="font:400 15px/1.6 Charter,'Sitka Text',Cambria,Georgia,serif;margin:0;text-wrap:pretty">{{ laudoTocou }}</p>
+          </div>
+          <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:16px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">3 · sobre o que ninguém tem opinião</p>
+            <p style="font:400 15px/1.6 Charter,'Sitka Text',Cambria,Georgia,serif;margin:0;text-wrap:pretty">{{ laudoBuraco }}</p>
+          </div>
+          <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:16px 20px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">4 · limites desta leitura</p>
+            <p style="font:400 15px/1.6 Charter,'Sitka Text',Cambria,Georgia,serif;margin:0;text-wrap:pretty">Leitura estática por AST: não mede cobertura de linhas, não julga a qualidade dos testes, não executa nada. Passar não certifica conformidade; este laudo descreve o que está escrito e o que rodou.</p>
+          </div>
+        </div>
+        <div style="border:1px solid #DED9D1;background:#1C2228;color:#FFFFFF;padding:0;overflow:hidden">
+          <p style="margin:0;padding:10px 16px;border-bottom:1px solid #2C3B37;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#9FB4AC;display:flex;justify-content:space-between;gap:10px">para máquinas <span style="text-transform:none;letter-spacing:0;font-weight:400">cockpit.json · igual ao --json do CLI</span></p>
+          <pre style="margin:0;padding:14px 16px;font:400 11px/1.7 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;max-height:520px;overflow:auto">{{ laudoJson }}</pre>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · ENTRE LEITURAS ======================= -->
+    <sc-if value="{{ telaDiff }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Entre leituras">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:26px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">entre leituras · o que mudou de um commit para outro</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:38ch;text-wrap:pretty">Aprovar é comparar: esta leitura contra a anterior.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:74ch;margin:10px 0 0">O diff é sobre o <b style="color:#1C2228">catálogo</b>, não sobre vereditos apenas: teste novo, teste removido, contrato reescrito e veredito que virou — cada um é um tipo de mudança diferente, e o aprovador lê os quatro.</p>
+      </header>
+      <sc-if value="{{ semDiff }}" hint-placeholder-val="{{ true }}">
+        <div style="border:1px dashed #B8B1A6;padding:32px;max-width:64ch">
+          <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">só existe uma leitura conhecida</p>
+          <p style="margin:0 0 6px;font-size:15px;max-width:52ch">Este painel conhece apenas o commit <code style="font:12px ui-monospace,Menlo,monospace">{{ commit }}</code>. A comparação aparece quando houver uma segunda leitura — o cockpit não compara com o que não leu.</p>
+          <p style="margin:0 0 16px;color:#4A5560;font-size:13.5px">Para ver o desenho da tela populada, use a leitura anterior simulada:</p>
+          <button onClick="{{ ligarDemo }}" style="font:400 12px ui-monospace,Menlo,monospace;padding:8px 16px;border:1px solid #1C2228;background:#1C2228;color:#FFFFFF;cursor:pointer;border-radius:2px" style-hover="background:#2F6B4F;border-color:#2F6B4F">ver com leitura anterior simulada →</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ demoDiff }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:10px 16px;font:400 12px ui-monospace,Menlo,monospace;margin:0 0 20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span><b>demonstração</b> — leitura anterior simulada (commit fictício e91c04a); nada disto veio do repositório</span><button onClick="{{ desligarDemo }}" style="font:400 12px ui-monospace,Menlo,monospace;background:none;border:0;padding:0;color:#1E5A8A;text-decoration:underline;text-underline-offset:2px;cursor:pointer">voltar ao estado real</button></div>
+        <p style="font:400 12px/1.6 ui-monospace,Menlo,monospace;color:#4A5560;margin:0 0 16px">e91c04a → {{ commit }} · {{ diffIguais }} testes idênticos nas duas leituras — o diff mostra só o resto</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#DED9D1;border:1px solid #DED9D1">
+          <section style="background:#FFFFFF;padding:16px 18px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 12px">novos nesta leitura · <b style="color:#2F6B4F">{{ nDiffNovos }}</b></p>
+            <sc-for list="{{ diffNovos }}" as="d" hint-placeholder-count="3">
+              <p style="margin:0 0 10px"><span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word;display:block">{{ d.id }}</span><small style="color:#4A5560;font-size:12px">{{ d.nota }}</small></p>
+            </sc-for>
+          </section>
+          <section style="background:#FFFFFF;padding:16px 18px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 12px">removidos do código · <b style="color:#9E2222">{{ nDiffRemovidos }}</b></p>
+            <sc-for list="{{ diffRemovidos }}" as="d" hint-placeholder-count="2">
+              <p style="margin:0 0 10px"><span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word;display:block;text-decoration:line-through;text-decoration-color:#9E2222">{{ d.id }}</span><small style="color:#4A5560;font-size:12px">{{ d.nota }}</small></p>
+            </sc-for>
+          </section>
+          <section style="background:#FFFFFF;padding:16px 18px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 12px">vereditos que viraram · <b style="color:#8A5800">{{ nDiffMudaram }}</b></p>
+            <sc-for list="{{ diffMudaram }}" as="d" hint-placeholder-count="2">
+              <p style="margin:0 0 10px"><span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word;display:block">{{ d.id }}</span><small style="color:#4A5560;font-size:12px">{{ d.nota }}</small></p>
+            </sc-for>
+          </section>
+          <section style="background:#FFFFFF;padding:16px 18px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 12px">contratos reescritos · <b>{{ nDiffContratos }}</b></p>
+            <sc-for list="{{ diffContratos }}" as="d" hint-placeholder-count="2">
+              <p style="margin:0 0 10px"><span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word;display:block">{{ d.id }}</span><small style="color:#4A5560;font-size:12px">{{ d.nota }}</small></p>
+            </sc-for>
+          </section>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:74ch;margin:14px 0 0">Contrato reescrito pesa tanto quanto veredito que virou: se a docstring mudou, <b style="color:#1C2228;font-weight:600">a promessa mudou</b> — o teste pode passar e garantir menos do que antes.</p>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · A RÉGUA (modo + carimbo + comparabilidade) ======================= -->
+    <sc-if value="{{ telaRegua }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="A régua">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:30px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">a régua · sob que condições este número vale</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:34ch;text-wrap:pretty">Um número só é comparável se a régua estiver declarada.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:78ch;margin:10px 0 0">Duas frentes da mesma pergunta: em que <b style="color:#1C2228">modo de risco</b> este run correu, e contra o que ele pode — ou <b style="color:#1C2228">não pode</b> — ser comparado. O invariante do painel sobe um nível: <em style="font-style:normal;border-bottom:1px solid #DED9D1">duas coberturas nunca se somam</em> vira <em style="font-style:normal;border-bottom:2px solid #8A5800">dois projetos só se comparam sob régua idêntica</em>.</p>
+      </header>
+
+      <!-- A · modo de execução (eixo de risco) -->
+      <section style="margin-bottom:46px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Modo de execução <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">o eixo de risco desta leitura</span></h2>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <sc-for list="{{ modeCards }}" as="mc" hint-placeholder-count="4">
+            <article style="{{ mc.estilo }}">
+              <span style="display:block;height:4px;margin:-14px -16px 12px;{{ mc.barra }}"></span>
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;min-height:22px">
+                <h3 style="margin:0;font:700 15px/1 ui-sans-serif,system-ui,sans-serif">{{ mc.rot }}</h3>
+                <sc-if value="{{ mc.ehAtual }}" hint-placeholder-val="{{ false }}"><span style="font:700 9.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#FFFFFF;background:#1C2228;padding:3px 6px;border-radius:2px;white-space:nowrap">este run</span></sc-if>
+              </div>
+              <p style="margin:9px 0 4px;font:400 11px ui-monospace,Menlo,monospace;color:#1C2228">{{ mc.gates }}</p>
+              <p style="margin:0;font-size:12.5px;color:#4A5560">{{ mc.nota }}</p>
+            </article>
+          </sc-for>
+        </div>
+        <div style="background:#EDF2F7;border-left:3px solid {{ seloCor }};padding:13px 17px;font-size:13.5px;margin:16px 0 0;max-width:80ch">{{ gatesFrase }}</div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:80ch;margin:12px 0 0"><code style="font:12px ui-monospace,Menlo,monospace">gates_ativos: []</code> é o estado sereno — dry-run padrão, rede intocada, o caso comum. A cor de alarme aqui não decora: <b style="color:#1C2228;font-weight:600">autorização ativa é o único estado não-teste grave o bastante para vestir o vermelho</b>, porque é a diferença entre o operador ler e o operador carimbar.</p>
+      </section>
+
+      <!-- B · a régua (carimbo) -->
+      <section style="margin-bottom:46px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">A régua <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">o carimbo que viaja com o artefato</span></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:16px;align-items:start">
+          <div style="border:1px solid #1C2228;background:#FFFFFF">
+            <p style="margin:0;padding:9px 16px;background:#1C2228;color:#9FB4AC;font:600 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase">procedência · carimbo da régua</p>
+            <div style="padding:6px 16px 12px">
+              <sc-for list="{{ carimboLinhas }}" as="cl" hint-placeholder-count="6">
+                <div style="display:grid;grid-template-columns:150px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid #DED9D1;align-items:baseline">
+                  <span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#4A5560">{{ cl.k }}</span>
+                  <span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word;{{ cl.estilo }}">{{ cl.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 4px">os quatro eixos desta leitura</p>
+            <sc-for list="{{ eixosRegua }}" as="e" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:1fr auto;gap:10px;padding:9px 0;border-bottom:1px solid #DED9D1;align-items:baseline">
+                <span style="font:400 12px ui-monospace,Menlo,monospace">{{ e.k }}</span>
+                <span style="font:400 11.5px ui-monospace,Menlo,monospace;text-align:right;{{ e.estilo }}">{{ e.texto }}</span>
+              </div>
+            </sc-for>
+            <p style="color:#4A5560;font-size:12.5px;max-width:52ch;margin:12px 0 0">Hoje 1 dos 4 eixos existe; os outros três aparecem como <b style="color:#1C2228;font-weight:600">ausência nomeada</b> — nunca célula vazia que convide a preencher de cabeça.</p>
+          </div>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:80ch;margin:14px 0 0"><b style="color:#1C2228;font-weight:600">Dois destinos, custo diferente.</b> No cockpit, o hash da lista curada é grátis — ele lê o repositório. No laudo de um run, depende de serializar o resultado da sondagem primeiro; por isso <code style="font:12px ui-monospace,Menlo,monospace">padrao.versao</code> e <code style="font:12px ui-monospace,Menlo,monospace">caminhos_sensiveis_hash</code> aparecem como <b style="color:#1C2228;font-weight:600">pendente</b>, não inventados.</p>
+      </section>
+
+      <!-- C · comparabilidade -->
+      <section>
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Comparabilidade <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">o estado dominante é a incomparabilidade</span></h2>
+        <sc-if value="{{ semComp }}" hint-placeholder-val="{{ true }}">
+          <div style="border:1px dashed #B8B1A6;padding:28px;max-width:70ch;margin-top:16px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">só este projeto é conhecido</p>
+            <p style="margin:0 0 6px;font-size:15px;max-width:56ch">Comparar exige dois projetos <b style="font-weight:600">sob régua idêntica</b>. Com um só, não há o que alinhar — e o cockpit não compara com o que não leu.</p>
+            <p style="margin:0 0 16px;color:#4A5560;font-size:13.5px;max-width:60ch">Ainda assim, a incomparabilidade já é desenhável hoje: mesmo aqui, <b style="color:#1C2228;font-weight:600">três dos quatro eixos são incomparáveis por ausência</b> — é exatamente esta a tela.</p>
+            <button onClick="{{ ligarComp }}" style="font:400 12px ui-monospace,Menlo,monospace;padding:8px 16px;border:1px solid #1C2228;background:#1C2228;color:#FFFFFF;cursor:pointer;border-radius:2px" style-hover="background:#1E5A8A;border-color:#1E5A8A">ver com projetos vizinhos simulados →</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ demoComp }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:10px 16px;font:400 12px ui-monospace,Menlo,monospace;margin:16px 0 16px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span><b>demonstração</b> — projetos vizinhos fictícios ({{ nIncomp }} incomparáveis, {{ nComp }} comparável); nada disto veio do repositório</span><button onClick="{{ desligarComp }}" style="font:400 12px ui-monospace,Menlo,monospace;background:none;border:0;padding:0;color:#1E5A8A;text-decoration:underline;text-underline-offset:2px;cursor:pointer">voltar ao estado real</button></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 0 18px">
+            <sc-for list="{{ compLegenda }}" as="l" hint-placeholder-count="5">
+              <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:1px;background:{{ l.cor }};display:inline-block;flex:0 0 auto"></span>{{ l.rot }} — {{ l.desc }}</span>
+            </sc-for>
+          </div>
+          <sc-for list="{{ compCards }}" as="c" hint-placeholder-count="4">
+            <article style="background:#FFFFFF;border:1px solid #DED9D1;border-left:3px solid {{ c.cor }};padding:14px 18px;margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
+                <span style="font:700 13px ui-monospace,Menlo,monospace">{{ c.par }}</span>
+                <span style="font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:{{ c.cor }}">{{ c.veredito }} · {{ c.motivo }}</span>
+              </div>
+              <p style="margin:8px 0 0;font-size:13.5px;color:#4A5560;max-width:84ch">{{ c.detalhe }}</p>
+              <sc-if value="{{ c.ehComp }}" hint-placeholder-val="{{ false }}">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:10px">
+                  <div style="background:#FFFFFF;padding:10px 14px;font:400 12px ui-monospace,Menlo,monospace">{{ c.ladoA }}</div>
+                  <div style="background:#FFFFFF;padding:10px 14px;font:400 12px ui-monospace,Menlo,monospace">{{ c.ladoB }}</div>
+                </div>
+              </sc-if>
+            </article>
+          </sc-for>
+          <p style="color:#4A5560;font-size:13.5px;max-width:80ch;margin:14px 0 0">Nenhuma célula fica vazia à espera de interpretação: onde falta base, o cartão <b style="color:#1C2228;font-weight:600">nomeia qual dos motivos</b>. Célula em branco convidaria o leitor a preencher a lacuna de cabeça — o mesmo "verde por omissão" que o painel inteiro existe para impedir.</p>
+        </sc-if>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · O MOTOR & MATURIDADE ======================= -->
+    <sc-if value="{{ telaMotor }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="O motor e maturidade">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:22px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">o instrumento · a força de quem mede, não o que foi medido</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:36ch;text-wrap:pretty">Quão forte é a régua — cobertura, mutação, complexidade e maturidade.</h1>
+        <p style="font:400 11.5px/1.5 ui-monospace,Menlo,monospace;color:#4A5560;margin:12px 0 0;max-width:84ch">Fonte: medição externa (coverage.py · radon · mutar.py) em {{ gBase }}. No cockpit final estes viram blocos opcionais do catálogo (D5k), com degradação honesta; aqui são seed do protótipo — <b style="color:#1C2228">nunca confundidos com a leitura AST</b> das telas "o todo".</p>
+      </header>
+      <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:13px 17px;font-size:13.5px;max-width:82ch;margin-bottom:34px"><b style="color:#1C2228;font-weight:600">Cobertura de código ≠ cobertura de execução.</b> Esta tela mede <code style="font:12px ui-monospace,Menlo,monospace">webqa/</code> — quantas linhas do motor um teste toca. As telas "o todo" medem quantos dos 763 testes rodaram. Compartilham a palavra e mais nada; somá-las é o erro que R-Q6 existe para impedir.</div>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Cobertura de código · {{ covGeral }} <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">linhas de webqa/ atingidas</span></h2>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:16px">
+          <sc-for list="{{ covBandas }}" as="b" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:70px 1fr;gap:14px;align-items:baseline;background:#FFFFFF;{{ b.estilo }};padding:10px 14px">
+              <span style="font:700 13.5px ui-monospace,Menlo,monospace">{{ b.faixa }}</span>
+              <span style="font:400 12px ui-monospace,Menlo,monospace;color:#4A5560">{{ b.mods }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="background:#EDF2F7;border-left:3px solid #8A5800;padding:13px 17px;font-size:13.5px;margin:16px 0 0;max-width:82ch"><b style="color:#1C2228;font-weight:600">O viés que o número esconde.</b> {{ covVies }}</div>
+        <p style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;margin:8px 0 0">{{ covFonte }}</p>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Mutação <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">a asserção morde, ou só visita a linha?</span></h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px">
+          <thead><tr>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Módulo</th>
+            <th style="text-align:right;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Viáveis</th>
+            <th style="text-align:right;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Mortos</th>
+            <th style="text-align:right;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Sobreviveram</th>
+            <th style="text-align:right;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Score</th>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ mutLinhas }}" as="m" hint-placeholder-count="2">
+              <tr>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace">{{ m.mod }}</td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;text-align:right;font:400 12px ui-monospace,Menlo,monospace;color:#4A5560">{{ m.viaveis }}</td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;text-align:right;font:400 12px ui-monospace,Menlo,monospace;color:#4A5560">{{ m.mortos }}</td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;text-align:right;font:400 12px ui-monospace,Menlo,monospace;color:#4A5560">{{ m.sobrev }}</td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;text-align:right;font:700 13px ui-monospace,Menlo,monospace;color:{{ m.cor }}">{{ m.score }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <p style="color:#4A5560;font-size:13.5px;max-width:82ch;margin:12px 0 0">Um sobrevivente é um <b style="color:#1C2228;font-weight:600">buraco dentro do verde</b>: a linha foi coberta, a suíte passou, e o defeito passou junto. <code style="font:12px ui-monospace,Menlo,monospace">sondagem.py</code> a 59,8% é onde as asserções mordem menos.</p>
+        <p style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;margin:8px 0 0">{{ mutFonte }}</p>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Complexidade ciclomática · média {{ cxMedia }} <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">a cauda, não a média</span></h2>
+        <div style="background:#EDF2F7;border-left:3px solid #8A5800;padding:13px 17px;font-size:13.5px;margin:16px 0;max-width:82ch"><b style="color:#1C2228;font-weight:600">A decisão que os números impõem.</b> {{ cxDecisao }}</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <sc-for list="{{ cxCauda }}" as="c" hint-placeholder-count="8">
+            <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline;padding:7px 12px;background:#FFFFFF;border:1px solid #DED9D1">
+              <span style="font:400 12px ui-monospace,Menlo,monospace;word-break:break-word"><b style="font-weight:700">{{ c.fn }}</b> <span style="color:#4A5560">· {{ c.onde }}</span> <sc-if value="{{ c.ehMotor }}" hint-placeholder-val="{{ false }}"><span style="font:700 9.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#8A5800;border:1px solid #8A5800;padding:1px 5px;border-radius:2px">motor</span></sc-if></span>
+              <span style="font:700 14px ui-monospace,Menlo,monospace;color:{{ c.cor }}">CC {{ c.cc }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <p style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;margin:8px 0 0">{{ cxFonte }}</p>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Dependências · {{ depCiclos }} <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">já fiscalizada · nada a fazer</span></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <div style="background:#FFFFFF;padding:14px 16px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560;display:block">fan-in máximo</span><b style="font:700 15px ui-monospace,Menlo,monospace">{{ depFanIn }}</b></div>
+          <div style="background:#FFFFFF;padding:14px 16px"><span style="font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560;display:block">fan-out máximo</span><b style="font:700 15px ui-monospace,Menlo,monospace">{{ depFanOut }}</b></div>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:82ch;margin:12px 0 0">{{ depNota }}</p>
+        <p style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;margin:8px 0 0">{{ depFonte }}</p>
+      </section>
+
+      <section>
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Maturidade de tipos de teste <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">16 de 20 categorias</span></h2>
+        <div style="display:flex;flex-direction:column;gap:18px;margin-top:16px">
+          <sc-for list="{{ matFamilias }}" as="f" hint-placeholder-count="5">
+            <div>
+              <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#4A5560;margin:0 0 8px">{{ f.nome }}</p>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+                <sc-for list="{{ f.itens }}" as="it" hint-placeholder-count="4">
+                  <div style="{{ it.estilo }}">
+                    <div style="display:flex;justify-content:space-between;gap:6px;align-items:baseline"><b style="font-size:13.5px">{{ it.k }}</b><span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:{{ it.cor }};white-space:nowrap">{{ it.rot }}</span></div>
+                    <sc-if value="{{ it.nota }}" hint-placeholder-val="{{ false }}"><span style="display:block;font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;margin-top:4px">{{ it.nota }}</span></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px">
+          <sc-for list="{{ matLegenda }}" as="l" hint-placeholder-count="4">
+            <span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:1px;background:{{ l.cor }};display:inline-block"></span>{{ l.rot }}</span>
+          </sc-for>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:82ch;margin:12px 0 0">As ausências não são aleatórias: <b style="color:#1C2228;font-weight:600">regressão e confirmação</b> faltam por falta de memória entre execuções; <b style="color:#1C2228;font-weight:600">cobertura e complexidade</b>, por falta de instrumentação; <b style="color:#1C2228;font-weight:600">estresse</b> é exclusão consciente de escopo, não pendência.</p>
+        <p style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560;margin:8px 0 0">{{ matFonte }}</p>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · ENTREGA & SAÚDE ======================= -->
+    <sc-if value="{{ telaEntrega }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Entrega e saúde">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:22px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">gestão da suíte · o plano de execução, com prova · {{ gBase }}</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:38ch;text-wrap:pretty">O que está quebrado, em que ordem se conserta, o que se vigia.</h1>
+      </header>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Defeitos abertos <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">verificados em execução, nenhum é hipótese</span></h2>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+          <sc-for list="{{ defeitos }}" as="d" hint-placeholder-count="5">
+            <article style="{{ d.estilo }}">
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap">
+                <span style="font:700 14px ui-monospace,Menlo,monospace">{{ d.id }} · {{ d.tit }}</span>
+                <span style="font:700 10px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:{{ d.sevCor }}">severidade {{ d.sev }}</span>
+              </div>
+              <p style="margin:8px 0 0;font-size:13.5px;color:#4A5560;max-width:88ch">{{ d.prova }}</p>
+              <p style="margin:6px 0 0;font:400 11px ui-monospace,Menlo,monospace;color:#4A5560">{{ d.onde }}</p>
+            </article>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Sequência consolidada <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">por dependência e risco, não por frente</span></h2>
+        <p style="color:#4A5560;font-size:13.5px;max-width:84ch;margin:14px 0 12px">{{ racional }}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:8%">#</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:14%">PR</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">O quê</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:18%">Bloqueia</th>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ seqLinhas }}" as="s" hint-placeholder-count="16">
+              <tr>
+                <td style="padding:8px;border-bottom:1px solid #DED9D1;font:700 12px ui-monospace,Menlo,monospace;color:#4A5560">{{ s.n }}</td>
+                <td style="padding:8px;border-bottom:1px solid #DED9D1;font:700 12px ui-monospace,Menlo,monospace">{{ s.pr }}</td>
+                <td style="padding:8px;border-bottom:1px solid #DED9D1;font-size:13px">{{ s.o }} <sc-if value="{{ s.ehCo }}" hint-placeholder-val="{{ false }}"><span style="font:700 9.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#9E2222;border:1px solid #9E2222;padding:1px 5px;border-radius:2px;margin-left:4px">CODEOWNERS</span></sc-if></td>
+                <td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">{{ s.bloq }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div style="background:#EDF2F7;border-left:3px solid #9E2222;padding:13px 17px;font-size:13.5px;margin:16px 0 0;max-width:84ch"><b style="color:#1C2228;font-weight:600">Firewall CODEOWNERS.</b> {{ coNota }}<br><span style="font:400 11px ui-monospace,Menlo,monospace;color:#4A5560">{{ codeownersTxt }}</span></div>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Frentes <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">cinco, cruzadas por dependência</span></h2>
+        <div style="display:flex;flex-direction:column;gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <sc-for list="{{ frentes }}" as="fr" hint-placeholder-count="5">
+            <div style="background:#FFFFFF;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap">
+              <span style="font-size:14px"><b style="font:700 13px ui-monospace,Menlo,monospace">{{ fr.id }}</b> · {{ fr.nome }}</span>
+              <span style="font:600 10px ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:{{ fr.cor }}">{{ fr.tag }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
+        <section>
+          <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Riscos registrados</h2>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ riscos }}" as="r" hint-placeholder-count="7">
+              <div>
+                <p style="margin:0;font-size:13.5px"><b style="font:700 11px ui-monospace,Menlo,monospace;color:#4A5560">{{ r.id }}</b> · {{ r.r }}</p>
+                <p style="margin:3px 0 0;font-size:12.5px;color:#4A5560">→ {{ r.m }}</p>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+        <section>
+          <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #DED9D1">O que não fazer</h2>
+          <p style="font-size:12px;color:#4A5560;margin:0 0 10px">Descartado com motivo, para não ser reintroduzido de boa-fé.</p>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ naoFazer }}" as="nf" hint-placeholder-count="6">
+              <p style="margin:0;font-size:13px;padding-left:14px;border-left:2px solid #DED9D1">{{ nf }}</p>
+            </sc-for>
+          </div>
+        </section>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · GOVERNANÇA ======================= -->
+    <sc-if value="{{ telaGov }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Governança e fronteira">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:22px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">gestão da suíte · fronteira, políticas e modos</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:40ch;text-wrap:pretty">Uma trava que o vigiado desliga em silêncio não é uma trava.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:80ch;margin:10px 0 0">O que hoje já morde no repositório, e o que vira requisito quando a suíte for consumida por muitos projetos. As linhas marcadas <b style="color:#1C2228">prospectivo</b> pertencem à frente E — <b style="color:#1C2228">não existem</b> em <code style="font:12px ui-monospace,Menlo,monospace">main</code>.</p>
+      </header>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Os dois trabalhos da suíte <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">naturezas opostas</span></h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#DED9D1;border:1px solid #DED9D1;margin-top:16px">
+          <sc-for list="{{ govTrabalhos }}" as="t" hint-placeholder-count="2">
+            <div style="background:#FFFFFF;padding:18px 20px">
+              <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">trabalho {{ t.t }} · {{ t.pop }}</p>
+              <h3 style="margin:6px 0 8px;font-size:15px">{{ t.nome }}</h3>
+              <p style="margin:0 0 8px;font-size:13.5px;color:#4A5560">{{ t.ex }}</p>
+              <p style="margin:0;font:400 12px/1.5 ui-monospace,Menlo,monospace;color:#1C2228">{{ t.ctx }}</p>
+            </div>
+          </sc-for>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:82ch;margin:12px 0 0">Uma harness que trate os dois como a mesma coisa vai pedir autorização de sondagem para rodar um inventário de testes — e <b style="color:#1C2228;font-weight:600">o operador aprende a aprovar sem ler</b>.</p>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Padrão × projeto <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">o projeto contribui config e autorização, nunca código</span></h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px">
+          <thead><tr>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Artefato</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:22%">Padrão</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:20%">Projeto</th>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ govFronteira }}" as="fr" hint-placeholder-count="6">
+              <tr>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1">{{ fr.art }}<sc-if value="{{ fr.nota }}" hint-placeholder-val="{{ false }}"><span style="display:block;font:400 11px ui-monospace,Menlo,monospace;color:#9E2222;margin-top:2px">{{ fr.nota }}</span></sc-if></td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace;color:#4A5560">{{ fr.pad }}</td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace;color:#4A5560">{{ fr.proj }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div style="background:#EDF2F7;border-left:3px solid #9E2222;padding:13px 17px;font-size:13.5px;margin:16px 0 0;max-width:84ch"><b style="color:#1C2228;font-weight:600">Por que a lista curada não pode ser do projeto.</b> Se cada projeto tiver cópia editável, alguém remove uma linha que dava trabalho, a suíte para de procurar aquilo, e <b style="color:#1C2228;font-weight:600">o laudo continua dizendo "nenhum achado"</b> — indistinguível de um alvo seguro.</div>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Políticas que mordem <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">executáveis, não markdown</span></h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px">
+          <thead><tr>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:34%">Política</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Onde é fiscalizada</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:26%">Como</th>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ govPoliticas }}" as="p" hint-placeholder-count="6">
+              <tr>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1">{{ p.p }}</td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#1C2228">{{ p.onde }}</td>
+                <td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font-size:12.5px;color:#4A5560">{{ p.como }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <p style="color:#4A5560;font-size:13.5px;max-width:84ch;margin:12px 0 0">Um <code style="font:12px ui-monospace,Menlo,monospace">forbidden-actions.md</code> não substitui nenhuma delas — é a diferença entre uma placa de "proibido fumar" e um detector ligado ao alarme. <code style="font:12px ui-monospace,Menlo,monospace">policies/</code> é índice; entrada sem apontamento para gate é lembrete, não garantia.</p>
+      </section>
+
+      <section>
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Modos e o ambiente do agente <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">o requisito não negociável</span></h2>
+        <p style="color:#4A5560;font-size:13.5px;max-width:82ch;margin:14px 0 12px">Os quatro modos de risco vivem na tela <button onClick="{{ irRegua }}" style="font:400 13.5px ui-sans-serif,system-ui,sans-serif;background:none;border:0;padding:0;color:#1E5A8A;text-decoration:underline;text-underline-offset:2px;cursor:pointer">A régua · modo</button>. O que os protege é o ambiente: os gates são variáveis de ambiente, e um agente com shell pode exportar qualquer uma.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px">
+          <sc-for list="{{ govGates }}" as="g" hint-placeholder-count="4">
+            <span style="font:400 11px ui-monospace,Menlo,monospace;padding:4px 8px;border:1px solid #DED9D1;background:#FFFFFF;color:#1C2228;border-radius:2px">{{ g }}</span>
+          </sc-for>
+        </div>
+        <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:13px 17px;font-size:13.5px;max-width:84ch">{{ govAmbiente }}</div>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · CONTRATO DE DADOS (dev) ======================= -->
+    <sc-if value="{{ telaDev }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Contrato de dados">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:22px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">para o desenvolvedor · o contrato que scripts/cockpit.py emite</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:40ch;text-wrap:pretty">Uma leitura, dois consumidores: as 11 telas e o <code style="font:700 24px ui-monospace,Menlo,monospace">--json</code>.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:82ch;margin:10px 0 0">Este protótipo é a spec visual; esta tela é a spec de dados. O gerador lê o repositório por AST, reconcilia com <code style="font:12px ui-monospace,Menlo,monospace">report/summary.json</code>, e emite o objeto abaixo — do qual <b style="color:#1C2228">as 11 telas e o laudo de máquina são duas vestes</b>. Nenhuma contagem é digitada no template; trocar o JSON troca todas as frases.</p>
+      </header>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Arquitetura do gerador <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">módulo novo = função nova</span></h2>
+        <p style="color:#4A5560;font-size:13.5px;max-width:82ch;margin:14px 0 12px">Cada tela é um montador <code style="font:12px ui-monospace,Menlo,monospace">(catalogo, run) → bloco</code>. Marcador novo no <code style="font:12px ui-monospace,Menlo,monospace">pytest.ini</code> vira linha nova em Dimensões sem tocar o gerador; dimensão sem testes some. Nenhuma lista escrita à mão.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_mapa</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_populacoes</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_niveis</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_dimensoes</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_catalogo</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_leitura</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_execucao</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_regua</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_motor <span style="color:#8A5800">·D5k</span></div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_entrega</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_governanca</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_laudo</div>
+          <div style="background:#FFFFFF;border:1px solid #DED9D1;padding:12px 14px;font:400 12px ui-monospace,Menlo,monospace;color:#1C2228">montar_diff</div>
+        </div>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Esquema de emissão <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">cockpit.json · fonte única das 11 telas</span></h2>
+        <div style="border:1px solid #DED9D1;background:#1C2228;color:#FFFFFF;margin-top:16px;overflow:hidden">
+          <p style="margin:0;padding:10px 16px;border-bottom:1px solid #2C3B37;font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#9FB4AC">report/cockpit.json</p>
+          <pre style="margin:0;padding:16px;font:400 11.5px/1.7 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;overflow:auto;max-height:600px">{
+  "procedencia": {                    <span style="color:#9FB4AC">// OBRIGATÓRIO — 1º campo</span>
+    "repositorio": "danzeroum/qa-suite",
+    "ramo": "main", "commit": "67a8bfe",
+    "lido_em": "2026-07-30T03:38:53Z", "arquivos": 59
+  },
+  "carimbo": {                        <span style="color:#9FB4AC">// D6k/E4 — a régua que viaja com o artefato</span>
+    "modo": "inventario",             <span style="color:#9FB4AC">// inventario|passivo|carga|sondagem</span>
+    "gates_ativos": [],               <span style="color:#9FB4AC">// [] = sereno; ["load"], ["rede",...] ruidoso</span>
+    "padrao_versao": null,            <span style="color:#9FB4AC">// pendente: serialização do ResultadoSondagem</span>
+    "caminhos_sensiveis_hash": null   <span style="color:#9FB4AC">// idem — nunca inventar hash</span>
+  },
+  "testes": [                         <span style="color:#9FB4AC">// leitura AST — Trabalho B, agnóstico</span>
+    {
+      "nodeid": "checks/functional/test_links.py::test_links_internos_sem_quebrados",
+      "arquivo": "checks/functional/test_links.py", "linha": 43,
+      "funcao": "test_links_internos_sem_quebrados",
+      "populacao": "alvo",            <span style="color:#9FB4AC">// alvo(checks/) | suite(tests/) — NUNCA somadas</span>
+      "nivel": "integracao",          <span style="color:#9FB4AC">// unidade|integracao|sistema|aceitacao</span>
+      "dimensoes": ["functional"],    <span style="color:#9FB4AC">// markers do pytest.ini</span>
+      "casos": 1,                     <span style="color:#9FB4AC">// parametrize expandido</span>
+      "garante": null,                <span style="color:#9FB4AC">// docstring como contrato; null = não escrito</span>
+      "origem": "ast",                <span style="color:#9FB4AC">// ast|gherkin</span>
+      "veredito_condicional": false,  <span style="color:#9FB4AC">// pytest.xfail no corpo (3 estados)</span>
+      "skipif": false,
+      "estado": "nao-executado",      <span style="color:#9FB4AC">// passed|failed|error|xfail|skipped|nao-executado</span>
+      "duracao_s": 0                  <span style="color:#9FB4AC">// 0 se não executado</span>
+    }
+  ],
+  "reconciliacao": { "executados": 60, "nunca_vistos": 703, "orfaos": [] },
+  "agregados": { "populacoes": {"alvo":91,"suite":672}, "niveis": {...},
+    "estados": {...}, "casos": 848, "sem_contrato": 387,
+    "condicionais": 22, "gherkin": 1 },
+
+  <span style="color:#9FB4AC">// ===== blocos OPCIONAIS (D5k) — ausência é honesta, nunca zero =====</span>
+  "cobertura_codigo": null,           <span style="color:#9FB4AC">// coverage.py: {geral, por_modulo[], vies}  · B4</span>
+  "mutacao": null,                    <span style="color:#9FB4AC">// mutar.py: [{modulo, viaveis, mortos, sobreviventes, score}] · B5</span>
+  "complexidade": null,               <span style="color:#9FB4AC">// radon: {media, cauda:[{onde, funcao, cc}]}  · B3</span>
+  "dependencias": null,               <span style="color:#9FB4AC">// {ciclos, fan_in_max, fan_out_max}</span>
+  "maturidade": null,                 <span style="color:#9FB4AC">// {familias:[{nome, itens:[{categoria, estado, nota}]}]}</span>
+
+  "comparavel": null                  <span style="color:#9FB4AC">// só != null com carimbo completo (padrao_versao + hash)</span>
+}</pre>
+        </div>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Degradação honesta <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">o que a ausência vira — e o que ela nunca vira</span></h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px">
+          <thead><tr>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:22%">Bloco</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:20%">Fonte · PR</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Ausente vira</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#9E2222;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:22%">NUNCA vira</th>
+          </tr></thead>
+          <tbody>
+            <tr><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace">cobertura_codigo</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">coverage.py · B4</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1">"não instrumentada" nomeada em O motor</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;color:#4A5560">0% · barra verde vazia</td></tr>
+            <tr><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace">mutacao</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">mutar.py · B5</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1">"só detectores / sem medição"</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;color:#4A5560">"0 sobreviventes" sem n</td></tr>
+            <tr><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace">complexidade</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">radon/C901 · B3</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1">"não instrumentada"</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;color:#4A5560">média que esconde a cauda</td></tr>
+            <tr><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace">carimbo.padrao_versao</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">serialização · D6k</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1">"pendente" no carimbo</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;color:#4A5560">hash inventado</td></tr>
+            <tr><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 12px ui-monospace,Menlo,monospace">comparavel</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">carimbo completo · E4</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1">null — ausente por contrato</td><td style="padding:9px 8px;border-bottom:1px solid #DED9D1;color:#4A5560">comparar réguas diferentes</td></tr>
+          </tbody>
+        </table>
+        <div style="background:#EDF2F7;border-left:3px solid #1C2228;padding:13px 17px;font-size:13.5px;margin:16px 0 0;max-width:84ch">A regra única: <b style="color:#1C2228;font-weight:600">ausência de medição nunca é zero, nunca é verde</b>. É estado nomeado — a 1ª heurística de Nielsen, o mesmo motivo pelo qual a célula não-executada tem aparência própria no mapa.</div>
+      </section>
+
+      <section style="margin-bottom:44px">
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Telas × dados <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">o que cada montador consome</span></h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:14px">
+          <thead><tr>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px;width:26%">Tela</th>
+            <th style="text-align:left;font:600 10.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#4A5560;border-bottom:1px solid #1C2228;padding:0 8px 7px">Chaves consumidas</th>
+          </tr></thead>
+          <tbody>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">Visão geral</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">testes[].{populacao,estado,casos,nivel,dimensoes} · agregados</td></tr>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">Execução &amp; descritiva</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">reconciliacao · testes[].duracao_s (por população) · agregados</td></tr>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">O motor &amp; maturidade</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">cobertura_codigo · mutacao · complexidade · dependencias · maturidade <span style="color:#8A5800">(D5k)</span></td></tr>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">Catálogo · Detalhe</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">testes[] (todos os campos)</td></tr>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">Modo leitura</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">testes[].{arquivo,linha,funcao,garante,estado} agrupado por arquivo</td></tr>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">A régua · modo</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">carimbo.{modo,gates_ativos,padrao_versao,caminhos_sensiveis_hash} · comparavel</td></tr>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">Entrega · Governança</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">fora do catálogo — plano/arquitetura versionados no repo</td></tr>
+            <tr><td style="padding:8px;border-bottom:1px solid #DED9D1;font-weight:600">Laudo · Entre leituras</td><td style="padding:8px;border-bottom:1px solid #DED9D1;font:400 11.5px ui-monospace,Menlo,monospace;color:#4A5560">o objeto inteiro (prosa derivada) + baseline anterior (C1)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid #DED9D1">CLI &amp; make <span style="float:right;color:#4A5560;font-weight:400;font-size:12px">modo inventário · rede não tocada · exit 0</span></h2>
+        <div style="border:1px solid #DED9D1;background:#1C2228;color:#FFFFFF;margin-top:16px;overflow:hidden">
+          <pre style="margin:0;padding:16px;font:400 12px/1.8 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;overflow:auto">make cockpit
+  <span style="color:#9FB4AC"># →</span> python scripts/cockpit.py --raiz . \
+       --json report/cockpit.json \
+       --html report/cockpit.html
+
+<span style="color:#9FB4AC"># modo 1 (inventário): sem alvo, sem autorização, sem rede — roda a cada commit.</span>
+<span style="color:#9FB4AC"># leitura não reprova CI: exit 0 sempre. Achados/órfãos são do laudo, não do exit.</span></pre>
+        </div>
+        <p style="color:#4A5560;font-size:13.5px;max-width:84ch;margin:14px 0 0"><b style="color:#1C2228;font-weight:600">Erro sem catálogo.</b> Se <code style="font:12px ui-monospace,Menlo,monospace">--raiz</code> não tem testes, o gerador não inventa: emite o esquema com <code style="font:12px ui-monospace,Menlo,monospace">testes: []</code> e o painel mostra o estado "nenhum run conhecido", nunca um zero verde. Estado prototipado no tweak <code style="font:12px ui-monospace,Menlo,monospace">cenario: sem-run</code>.</p>
+      </section>
+    </div>
+    </sc-if>
+
+    <!-- ======================= TELA · MÓDULOS ======================= -->
+    <sc-if value="{{ telaModulos }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Módulos e customização">
+      <header style="border-bottom:2px solid #1C2228;padding-bottom:16px;margin-bottom:26px">
+        <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0 0 10px">arquitetura modular · a visão geral é composta, não fixa</p>
+        <h1 style="font:400 27px/1.3 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.015em;margin:0;max-width:38ch;text-wrap:pretty">Cada módulo liga e desliga — o todo permanece honesto.</h1>
+        <p style="color:#4A5560;font-size:13.5px;max-width:74ch;margin:10px 0 0">A regra de corte é limpa: se muda <b style="color:#1C2228">o que</b> é dito, é módulo e liga aqui; se muda <b style="color:#1C2228">como</b> aparece, é apresentação e vive no painel <b style="color:#1C2228">Tweaks</b>.</p>
+      </header>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1px;background:#DED9D1;border:1px solid #DED9D1">
+        <sc-for list="{{ modCards }}" as="mc" hint-placeholder-count="5">
+          <article style="background:#FFFFFF;padding:18px 20px;display:flex;flex-direction:column;gap:8px">
+            <p style="font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:#4A5560;margin:0">{{ mc.slug }}</p>
+            <h4 style="margin:0;font-size:15px">{{ mc.nome }}</h4>
+            <p style="margin:0;font-size:13.5px;color:#4A5560;flex:1">{{ mc.desc }}</p>
+            <button onClick="{{ mc.on }}" aria-pressed="{{ mc.ligado }}" style="{{ mc.estilo }}" style-hover="border-color:#4A5560">{{ mc.rotulo }}</button>
+          </article>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:34px">
+        <div>
+          <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #DED9D1">Como estender</h2>
+          <p style="font-size:13.5px;line-height:1.7;color:#4A5560;margin:0;max-width:60ch">Um módulo novo é uma função que recebe <code style="font:12px ui-monospace,Menlo,monospace">(catalogo, run)</code> e devolve um bloco. Marcador novo no <code style="font:12px ui-monospace,Menlo,monospace">pytest.ini</code> vira linha nova em Dimensões sem tocar o painel; dimensão vazia some. Nenhuma lista escrita à mão.</p>
+        </div>
+        <div>
+          <h2 style="font:700 15px/1.3 ui-monospace,Menlo,monospace;letter-spacing:.02em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #DED9D1">O que nunca é customizável</h2>
+          <p style="font-size:13.5px;line-height:1.7;color:#4A5560;margin:0;max-width:60ch">As duas populações nunca se somam; o não-executado nunca é ocultado por padrão; xfail nunca entra em conta de falha; nenhum selo de aprovação. Customização muda a lente, não a honestidade.</p>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;telaInicial&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;visao-geral&quot;, &quot;motor&quot;, &quot;catalogo&quot;, &quot;leitura&quot;, &quot;execucao&quot;, &quot;regua&quot;, &quot;entrega&quot;, &quot;governanca&quot;, &quot;dev&quot;, &quot;laudo&quot;, &quot;diff&quot;, &quot;modulos&quot;], &quot;default&quot;: &quot;visao-geral&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Navegação&quot;},
+  &quot;grauLeitura&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;1-arquivos&quot;, &quot;2-contratos&quot;, &quot;3-completo&quot;], &quot;default&quot;: &quot;1-arquivos&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Navegação&quot;},
+  &quot;cenario&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;run-parcial&quot;, &quot;sem-run&quot;], &quot;default&quot;: &quot;run-parcial&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Cenário&quot;},
+  &quot;modo&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;inventario&quot;, &quot;passivo&quot;, &quot;carga&quot;, &quot;sondagem&quot;], &quot;default&quot;: &quot;inventario&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Régua &amp; modo&quot;},
+  &quot;densidade&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;confortavel&quot;, &quot;compacta&quot;], &quot;default&quot;: &quot;confortavel&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Apresentação&quot;},
+  &quot;celulaPx&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 9, &quot;min&quot;: 8, &quot;max&quot;: 14, &quot;step&quot;: 1, &quot;unit&quot;: &quot;px&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Apresentação&quot;},
+  &quot;animarMapa&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Apresentação&quot;}
+}">
+class Component extends DCLogic {
+  state = { dados: null, erro: false, tela: null, filtros: { populacao: null, nivel: null, estado: null, dimensao: null }, busca: "", limite: 80, sel: null, grau: null, arquivoFoco: null, demoDiff: false, demoRegua: false, mod: { mapa: true, populacoes: true, niveis: true, dimensoes: true, leitura: true } };
+
+  // seed de gestão — medição externa (coverage/radon/mutar) + PLANO §2–7 e ARQUITETURA, em 67a8bfe.
+  // No cockpit final vira blocos opcionais do catálogo (D5k); aqui é seed do protótipo, com procedência por bloco.
+  gestao = {
+    base: "main @ 67a8bfe",
+    motor: {
+      cobertura: {
+        geral: 77,
+        fonte: "coverage.py sob pytest -m verification (gate quality-gate)",
+        bandas: [
+          { faixa: "100%", mods: ["gates.py", "audit.py", "config.py", "rede.py", "navegacao.py"], cor: "#2F6B4F" },
+          { faixa: "97–99%", mods: ["escopo.py", "estabilidade_html.py", "telemetria_fasec.py"], cor: "#2F6B4F" },
+          { faixa: "76–94%", mods: ["etiqueta.py", "sondagem.py (83)", "llm.py", "report_html.py"], cor: "#8A5800" },
+          { faixa: "52–65%", mods: ["http_utils.py", "sanitize.py", "auth.py", "dominio.py", "trackers.py", "report.py"], cor: "#8A5800" },
+          { faixa: "7%", mods: ["metricas.py"], cor: "#9E2222" },
+          { faixa: "0%", mods: ["report_style.py — contrato visual verbatim, exclusão honesta"], cor: "#4A5560" },
+        ],
+        vies: "O gate roda só a população verification. Todo caminho de checks/ aparece descoberto; o job validate-target exercita esses caminhos e não emite cobertura nenhuma. A execução que cobre mais é a que não mede.",
+      },
+      mutacao: {
+        fonte: "harness scripts/mutar.py (apêndice B do HANDOFF-Q1) — hoje só sobre os detectores",
+        linhas: [
+          { mod: "webqa/escopo.py", viaveis: 26, mortos: 23, sobrev: 3, score: 88.5 },
+          { mod: "webqa/sondagem.py", viaveis: 82, mortos: 49, sobrev: 33, score: 59.8 },
+        ],
+      },
+      complexidade: {
+        media: "A (3,99)", fonte: "radon cc -a / ruff C901, limiar 8 — 207 blocos",
+        decisao: "A 10, nenhuma função de webqa/ é pega — só scripts/. Um gate a 10 não vigia o motor. A 8 sobram três em webqa/: sondar (10), metadados_exif (9), preparar (9); sondar cai sozinho quando A4 entrar.",
+        cauda: [
+          { onde: "scripts/campanha.py:523", fn: "render_markdown", cc: 19 },
+          { onde: "scripts/estabilidade.py:496", fn: "main", cc: 17 },
+          { onde: "fixture_target/servir.py:242", fn: "do_GET", cc: 12 },
+          { onde: "scripts/audita_design.py:405", fn: "main", cc: 11 },
+          { onde: "webqa/sondagem.py:289", fn: "sondar", cc: 10 },
+          { onde: "checks/functional/test_links.py:43", fn: "test_links_internos_sem_quebrados", cc: 10 },
+          { onde: "webqa/dominio.py:321", fn: "metadados_exif", cc: 9 },
+          { onde: "webqa/etiqueta.py:151", fn: "preparar", cc: 9 },
+          { onde: "checks/lgpd/test_retencao_observavel.py:32", fn: "_duracao_em_dias", cc: 9 },
+          { onde: "scripts/audita_design.py:128", fn: "criterio_zero_requisicao_externa", cc: 9 },
+          { onde: "scripts/campanha.py:402", fn: "por_dimensao", cc: 9 },
+        ],
+      },
+      dependencias: { ciclos: 0, fanIn: "sanitize (5)", fanOut: "report (6)", fonte: "test_convencoes.py + test_fronteira_de_rede.py (import-linter à mão)", nota: "Aciclicidade e sanitização na base do grafo — onde deveria estar, num produto cuja invariante é \u201cachado nasce mascarado\u201d. Nada a fazer nesta rodada." },
+      maturidade: {
+        fonte: "PLANO §2.6 — 16 de 20 categorias, 11 completas",
+        familias: [
+          { nome: "Funcionais", itens: [{ k: "Unitários", est: "ok", nota: "666" }, { k: "Integração", est: "ok", nota: "58" }, { k: "Sistema", est: "ok", nota: "38" }, { k: "Aceitação", est: "parcial", nota: "1 cenário" }, { k: "Regressão", est: "ausente", nota: "sem memória entre runs" }] },
+          { nome: "Não-funcionais", itens: [{ k: "Performance", est: "ok", nota: "" }, { k: "Carga", est: "parcial", nota: "rajada leve 30/10" }, { k: "Estresse", est: "escopo", nota: "fora por desenho" }, { k: "Segurança", est: "ok", nota: "16 + motor Fase C" }, { k: "Usabilidade", est: "ok", nota: "16" }, { k: "Compatibilidade", est: "ausente", nota: "só Chromium" }, { k: "Confiabilidade", est: "ok", nota: "ledger" }] },
+          { nome: "Manutenção", itens: [{ k: "Fumaça", est: "ok", nota: "" }, { k: "Sanidade", est: "ok", nota: "make verify" }, { k: "Confirmação", est: "ausente", nota: "sem memória" }, { k: "Instalação", est: "ok", nota: "vps_smoke + docker" }] },
+          { nome: "Métricas", itens: [{ k: "Cobertura", est: "ausente", nota: "não instrumentada · B4" }, { k: "Mutação", est: "parcial", nota: "só detectores" }] },
+          { nome: "Estática", itens: [{ k: "Complexidade", est: "ausente", nota: "não instrumentada · B3" }, { k: "Dependências", est: "ok", nota: "acima da média" }] },
+        ],
+      },
+    },
+    defeitos: [
+      { id: "D1", tit: "IPv6 quebra a URL pinada", sev: "alto", prova: "sorted(ips)[0] sobre strings pode eleger o IPv6; _url_pinada monta sem colchetes → _FALHA_DE_REDE, run inconclusivo, e não diz por quê.", onde: "sondagem.py:320 · :221" },
+      { id: "D2", tit: "procedencia é campo órfão", sev: "medio", prova: "preenchido nas 5 entradas de caminhos-sensiveis.yaml (WSTG-CONF-004, CWE-538/527), carregado em CaminhoSensivel, e nunca chega ao Finding.", onde: "dominio.py · report.py" },
+      { id: "D3", tit: "CLI termina em traceback no erro mais comum", sev: "alto", prova: "require_escopo/discovery usam pytest.skip(); fora de teste levanta Skipped sem tratamento. Não é bypass (sondar chama require_discovery) — é contrato de erro.", onde: "gates.py:115 · main()" },
+      { id: "D4", tit: "Dataclasses de governança sem prova de imutabilidade", sev: "alto", prova: "frozen=True→False em escopo.py:76/:112 sobrevive à suíte inteira. Registro de autorização mutável anula a premissa da Fase C.", onde: "escopo.py:76 · :112" },
+      { id: "D5", tit: "Abortos e descartes não deixam rastro", sev: "medio", prova: "posse-divergente retorna antes do AuditLog; kill-switch sai sem registrar; soft-404 faz return None e o log mostra status=200.", onde: "sondagem.py · audit.py" },
+    ],
+    sequencia: [
+      { n: 1, pr: "A1", o: "IPv6 + procedencia órfã (D1, D2)", bloq: "—", co: false },
+      { n: 2, pr: "B1", o: "Imutabilidade das dataclasses (D4)", bloq: "—", co: false },
+      { n: 3, pr: "B2", o: "Contrato de erro da CLI (D3)", bloq: "E1–E5", co: false },
+      { n: 4, pr: "A2", o: "Circuit breaker, log de descarte/abortos, timeout (D5)", bloq: "—", co: false },
+      { n: 5, pr: "B4", o: "--cov nos dois jobs", bloq: "D5k", co: false },
+      { n: 6, pr: "B3", o: "C901 limiar 8", bloq: "D5k", co: false },
+      { n: 7, pr: "D1k", o: "Cockpit no repositório", bloq: "D2k–D6k", co: false },
+      { n: 8, pr: "D2k+D4k", o: "Selo de modo e estado de incomparabilidade", bloq: "—", co: false },
+      { n: 9, pr: "B6", o: "Bordas do motor (2xx, porta)", bloq: "—", co: false },
+      { n: 10, pr: "A4", o: "Extração de funções puras de sondar", bloq: "fecha B3 em webqa/", co: false },
+      { n: 11, pr: "B5", o: "Job de mutação escopado", bloq: "D5k", co: false },
+      { n: 12, pr: "A3", o: "Diagnóstico de posse", bloq: "—", co: true },
+      { n: 13, pr: "C3", o: "Compatibilidade multi-engine", bloq: "—", co: false },
+      { n: 14, pr: "C1+C2", o: "Baseline e confirmação", bloq: "—", co: false },
+      { n: 15, pr: "D3k", o: "Procedência como espinha", bloq: "E4", co: false },
+      { n: 16, pr: "C4", o: "Ampliar aceitação", bloq: "—", co: false },
+    ],
+    racional: "A1 é pura correção e o menor diff — vai sozinho. B1 fecha a única quebra de invariante de segurança do lote. B2 sobe ao 3º porque é o único item que destrava uma frente inteira (E).",
+    frentes: [
+      { id: "A", nome: "Fase C — correção e resiliência do motor", prosp: false },
+      { id: "B", nome: "Instrumentação de qualidade", prosp: false },
+      { id: "C", nome: "Tipos de teste ausentes", prosp: false },
+      { id: "D", nome: "Cockpit de testes", prosp: false },
+      { id: "E", nome: "A suíte como padrão distribuível", prosp: true },
+    ],
+    codeowners: ["webqa/gates.py", "webqa/escopo.py", "data/caminhos-sensiveis.yaml", "tests/test_fase_c_travada.py"],
+    coNota: "PRs 1–11 não tocam nenhum caminho protegido; só aparecem em A3 (#12). Se precisar editar um antes disso, pare e reveja — o problema está no lugar errado.",
+    riscos: [
+      { id: "R-Q1", r: "Cobertura de 77% cai sem sinal a cada PR", m: "B4 com --cov-fail-under=75 no job determinístico" },
+      { id: "R-Q2", r: "Score de mutação regride e ninguém percebe", m: "B5; zero sobreviventes em escopo/gates, equivalente justificado no PR, nunca em silêncio" },
+      { id: "R-Q4", r: "Baseline (C1) vira cache implícito e achado some", m: "baseline é artefato versionado, revisável em PR" },
+      { id: "R-Q6", r: "Cockpit mostra célula vazia e leem como aprovação", m: "D4k: a ausência sempre nomeia o motivo" },
+      { id: "R-Q7", r: "Laudos de versões diferentes comparados como iguais", m: "E4; agregação recusa misturar versões" },
+      { id: "H1", r: "Agente exporta um gate e dispara sondagem ativa", m: "ambiente do agente com denylist WEBQA_* + fail_on_denied_env" },
+      { id: "H2", r: "Projeto copia a suíte; lista curada editada em silêncio", m: "laudo carrega caminhos_sensiveis_hash; divergência é achado, não silêncio" },
+    ],
+    naoFazer: [
+      "Probes adaptativos — quebram executado×esperado (denominador móvel) e degeneram a lista em wordlist",
+      "Triagem de achados por LLM — proibida por AST (test_convencoes.py:212)",
+      "radon/xenon no CI — dependência nova para o que o ruff já faz embutido",
+      "Correlação elevando severidade automaticamente — laudo especulativo; severidade vem do caminho curado",
+      "Cache/state de índice de repositório — a suíte é sem estado entre execuções por desenho",
+      "WAF fingerprint virando Finding — falso-negativo por design; header no AuditLog, ok; Finding, não",
+    ],
+    governanca: {
+      trabalhos: [
+        { t: "A", nome: "Auditar o alvo publicado", pop: "checks/", ctx: "precisa de contexto do projeto: alvo, autorização, limites", ex: "latência, cabeçalhos de segurança, terceiros, exposição de arquivos" },
+        { t: "B", nome: "Vigiar os testes do projeto", pop: "tests/ + AST", ctx: "agnóstico: lê por AST, não importa módulo, não executa nada", ex: "catálogo, níveis, reconciliação — o cockpit" },
+      ],
+      fronteira: [
+        { art: "webqa/ · checks/ · tests/ — motor e dimensões", pad: "padrão", proj: "—", nota: "" },
+        { art: "data/caminhos-sensiveis.yaml — lista curada", pad: "padrão", proj: "—", nota: "imutável pelo projeto · CODEOWNERS · teto 200" },
+        { art: "pytest.ini · CODEOWNERS", pad: "padrão", proj: "—", nota: "CODEOWNERS não sobrevive a cópia" },
+        { art: "config.yaml — alvo e thresholds", pad: "template .example", proj: "valores", nota: "" },
+        { art: "escopo-autorizado.yaml — autorização Fase C", pad: "template .example", proj: "obrigatório", nota: "" },
+        { art: "report/ — laudo produzido", pad: "—", proj: "efêmero", nota: "" },
+      ],
+      politicas: [
+        { p: "Sondagem exige opt-in", onde: "gates.py::require_discovery", como: "variável de ambiente, fail-closed" },
+        { p: "Host fora do escopo não é tocado", onde: "escopo.py", como: "comparação de origem exata" },
+        { p: "Alvo não pode ter sido reapontado", onde: "escopo.verificar_posse", como: "snapshot de IP no carregamento" },
+        { p: "Motor de sondagem não conhece IA", onde: "test_convencoes.py", como: "varredura de AST" },
+        { p: "Todo consumidor de rede é registrado", onde: "test_fronteira_de_rede.py", como: "AST + registro FRONTEIRAS_DE_REDE" },
+        { p: "Achado nasce mascarado", onde: "dominio.py", como: "sanitização no construtor" },
+      ],
+      gates: ["WEBQA_DISCOVERY_AUTHORIZED", "WEBQA_ACTIVE_PROBES_AUTHORIZED", "WEBQA_LOAD_AUTHORIZED", "WEBQA_ACTIVE_PROBES_KILL"],
+      ambiente: "O runner do agente roda com ambiente limpo, sempre: allowlist [PATH, HOME, LANG], denylist WEBQA_*, fail_on_denied_env: true (aborta, não ignora). Os modos carga e sondagem só existem em jobs separados, disparados por pessoa.",
+    },
+  };
+
+  componentDidMount() {
+    fetch("uploads/catalogo.json")
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => {
+        (d.testes || []).forEach((t) => { t._busca = [t.nodeid, t.garante, (t.dimensoes || []).join(" "), t.nivel, t.estado].join(" ").toLowerCase(); });
+        this.setState({ dados: d });
+      })
+      .catch(() => this.setState({ erro: true }));
+  }
+
+  _cor(estado) {
+    return { passed: "#2F6B4F", failed: "#9E2222", error: "#9E2222", xfail: "#8A5800", skipped: "#5C6670", "nao-executado": "#1E5A8A" }[estado] || "#1C2228";
+  }
+  _rotulo(estado) { return estado === "nao-executado" ? "nunca executado" : estado === "passed" ? "passou" : estado === "failed" ? "falhou" : estado; }
+
+  _regiaoTxt(txt) { if (this._regiao) this._regiao.textContent = txt; }
+
+  // grade de células — o primitivo único: porCaso p/ o mapa, 1/teste p/ níveis e dimensões
+  _grade(testes, celula, animar, porCaso, focavel) {
+    const cells = []; let i = 0;
+    const pequena = celula < 9; // abaixo disso o tracejado vira textura: vazio passa a sólido claro
+    for (const t of testes) {
+      const vazio = t.estado === "nao-executado";
+      const reps = porCaso ? (t.casos || 1) : 1;
+      for (let k = 0; k < reps; k++) {
+        const st = { width: celula + "px", height: celula + "px", borderRadius: "1px", flex: "0 0 auto" };
+        if (vazio) {
+          if (pequena) st.background = "#E7E2D9";
+          else { st.background = "transparent"; st.border = "1px dashed #B8B1A6"; }
+        } else {
+          st.background = this._cor(t.estado);
+          if (animar) { st.opacity = 0; st.animation = "acende .01s forwards"; st.animationDelay = (i++ * 1.2) + "ms"; }
+        }
+        const desc = t.nodeid + (porCaso && reps > 1 ? " [caso " + (k + 1) + "/" + reps + "]" : "") + " — " + this._rotulo(t.estado);
+        const props = { key: t.nodeid + k, style: st, className: "cel" };
+        if (focavel) {
+          props.tabIndex = 0;
+          props["aria-label"] = desc;
+          props.onMouseEnter = () => this._regiaoTxt(desc);
+          props.onFocus = () => this._regiaoTxt(desc);
+        } else props.title = desc;
+        cells.push(React.createElement("span", props));
+      }
+    }
+    return React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "2.5px", alignContent: "flex-start" }, role: focavel ? "group" : undefined }, cells);
+  }
+
+  _nav(id, tela) {
+    const ativo = tela === id;
+    return { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", width: "100%", textAlign: "left", font: "400 12px ui-monospace,Menlo,Consolas,monospace", padding: "8px 10px", border: "1px solid transparent", borderRadius: "2px", cursor: "pointer", background: ativo ? "#1C2228" : "transparent", color: ativo ? "#FFFFFF" : "#1C2228", fontWeight: ativo ? 700 : 400 };
+  }
+
+  _gestaoVals() {
+    const G = this.gestao;
+    const scoreCor = (s) => (s >= 85 ? "#2F6B4F" : s >= 70 ? "#8A5800" : "#9E2222");
+    const ccCor = (c) => (c >= 15 ? "#9E2222" : c >= 10 ? "#8A5800" : "#4A5560");
+    const sevCor = (s) => (s === "alto" ? "#9E2222" : "#8A5800");
+    const marca = { ok: { cor: "#2F6B4F", rot: "presente" }, parcial: { cor: "#8A5800", rot: "parcial" }, ausente: { cor: "#1E5A8A", rot: "ausente" }, escopo: { cor: "#4A5560", rot: "fora de escopo" } };
+    const co = new Set(G.codeowners);
+    return {
+      gBase: G.base,
+      covGeral: G.motor.cobertura.geral + "%",
+      covFonte: G.motor.cobertura.fonte,
+      covVies: G.motor.cobertura.vies,
+      covBandas: G.motor.cobertura.bandas.map((b) => ({ faixa: b.faixa, mods: b.mods.join(" · "), estilo: "border-left:3px solid " + b.cor })),
+      mutFonte: G.motor.mutacao.fonte,
+      mutLinhas: G.motor.mutacao.linhas.map((l) => ({ mod: l.mod, viaveis: String(l.viaveis), mortos: String(l.mortos), sobrev: String(l.sobrev), score: String(l.score).replace(".", ",") + "%", cor: scoreCor(l.score) })),
+      cxMedia: G.motor.complexidade.media, cxFonte: G.motor.complexidade.fonte, cxDecisao: G.motor.complexidade.decisao,
+      cxCauda: G.motor.complexidade.cauda.map((c) => ({ onde: c.onde, fn: c.fn, cc: String(c.cc), cor: ccCor(c.cc), motor: c.onde.indexOf("webqa/") === 0 ? "sim" : "", ehMotor: c.onde.indexOf("webqa/") === 0 })),
+      depCiclos: G.motor.dependencias.ciclos + " ciclos", depFanIn: G.motor.dependencias.fanIn, depFanOut: G.motor.dependencias.fanOut, depFonte: G.motor.dependencias.fonte, depNota: G.motor.dependencias.nota,
+      matFonte: G.motor.maturidade.fonte,
+      matFamilias: G.motor.maturidade.familias.map((f) => ({ nome: f.nome, itens: f.itens.map((it) => ({ k: it.k, nota: it.nota, rot: marca[it.est].rot, cor: marca[it.est].cor, estilo: (it.est === "ausente" ? "background:#FFFFFF;border:1px dashed #B8B1A6" : "background:#FFFFFF;border:1px solid #DED9D1") + ";border-top:3px solid " + marca[it.est].cor + ";padding:10px 12px" })) })),
+      matLegenda: [{ rot: "presente", cor: "#2F6B4F" }, { rot: "parcial", cor: "#8A5800" }, { rot: "ausente", cor: "#1E5A8A" }, { rot: "fora de escopo", cor: "#4A5560" }],
+      defeitos: G.defeitos.map((d) => ({ id: d.id, tit: d.tit, prova: d.prova, onde: d.onde, sev: d.sev, estilo: "background:#FFFFFF;border:1px solid #DED9D1;border-left:3px solid " + sevCor(d.sev) + ";padding:14px 18px", sevCor: sevCor(d.sev) })),
+      seqLinhas: G.sequencia.map((s) => ({ n: String(s.n), pr: s.pr, o: s.o, bloq: s.bloq, co: s.co ? "sim" : "", ehCo: s.co, destaque: s.n <= 3 })),
+      racional: G.racional,
+      codeownersTxt: G.codeowners.join(" · "), coNota: G.coNota,
+      frentes: G.frentes.map((f) => ({ id: f.id, nome: f.nome, prosp: f.prosp, tag: f.prosp ? "prospectivo — não existe" : "em execução", cor: f.prosp ? "#4A5560" : "#1C2228" })),
+      riscos: G.riscos,
+      naoFazer: G.naoFazer,
+      govTrabalhos: G.governanca.trabalhos,
+      govFronteira: G.governanca.fronteira,
+      govPoliticas: G.governanca.politicas,
+      govGates: G.governanca.gates,
+      govAmbiente: G.governanca.ambiente,
+    };
+  }
+
+  _desc(vals) {
+    const v = vals.filter((x) => x > 0).sort((a, b) => a - b);
+    if (!v.length) return null;
+    const n = v.length, med = (a) => { const m = a.length; return m ? (m % 2 ? a[(m - 1) / 2] : (a[m / 2 - 1] + a[m / 2]) / 2) : 0; };
+    const q1 = n > 1 ? med(v.slice(0, Math.floor(n / 2))) : v[0];
+    const q3 = n > 1 ? med(v.slice(Math.ceil((n + 1) / 2))) : v[0];
+    const lim = q3 + 1.5 * (q3 - q1);
+    const media = v.reduce((s, x) => s + x, 0) / n;
+    const dp = n > 1 ? Math.sqrt(v.reduce((s, x) => s + (x - media) * (x - media), 0) / n) : 0;
+    return { n, mediana: med(v), media, p95: v[Math.min(n - 1, Math.floor(0.95 * n))], desvio: dp, limite: lim, outliers: v.filter((x) => x > lim).length, total: v.reduce((s, x) => s + x, 0) };
+  }
+  _fmtDesc(d) {
+    const s = (x) => String(Math.round(x * 1000) / 1000).replace(".", ",") + "s";
+    return [{ k: "mediana", v: s(d.mediana) }, { k: "média", v: s(d.media) }, { k: "p95", v: s(d.p95) }, { k: "desvio", v: s(d.desvio) }, { k: "n", v: String(d.n) }, { k: "total", v: String(Math.round(d.total * 10) / 10).replace(".", ",") + "s" }];
+  }
+
+  renderVals() {
+    const st = this.state, dados = st.dados;
+    const tela = st.tela ?? this.props.telaInicial ?? "visao-geral";
+    const celula = Math.max(8, this.props.celulaPx ?? 9);
+    const animar = this.props.animarMapa ?? true;
+    const compacta = (this.props.densidade ?? "confortavel") === "compacta";
+    const setTela = (t) => () => this.setState({ tela: t });
+
+    const vals = {
+      erro: st.erro,
+      telaVisao: tela === "visao-geral", telaCatalogo: tela === "catalogo", telaLeitura: tela === "leitura", telaExecucao: tela === "execucao", telaLaudo: tela === "laudo", telaDiff: tela === "diff", telaRegua: tela === "regua", telaMotor: tela === "motor", telaEntrega: tela === "entrega", telaGov: tela === "governanca", telaDev: tela === "dev", telaModulos: tela === "modulos",
+      irVisao: setTela("visao-geral"), irCatalogo: setTela("catalogo"), irLeitura: setTela("leitura"), irExecucao: setTela("execucao"), irLaudo: setTela("laudo"), irDiff: setTela("diff"), irRegua: setTela("regua"), irMotor: setTela("motor"), irEntrega: setTela("entrega"), irGov: setTela("governanca"), irDev: setTela("dev"), irModulos: setTela("modulos"),
+      navVisao: this._nav("visao-geral", tela), navCatalogo: this._nav("catalogo", tela), navLeitura: this._nav("leitura", tela), navExecucao: this._nav("execucao", tela), navLaudo: this._nav("laudo", tela), navDiff: this._nav("diff", tela), navRegua: this._nav("regua", tela), navMotor: this._nav("motor", tela), navEntrega: this._nav("entrega", tela), navGov: this._nav("governanca", tela), navDev: this._nav("dev", tela), navModulos: this._nav("modulos", tela),
+      padTd: compacta ? "5px 8px" : "9px 10px",
+      lidoEm: new Date().toLocaleDateString("pt-BR"),
+      refRegiao: (el) => { this._regiao = el; },
+      swVazio: celula < 9 ? "background:#E7E2D9;" : "border:1px dashed #B8B1A6;",
+      modMapa: st.mod.mapa, modPopulacoes: st.mod.populacoes, modNiveis: st.mod.niveis, modDimensoes: st.mod.dimensoes, modLeitura: st.mod.leitura,
+      busca: st.busca, aoBuscar: (e) => this.setState({ busca: e.target.value, limite: 80 }),
+      maisLinhas: () => this.setState({ limite: st.limite + 200 }),
+      fecharSel: () => this.setState({ sel: null }),
+    };
+
+    Object.assign(vals, this._gestaoVals());
+
+    if (!dados) {
+      return Object.assign(vals, { procLinha: "lendo o catálogo…", procCompleta: "", chips: [], linhas: [], niveisLinhas: [], dimsLinhas: [], modCards: [], descSuite: [], descAlvo: [], temDescSuite: false, semDescSuite: false, temDescAlvo: false, semDescAlvo: false, temSel: false, vazioCatalogo: false, temMais: false, temOrfaos: false, arquivosLeitura: [], grausLeitura: [], temFoco: false, resumoLeitura: "", semRun: false, mtRodape: "auto", semDiff: true, demoDiff: false, diffNovos: [], diffRemovidos: [], diffMudaram: [], diffContratos: [], seloCor: "#1C2228", seloModo: "…", seloGates: "lendo o modo…", modeCards: [], eixosRegua: [], carimboLinhas: [], compCards: [], compLegenda: [], semComp: true, demoComp: false, gatesFrase: "", reguaCommit: "…", reguaModoTxt: "…", reguaPadrao: "…", reguaHash: "…", nIncomp: 0, nComp: 0 });
+    }
+
+    const semRun = (this.props.cenario ?? "run-parcial") === "sem-run";
+    const testes = semRun ? (dados.testes || []).map((t) => Object.assign({}, t, { estado: "nao-executado", duracao_s: 0 })) : (dados.testes || []);
+    vals.semRun = semRun; vals.mtRodape = semRun ? "12px" : "auto";
+    const ag = dados.agregados || {};
+    const proc = dados.procedencia || {};
+    const total = testes.length;
+    const exe = testes.filter((t) => t.estado !== "nao-executado").length;
+    const buraco = total - exe;
+    const casos = ag.casos ?? testes.reduce((s, t) => s + (t.casos || 1), 0);
+    const rec = dados.reconciliacao || {};
+    const alvo = testes.filter((t) => t.populacao === "alvo");
+    const suite = testes.filter((t) => t.populacao === "suite");
+
+    const repo = proc.repositorio || "danzeroum/qa-suite";
+    const ramo = proc.ramo || "main", commit = proc.commit || "—";
+    const nArquivos = new Set(testes.map((t) => t.arquivo)).size;
+    vals.repo = repo; vals.ramo = ramo; vals.commit = commit; vals.nArquivos = nArquivos;
+    vals.procLinha = commit + " · " + ramo + " · " + nArquivos + " arq";
+    vals.procCompleta = "repo " + repo + " · ramo " + ramo + " · commit " + commit + " · " + nArquivos + " arquivos varridos por AST";
+    vals.nTestes = total; vals.nCasos = casos; vals.nExe = exe; vals.nBuraco = buraco;
+    vals.pctExe = (total ? (100 * exe / total).toFixed(1).replace(".", ",") : "0") + "%";
+    vals.nAlvo = alvo.length; vals.nSuite = suite.length;
+    vals.casosAlvo = alvo.reduce((s, t) => s + (t.casos || 1), 0);
+    vals.casosSuite = suite.reduce((s, t) => s + (t.casos || 1), 0);
+    vals.mapaAlvo = this._grade(alvo, celula, animar, true, true);
+    vals.mapaSuite = this._grade(suite, celula, animar, true, true);
+    vals.nCondicionais = ag.condicionais ?? testes.filter((t) => t.veredito_condicional).length;
+    vals.nGherkin = ag.gherkin ?? testes.filter((t) => t.origem === "gherkin").length;
+    vals.semContrato = ag.sem_contrato ?? testes.filter((t) => !t.garante).length;
+    vals.nParametrizados = testes.filter((t) => (t.casos || 1) > 1).length;
+    vals.nOrfaos = (rec.orfaos || []).length; vals.temOrfaos = vals.nOrfaos > 0;
+
+    const ordemNiveis = ["unidade", "integracao", "sistema", "aceitacao"];
+    vals.niveisLinhas = ordemNiveis.map((nv) => {
+      const grupo = testes.filter((t) => t.nivel === nv);
+      return { k: nv, grade: this._grade(grupo, celula, false, false, false), v: grupo.length + " · " + (total ? (100 * grupo.length / total).toFixed(1).replace(".", ",") : 0) + "%" };
+    });
+    const unid = testes.filter((t) => t.nivel === "unidade").length;
+    const aceit = testes.filter((t) => t.nivel === "aceitacao").length;
+    vals.alertaPiramide = "Leitura do formato: " + unid + " de " + total + " testes (" + (total ? (100 * unid / total).toFixed(0) : 0) + "%) são de unidade; a aceitação tem " + aceit + ". A base larga é saudável; o topo estreito é o alerta — aceitação é o único nível que responde \u201cfaz o que deveria?\u201d.";
+
+    const dimsAlvo = {}; alvo.forEach((t) => (t.dimensoes || []).forEach((d) => { (dimsAlvo[d] = dimsAlvo[d] || []).push(t); }));
+    vals.dimsLinhas = Object.keys(dimsAlvo).sort().map((d) => ({ k: d, grade: this._grade(dimsAlvo[d], celula, false, false, false), v: dimsAlvo[d].length + " teste(s)" }));
+
+    const dSuite = this._desc(suite.map((t) => t.duracao_s || 0));
+    const dAlvo = this._desc(alvo.map((t) => t.duracao_s || 0));
+    vals.temDescSuite = !!dSuite; vals.semDescSuite = !dSuite;
+    vals.temDescAlvo = !!dAlvo; vals.semDescAlvo = !dAlvo;
+    vals.descSuite = dSuite ? this._fmtDesc(dSuite) : [];
+    vals.descAlvo = dAlvo ? this._fmtDesc(dAlvo) : [];
+    const obs = (d) => d ? d.outliers + " caso(s) acima do limite de Tukey (" + String(Math.round(d.limite * 1000) / 1000).replace(".", ",") + "s). Média " + (d.media > d.mediana ? "acima" : "abaixo") + " da mediana → distribuição assimétrica à " + (d.media > d.mediana ? "direita" : "esquerda") + "." : "";
+    vals.obsSuite = obs(dSuite); vals.obsAlvo = obs(dAlvo);
+
+    const f = st.filtros, q = st.busca.trim().toLowerCase();
+    const filtrados = testes.filter((t) => (!f.populacao || t.populacao === f.populacao) && (!f.nivel || t.nivel === f.nivel) && (!f.estado || t.estado === f.estado) && (!f.dimensao || (t.dimensoes || []).includes(f.dimensao)) && (!q || t._busca.includes(q)));
+    vals.contador = filtrados.length + " de " + total + " testes";
+    vals.vazioCatalogo = filtrados.length === 0;
+    vals.temMais = filtrados.length > st.limite;
+    vals.resta = Math.max(0, filtrados.length - st.limite);
+    vals.linhas = filtrados.slice(0, st.limite).map((t) => {
+      const tags = [...(t.dimensoes || []), t.nivel];
+      if ((t.casos || 1) > 1) tags.push(t.casos + " casos");
+      if (t.veredito_condicional) tags.push("3 estados");
+      if (t.origem === "gherkin") tags.push("gherkin");
+      return { funcao: t.funcao, contrato: t.garante || "sem docstring — o contrato não está escrito", onde: t.arquivo + ":" + t.linha, tags, cor: this._cor(t.estado), estadoRotulo: this._rotulo(t.estado), dur: t.duracao_s ? String(t.duracao_s).replace(".", ",") + "s" : "—", on: () => this.setState({ sel: t }) };
+    });
+
+    const chip = (campo, valor, rotulo) => { const ativo = f[campo] === valor; return { rotulo, ativo: String(ativo), on: () => this.setState({ filtros: Object.assign({}, f, { [campo]: ativo ? null : valor }), limite: 80 }), estilo: { font: "400 12px ui-monospace,Menlo,Consolas,monospace", padding: "5px 11px", border: "1px solid " + (ativo ? "#1C2228" : "#DED9D1"), background: ativo ? "#1C2228" : "#FFFFFF", color: ativo ? "#FFFFFF" : "#4A5560", cursor: "pointer", borderRadius: "2px" } }; };
+    const estadosPresentes = [...new Set(testes.map((t) => t.estado))];
+    vals.chips = [chip("populacao", "alvo", "julga o alvo"), chip("populacao", "suite", "verifica a suíte"), ...ordemNiveis.filter((n) => testes.some((t) => t.nivel === n)).map((n) => chip("nivel", n, n)), ...estadosPresentes.map((e) => chip("estado", e, this._rotulo(e))), ...Object.keys(dimsAlvo).sort().map((d) => chip("dimensao", d, d))];
+
+    const sel = st.sel;
+    vals.temSel = !!sel;
+    if (sel) {
+      vals.selId = sel.nodeid;
+      vals.selGarante = sel.garante || "Sem docstring. O AST não encontrou contrato escrito — quem aprova só tem o nome da função como evidência.";
+      vals.selPop = sel.populacao === "alvo" ? "alvo · checks/" : "suíte · tests/";
+      vals.selNivel = sel.nivel; vals.selCasos = sel.casos || 1;
+      vals.selEstado = this._rotulo(sel.estado); vals.selCor = this._cor(sel.estado);
+      vals.selDur = sel.duracao_s ? String(sel.duracao_s).replace(".", ",") + "s" : "—";
+      vals.selDims = (sel.dimensoes || []).join(", ") || "—";
+      vals.selOnde = sel.arquivo + ":" + sel.linha;
+      vals.selOrigem = sel.origem === "gherkin" ? "cenário Gherkin (.feature)" : "AST do arquivo Python";
+      const fatos = [];
+      fatos.push(sel.populacao === "alvo" ? "Falha aqui é achado sobre o site auditado — não sobre a ferramenta." : "Falha aqui é bug da própria suíte — não diz nada sobre o alvo.");
+      if (sel.estado === "nao-executado") fatos.push("Nunca executado no último run: nenhuma afirmação sobre ele é possível, positiva ou negativa.");
+      else fatos.push("Executado no último run com veredito \u201c" + this._rotulo(sel.estado) + "\u201d.");
+      if (sel.veredito_condicional) fatos.push("Chama pytest.xfail() no corpo: veredito de três estados, invisível a leitores de decorators.");
+      if (sel.skipif) fatos.push("Tem skipif: o que ele decide em runtime não é visível a esta leitura.");
+      if ((sel.casos || 1) > 1) fatos.push("Parametrizado: " + sel.casos + " casos coletáveis a partir de uma função.");
+      vals.selVeredicto = fatos.join(" ");
+      vals.selLerArquivo = () => this.setState({ tela: "leitura", arquivoFoco: sel.arquivo, grau: 3, sel: null });
+    }
+
+    // ===== ângulo 1+3: modo (eixo de risco) · régua (carimbo) · comparabilidade =====
+    const MODOS = {
+      inventario: { rot: "inventário", grav: 1, gates: [], nota: "agnóstico · rede não tocada · dry-run padrão" },
+      passivo: { rot: "passivo", grav: 2, gates: [], nota: "observa o alvo sem tocar credenciais" },
+      carga: { rot: "carga", grav: 3, gates: ["load"], nota: "marcador load · gera tráfego contra o alvo" },
+      sondagem: { rot: "sondagem", grav: 4, gates: ["rede", "credenciais"], nota: "gates de ambiente ativos · toca rede autorizada" },
+    };
+    const modo = MODOS[this.props.modo] ? this.props.modo : "inventario";
+    const M = MODOS[modo];
+    const barCor = (m) => (m.grav >= 4 ? "#9E2222" : m.grav === 3 ? "#8A5800" : "#1C2228");
+    vals.seloCor = barCor(M);
+    vals.seloModo = M.rot;
+    vals.seloGates = M.gates.length ? "gates: " + M.gates.join(", ") : "sem gate — sereno";
+    vals.gatesFrase = M.gates.length
+      ? "Há gate(s) ativo(s): " + M.gates.join(", ") + ". Este run foi além da leitura — pediu autorização e tocou o alvo. O painel fica ruidoso de propósito: é o momento em que ler importa mais."
+      : "Nenhum gate ativo. O run não pediu autorização e não tocou a rede — sereno por construção, e o painel diz isso em vez de encenar gravidade que não houve.";
+    vals.modeCards = ["inventario", "passivo", "carga", "sondagem"].map((k) => {
+      const m = MODOS[k], atual = k === modo;
+      return { rot: m.rot, nota: m.nota, gates: m.gates.length ? "gates: " + m.gates.join(", ") : "gates: nenhum", ehAtual: atual, barra: "background:" + barCor(m), estilo: { background: "#FFFFFF", padding: "14px 16px", opacity: atual ? 1 : 0.5, outline: atual ? "2px solid #1C2228" : "0", outlineOffset: "-1px" } };
+    });
+    vals.reguaCommit = commit;
+    vals.carimboLinhas = [
+      { k: "commit", v: commit, estilo: "color:#1C2228" },
+      { k: "ramo", v: ramo, estilo: "color:#1C2228" },
+      { k: "modo", v: M.rot, estilo: "color:#1C2228" },
+      { k: "gates_ativos", v: M.gates.length ? "[" + M.gates.join(", ") + "]" : "[] — nenhum", estilo: "color:#1C2228" },
+      { k: "padrao.versao", v: "pendente de serialização", estilo: "color:#4A5560;font-style:italic" },
+      { k: "caminhos_sensiveis_hash", v: "pendente de serialização", estilo: "color:#4A5560;font-style:italic" },
+    ];
+    vals.eixosRegua = [
+      { k: "catálogo & execução", texto: casos + " casos · " + exe + " exec", estilo: "color:#1C2228" },
+      { k: "cobertura de código", texto: "ausente — não emitido", estilo: "color:#4A5560" },
+      { k: "mutação", texto: "ausente — não emitido", estilo: "color:#4A5560" },
+      { k: "complexidade", texto: "ausente — não emitido", estilo: "color:#4A5560" },
+    ];
+    const demoR = st.demoRegua;
+    vals.semComp = !demoR; vals.demoComp = demoR;
+    vals.ligarComp = () => this.setState({ demoRegua: true });
+    vals.desligarComp = () => this.setState({ demoRegua: false });
+    vals.compLegenda = [
+      { rot: "régua divergente", cor: "#9E2222", desc: "padrão/lista curada com hash diferente" },
+      { rot: "modo divergente", cor: "#8A5800", desc: "execuções sob risco diferente" },
+      { rot: "sem execução", cor: "#1E5A8A", desc: "o projeto nunca rodou" },
+      { rot: "eixo ausente", cor: "#4A5560", desc: "o eixo não foi medido de um lado" },
+      { rot: "comparável", cor: "#2F6B4F", desc: "mesma régua, mesmo modo" },
+    ];
+    vals.compCards = demoR ? [
+      { par: "este ⟷ checks-loja", veredito: "incomparável", motivo: "régua divergente", cor: "#9E2222", ehComp: false, detalhe: "Padrão v2.0 contra v2.1 — o hash da lista curada difere. Comparar dois \u201c0 achados\u201d medidos com réguas diferentes produz um número falso; o painel recusa o alinhamento." },
+      { par: "este ⟷ checks-portal", veredito: "incomparável", motivo: "modo divergente", cor: "#8A5800", ehComp: false, detalhe: "checks-portal rodou em sondagem (rede autorizada); este, em inventário. Execuções sob risco diferente não cabem na mesma linha — o que um tocou, o outro nem tentou." },
+      { par: "este ⟷ checks-app", veredito: "incomparável", motivo: "sem execução", cor: "#1E5A8A", ehComp: false, detalhe: "checks-app tem catálogo, mas nunca rodou. Não há amostra a comparar — e a ausência não é zero, é silêncio." },
+      { par: "este ⟷ checks-espelho", veredito: "comparável", motivo: "régua idêntica", cor: "#2F6B4F", ehComp: true, detalhe: "Mesmo padrão, mesmo modo, mesmo hash de caminhos. Só aqui a comparação é honesta — e note que ela compara execução, não veredito somado:", ladoA: "este · " + casos + " casos · " + exe + " exec", ladoB: "checks-espelho · 848 casos · 91 exec" },
+    ] : [];
+    vals.nIncomp = 3; vals.nComp = 1;
+
+    vals.laudoExiste = "O repositório " + repo + " (commit " + commit + ") declara " + total + " testes — " + casos + " casos com parametrize expandido — em " + nArquivos + " arquivos: " + alvo.length + " julgam o alvo (checks/) e " + suite.length + " verificam a própria suíte (tests/). " + vals.nGherkin + " nasce(m) de cenário Gherkin e " + vals.nCondicionais + " têm veredito condicional no corpo.";
+    vals.laudoTocou = exe === 0 ? "Nenhum run conhecido: o catálogo existe, a execução não. Não há veredito nenhum a relatar — e este laudo prefere dizer isso a extrapolar." : "O último run executou " + exe + " teste(s) — " + vals.pctExe + " do catálogo — todos da população que verifica a suíte" + (dAlvo ? " e parte dos checks" : "; nenhum check contra o alvo rodou") + ". Dentro do que rodou: " + (testes.filter((t) => t.estado === "passed").length) + " passaram, " + (testes.filter((t) => t.estado === "failed" || t.estado === "error").length) + " falharam.";
+    vals.laudoBuraco = buraco + " teste(s) — inclusive todos os " + alvo.length + " checks sobre o alvo" + (dAlvo ? " exceto os executados" : "") + " — nunca foram coletados neste run. Sobre eles, o run não oferece evidência nenhuma: aprovar o lote exige tratar esse silêncio como silêncio, não como verde.";
+    vals.laudoJson = JSON.stringify({
+      procedencia: proc,
+      carimbo: { modo: M.rot, gates_ativos: M.gates, padrao_versao: null, caminhos_sensiveis_hash: null },
+      _schema: "procedencia+carimbo sao obrigatorios; nenhum agregado comparavel e emitido sem carimbo completo — padrao_versao/caminhos_sensiveis_hash=null ⇒ 'comparavel' ausente por contrato, nao por esquecimento",
+      reconciliacao: { executados: exe, nunca_vistos: buraco, orfaos: rec.orfaos || [] },
+      agregados: { populacoes: ag.populacoes, niveis: ag.niveis, estados: ag.estados, casos, sem_contrato: vals.semContrato, condicionais: vals.nCondicionais, gherkin: vals.nGherkin },
+      comparavel: null,
+    }, null, 1);
+
+    // entre leituras — vazio honesto por padrão; demo popula com leitura anterior simulada e rotulada
+    const demo = st.demoDiff;
+    vals.semDiff = !demo; vals.demoDiff = demo;
+    vals.ligarDemo = () => this.setState({ demoDiff: true });
+    vals.desligarDemo = () => this.setState({ demoDiff: false });
+    if (demo) {
+      const ord = testes.slice().sort((a, b) => (a.nodeid < b.nodeid ? -1 : 1));
+      vals.diffNovos = ord.slice(0, 3).map((t) => ({ id: t.nodeid, nota: "não existia em e91c04a — nasce " + (t.garante ? "com contrato escrito" : "sem docstring") }));
+      const virou = testes.filter((t) => t.estado === "failed" || t.estado === "error" || t.estado === "xfail").slice(0, 3);
+      const baseVirou = virou.length ? virou : ord.filter((t) => t.estado !== "nao-executado").slice(0, 2);
+      vals.diffMudaram = baseVirou.map((t) => ({ id: t.nodeid, nota: "passou em e91c04a → " + this._rotulo(t.estado) + " em " + commit }));
+      vals.diffRemovidos = [
+        { id: "tests/test_relatorio.py::test_resumo_txt_legado", nota: "existia em e91c04a; a função sumiu do arquivo" },
+        { id: "checks/test_navegacao.py::test_menu_v1", nota: "removido junto com o menu antigo do alvo" },
+      ];
+      const comContrato = ord.filter((t) => t.garante).slice(0, 2);
+      vals.diffContratos = comContrato.map((t) => ({ id: t.nodeid, nota: "docstring reescrita — a promessa desta leitura não é a de e91c04a" }));
+      vals.nDiffNovos = vals.diffNovos.length; vals.nDiffRemovidos = vals.diffRemovidos.length;
+      vals.nDiffMudaram = vals.diffMudaram.length; vals.nDiffContratos = vals.diffContratos.length;
+      vals.diffIguais = total - vals.nDiffNovos - vals.nDiffMudaram - vals.nDiffContratos;
+    }
+
+    // modo leitura — graduado: 1 arquivos, 2 contratos, 3 completo; foco = um arquivo só
+    const grau = st.grau ?? ({ "1-arquivos": 1, "2-contratos": 2, "3-completo": 3 }[this.props.grauLeitura] ?? 1);
+    const foco = st.arquivoFoco;
+    vals.temFoco = !!foco;
+    vals.limparFoco = () => this.setState({ arquivoFoco: null, grau: 1 });
+    vals.grausLeitura = [[1, "1 · arquivos"], [2, "2 · contratos"], [3, "3 · completo"]].map(([n, rot]) => ({ rot, ativo: String(grau === n), on: () => this.setState({ grau: n }), estilo: { font: "400 12px ui-monospace,Menlo,Consolas,monospace", padding: "5px 11px", border: "1px solid " + (grau === n ? "#1C2228" : "#DED9D1"), background: grau === n ? "#1C2228" : "#FFFFFF", color: grau === n ? "#FFFFFF" : "#4A5560", cursor: "pointer", borderRadius: "2px" } }));
+    const porArq = {}; testes.forEach((t) => { (porArq[t.arquivo] = porArq[t.arquivo] || []).push(t); });
+    vals.resumoLeitura = Object.keys(porArq).length + " arquivos · " + total + " testes · " + (total - vals.semContrato) + " contratos escritos";
+    vals.arquivosLeitura = Object.keys(porArq).sort().filter((a) => !foco || a === foco).map((a) => {
+      const ts = porArq[a].slice().sort((x, y) => x.linha - y.linha);
+      const com = ts.filter((t) => t.garante).length;
+      const exeA = ts.filter((t) => t.estado !== "nao-executado").length;
+      const base = grau === 1 ? [] : grau === 2 ? ts.filter((t) => t.garante) : ts;
+      const ocultos = ts.length - com;
+      return {
+        nome: a,
+        resumo: ts.length + " teste(s) · " + com + " com contrato · " + exeA + " executado(s)",
+        on: () => this.setState({ arquivoFoco: foco === a ? null : a, grau: foco === a ? grau : 3 }),
+        temNota: grau === 2 && ocultos > 0,
+        nota: ocultos + " teste(s) sem contrato não aparecem neste grau — o grau 3 os mostra",
+        entradas: base.map((t) => ({
+          funcao: t.funcao, linha: "linha " + t.linha,
+          garante: t.garante || "sem docstring — o contrato não está escrito",
+          corGarante: t.garante ? "#1C2228" : "#4A5560",
+          temMeta: grau === 3,
+          meta: t.nivel + " · " + ((t.dimensoes || []).join(", ") || "—") + " · " + (t.casos || 1) + " caso(s) · ",
+          estadoRotulo: this._rotulo(t.estado), cor: this._cor(t.estado),
+        })),
+      };
+    });
+
+    const defs = [
+      { k: "mapa", slug: "modulo/mapa", nome: "Mapa do lote", desc: "Uma célula por caso coletável. A assinatura do painel: o não-executado tem aparência própria." },
+      { k: "populacoes", slug: "modulo/populacoes", nome: "Duas populações", desc: "checks/ julga o alvo; tests/ verifica a suíte. Nunca se somam." },
+      { k: "niveis", slug: "modulo/niveis", nome: "Níveis de teste", desc: "Unidade → aceitação no mesmo primitivo de célula, com alerta de formato." },
+      { k: "dimensoes", slug: "modulo/dimensoes", nome: "Dimensões de qualidade", desc: "Espelho dos markers do pytest.ini, só da população que julga o alvo." },
+      { k: "leitura", slug: "modulo/leitura", nome: "Como ler", desc: "Os quatro cartões epistêmicos: verificação × validação, amostra, vazio, limite." },
+    ];
+    vals.modCards = defs.map((d) => { const ligado = st.mod[d.k]; return { slug: d.slug, nome: d.nome, desc: d.desc, ligado: String(ligado), rotulo: ligado ? "ligado — na visão geral" : "desligado", on: () => this.setState({ mod: Object.assign({}, st.mod, { [d.k]: !ligado }) }), estilo: { font: "600 12px ui-monospace,Menlo,Consolas,monospace", padding: "7px 12px", border: "1px solid " + (ligado ? "#1E5A8A" : "#DED9D1"), background: ligado ? "#1E5A8A" : "#FFFFFF", color: ligado ? "#FFFFFF" : "#4A5560", cursor: "pointer", borderRadius: "2px", alignSelf: "flex-start" } }; });
+
+    return vals;
+  }
+}
+</script>
+</body>
+</html>
