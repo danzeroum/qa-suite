@@ -351,3 +351,38 @@ def test_alvos_de_terceiro_da_campanha_reprovam_escopo(tmp_path):
     for alvo in campanha["alvos"]:
         assert not esc.esta_no_escopo(alvo["url"]), (
             f"{alvo['url']} é alvo passivo de terceiro — nunca deve estar no escopo ativo")
+
+
+# ---------- Q1a: a autorização é uma foto congelada, não um objeto editável ----------
+
+def test_toda_dataclass_do_escopo_e_congelada():
+    """Guarda estrutural: modelo novo aqui nasce imutável, sem depender de lembrança.
+
+    Testar `EntradaEscopo`/`Escopo` uma a uma protege o que existe hoje; varrer o
+    módulo protege o que alguém acrescentar amanhã — mesmo padrão de
+    test_convencoes.py e test_fronteira_de_rede.py."""
+    import dataclasses
+    import inspect
+
+    mutaveis = [
+        nome for nome, obj in vars(escopo).items()
+        if inspect.isclass(obj) and dataclasses.is_dataclass(obj)
+        and obj.__module__ == escopo.__name__
+        and not obj.__dataclass_params__.frozen
+    ]
+    assert not mutaveis, (
+        f"dataclass mutável em webqa/escopo.py: {mutaveis}. A autorização é um "
+        "snapshot do carregamento; objeto editável em memória anula a prova de posse.")
+
+
+def test_entrada_e_escopo_recusam_reatribuicao(tmp_path):
+    """Comportamento, não só declaração: o `frozen=True` é verdade em runtime."""
+    from dataclasses import FrozenInstanceError
+
+    esc = escopo.carregar(_escrever(tmp_path, "https://meusite.exemplo.br"))
+    entrada = esc.entradas[0]                       # construído FORA do raises
+
+    with pytest.raises(FrozenInstanceError):
+        entrada.origem = "https://invasor.exemplo.br"
+    with pytest.raises(FrozenInstanceError):
+        esc.entradas = ()
