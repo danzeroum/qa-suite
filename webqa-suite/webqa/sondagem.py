@@ -29,6 +29,7 @@ de quem opera.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import ipaddress
 import json
 import time
@@ -134,6 +135,30 @@ def carregar_caminhos(caminho: str | Path) -> list[CaminhoSensivel]:
             f"caminhos sem procedencia (MITRE/OWASP obrigatório na lista curada): "
             f"{sorted(sem_procedencia)}")
     return entradas
+
+
+def hash_dos_caminhos(caminho: str | Path) -> str:
+    """`sha256:<hex>` do conteúdo BRUTO da lista curada que foi usada no run.
+
+    É a régua carimbada no laudo. Dois laudos que dizem "0 achados" com o mesmo
+    hash foram medidos pela MESMA lista; hashes diferentes acusam que alguém
+    editou a lista entre os dois — o buraco de silêncio que a arquitetura de
+    padrão-em-harness fecha (H2/§8.1): lista encurtada em segredo produz "nenhum
+    achado" indistinguível de alvo seguro. Bytes crus, não conteúdo normalizado:
+    qualquer alteração do arquivo tem de aparecer, não só as semânticas."""
+    dados = Path(caminho).read_bytes()
+    return "sha256:" + hashlib.sha256(dados).hexdigest()
+
+
+def _bloco_padrao(caminho: str | Path, caminhos: list[CaminhoSensivel]) -> dict:
+    """Procedência da régua no laudo: qual lista curada mediu, e de que tamanho.
+
+    `caminhos_total` torna dois laudos comparáveis mesmo sem versão do pacote: um
+    laudo de lista com 5 caminhos e outro com 40 dizem "0 achados" afirmando
+    coisas diferentes (§8.1). Versão/commit do padrão dependem da frente de
+    distribuição (E1), ainda inexistente — não são inventados aqui."""
+    return {"caminhos_sensiveis_hash": hash_dos_caminhos(caminho),
+            "caminhos_total": len(caminhos)}
 
 
 @dataclass
@@ -638,15 +663,19 @@ def _imprimir_resultados(resultados: list[ResultadoSondagem]) -> None:
             print(f"  [{f.severidade}] {f.tipo} — {f.recurso}")
 
 
-def _gravar_laudo(saida: Path, resultados: list[ResultadoSondagem]) -> None:
+def _gravar_laudo(saida: Path, resultados: list[ResultadoSondagem],
+                  padrao: dict | None = None) -> None:
     from webqa.correlacao import correlacionar_findings
 
     todos = [f for r in resultados for f in r.findings]
     correlacoes = correlacionar_findings(todos)
-    saida.write_text(
-        json.dumps({"alvos": [_resultado_para_dict(r) for r in resultados],
-                    "correlacoes": correlacoes}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
+    laudo: dict = {"alvos": [_resultado_para_dict(r) for r in resultados],
+                   "correlacoes": correlacoes}
+    if padrao is not None:
+        # A régua vem ANTES dos alvos no JSON: quem lê o laudo topa com a
+        # procedência da lista antes de qualquer "0 achados" (§8.1).
+        laudo = {"padrao": padrao, **laudo}
+    saida.write_text(json.dumps(laudo, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Laudo gravado em {saida}")
     for c in correlacoes:
         print(f"  risco composto em {c['host']}: {c['tipo']}")
@@ -667,7 +696,8 @@ def _classificar_baseline(caminho: Path, findings: list[Finding]) -> int:
     return 0
 
 
-def _emitir_relatorios(args, resultados: list[ResultadoSondagem]) -> int:
+def _emitir_relatorios(args, resultados: list[ResultadoSondagem],
+                       padrao: dict | None = None) -> int:
     """Aplica os flags de saída (--curl/--saida/--sarif/--baseline). Devolve o
     código de saída (3 se o baseline pegou achado novo/reaberto; 0 caso contrário)."""
     todos = [f for r in resultados for f in r.findings]
@@ -678,7 +708,7 @@ def _emitir_relatorios(args, resultados: list[ResultadoSondagem]) -> int:
             for f in r.findings:
                 print(f"  {curl_de(f, r.ip_pinado)}")
     if args.saida:
-        _gravar_laudo(args.saida, resultados)
+        _gravar_laudo(args.saida, resultados, padrao)
     if args.sarif:
         from webqa.sarif import serializar_sarif
         args.sarif.write_text(serializar_sarif(todos), encoding="utf-8")
@@ -713,7 +743,8 @@ def main(argv: list[str] | None = None) -> int:
     resultados = (sondar_multialvo(escopo, caminhos, dry_run=False) if args.multi_alvo
                   else [sondar(escopo, args.alvo, caminhos, dry_run=False)])
     _imprimir_resultados(resultados)
-    return _emitir_relatorios(args, resultados)
+    padrao = _bloco_padrao(args.caminhos, caminhos)
+    return _emitir_relatorios(args, resultados, padrao)
 
 
 if __name__ == "__main__":
