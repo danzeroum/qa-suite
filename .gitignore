@@ -25,3 +25,9 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+
+# Cobertura da própria suíte (Q1c/pytest-cov): dados de execução, nunca versionar.
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/

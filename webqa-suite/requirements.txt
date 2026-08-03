@@ -14,8 +14,10 @@ PyYAML>=6.0
 # config explícita, e subir de versão passa a ser decisão versionada.
 playwright==1.56.0
 locust>=2.24
-# qualidade da própria suíte (verificação / SAST)
+# qualidade da própria suíte (verificação / SAST / cobertura)
 ruff>=0.4
+# medição da própria suíte: sem isto o número de cobertura existe mas ninguém o vê
+pytest-cov>=5.0
 # extra [toml]: sem ele o bandit ignora [tool.bandit] do pyproject.toml e
 # acusa 81 falsos positivos B101 (assert é o mecanismo do pytest).
 bandit[toml]>=1.7
