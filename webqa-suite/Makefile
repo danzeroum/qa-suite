@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar
+.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -28,6 +28,9 @@ campanha: ; python scripts/campanha.py   # nivel sistema: alvos reais x N, conso
 # Rodar FORA da janela do noturno; ver docs/VPS.md §campanha.
 campanha-vps: ; docker compose -f ../docker/compose.yml run --rm campanha
 verify: ; pytest -m verification tests
+# Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
+# Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
+cockpit: ; python scripts/cockpit.py --html
 # Mutação escopada na superfície de segurança. NAO roda no PR (lento: ~1 min por
 # modulo); roda no noturno agendado e a mao. O ambiente TEM de estar limpo — este
 # harness inverte a logica dos gates de proposito. Ver
