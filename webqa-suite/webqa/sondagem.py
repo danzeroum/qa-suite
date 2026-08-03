@@ -43,7 +43,7 @@ from webqa.audit import AuditLog
 from webqa.dominio import Finding
 from webqa.gates import kill_switch_active, require_discovery, require_escopo
 
-CATEGORIAS_VALIDAS = frozenset({"vcs", "configuracao", "backup", "editor", "credencial"})
+CATEGORIAS_VALIDAS = frozenset({"vcs", "configuracao", "backup", "editor", "credencial", "fonte"})
 SEVERIDADES_VALIDAS = frozenset({"alta", "media", "baixa"})
 
 # Teto do carregador: a lista é CURADA, não uma wordlist. Um arquivo inflado é
@@ -123,6 +123,15 @@ def carregar_caminhos(caminho: str | Path) -> list[CaminhoSensivel]:
     duplicados = {p_ for p_ in paths if paths.count(p_) > 1}
     if duplicados:
         raise ValueError(f"caminhos duplicados na lista: {sorted(duplicados)}")
+    # Invariante de carregamento (C2): todo caminho curado carrega procedencia
+    # (MITRE/OWASP/CWE). Sem ela o achado não tem valor de compliance — e é a
+    # referência que o laudo promove. Exigir no CARREGADOR (não no dataclass, que
+    # os testes constroem direto) mantém a lista curada como dado de auditoria.
+    sem_procedencia = [e.path for e in entradas if not e.procedencia.strip()]
+    if sem_procedencia:
+        raise ValueError(
+            f"caminhos sem procedencia (MITRE/OWASP obrigatório na lista curada): "
+            f"{sorted(sem_procedencia)}")
     return entradas
 
 

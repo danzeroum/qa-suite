@@ -932,3 +932,36 @@ def test_multialvo_alvo_sem_posse_nao_impede_os_outros(tmp_path, monkeypatch):
     por_alvo = {r.alvo: r for r in resultados}
     assert por_alvo[ALVO2].abortado_por == "posse-divergente"
     assert por_alvo[ALVO].abortado_por == "" and por_alvo[ALVO].findings
+
+
+# ---------- C2 fatia 2: poda curada + procedencia obrigatória no carregamento ----------
+
+def test_poda_aceitos_entram_na_lista_curada():
+    """Os aceitos da poda C2 entram; os públicos-por-design NÃO entram."""
+    from pathlib import Path
+
+    from webqa.sondagem import carregar_caminhos
+    real = Path(__file__).resolve().parent.parent / "data" / "caminhos-sensiveis.yaml"
+    paths = {c.path for c in carregar_caminhos(real)}
+    for aceito in ("/.env.local", "/docker-compose.yml", "/bundle.js.map"):
+        assert aceito in paths, f"poda: {aceito} deveria entrar"
+    for publico in ("/docs", "/openapi.json", "/redoc", "/api/v1/users"):
+        assert publico not in paths, f"poda: {publico} é público por design, não entra"
+
+
+def test_carregar_reprova_caminho_sem_procedencia(tmp_path):
+    """Invariante de carregamento C2: caminho curado sem procedencia falha."""
+    from webqa.sondagem import carregar_caminhos
+    p = tmp_path / "sem-proc.yaml"
+    p.write_text(
+        '- path: "/.env"\n  categoria: "configuracao"\n  severidade: "alta"\n'
+        '  content_type_esperado: "application/octet-stream"\n  remediacao: "corrija"\n',
+        encoding="utf-8")
+    with pytest.raises(ValueError, match="procedencia"):
+        carregar_caminhos(p)
+
+
+def test_categoria_fonte_e_valida_para_source_map(tmp_path):
+    """A poda introduziu a categoria 'fonte' (source maps)."""
+    c = CaminhoSensivel("/x.map", "fonte", "media", "application/json", "r", procedencia="CWE-540")
+    assert c.categoria == "fonte"

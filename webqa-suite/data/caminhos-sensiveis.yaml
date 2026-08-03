@@ -44,3 +44,28 @@
   content_type_esperado: "application/octet-stream"
   remediacao: "Remova .DS_Store do docroot; adicione ao .gitignore e à regra do servidor."
   procedencia: "CWE-527 (Exposure of Version-Control Repository)"
+
+# ---------- Poda curada C2 (aceitos: .env.local, docker-compose.yml, source map) ----------
+# NÃO entram por serem públicos por design: /docs, /openapi.json, /redoc; nem
+# endpoint de app (/api/v1/*) — a lista é de ARQUIVO não-linkado, não de rota.
+
+- path: "/.env.local"
+  categoria: "configuracao"
+  severidade: "alta"
+  content_type_esperado: "application/octet-stream"
+  remediacao: "Não publique .env.local; mova segredos para variáveis do host e bloqueie o acesso."
+  procedencia: "OWASP Top 10 A05:2021 (Security Misconfiguration); CWE-538"
+
+- path: "/docker-compose.yml"
+  categoria: "configuracao"
+  severidade: "alta"
+  content_type_esperado: "application/octet-stream"
+  remediacao: "Remova o compose do docroot; ele revela serviços, portas e, com frequência, segredos."
+  procedencia: "OWASP WSTG-CONF-004 (Old/Unreferenced Files); CWE-538"
+
+- path: "/bundle.js.map"
+  categoria: "fonte"
+  severidade: "media"
+  content_type_esperado: "application/json"
+  remediacao: "Não publique source maps em produção; eles reconstroem o código-fonte do frontend."
+  procedencia: "OWASP WSTG-CONF-004 (source map exposto); CWE-540 (Information Exposure Through Source Code)"
