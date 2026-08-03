@@ -399,12 +399,10 @@ def instabilidades(execucoes: list[dict]) -> list[dict]:
     return achados
 
 
-def por_dimensao(execucoes: list[dict]) -> dict[str, dict]:
-    """Contagem por dimensão e estado, com a VARIAÇÃO entre repetições exposta.
-
-    Guarda min e max de cada estado. Quando diferem, o consolidado imprime a
-    faixa (`2–3`): a variação é o sinal, e um número único a apagaria.
-    """
+def _acumular_dimensoes(execucoes: list[dict]) -> tuple[dict, dict]:
+    """Material bruto de `por_dimensao`: por dimensão, as contagens de estado de
+    cada execução e o tempo somado. Extraído (§Q1d) para tirar o `scripts/**`
+    do gate C901 sem esconder o laço."""
     bruto: dict[str, dict[str, list[int]]] = {}
     parede: dict[str, list[float]] = {}
     for summary in execucoes:
@@ -423,7 +421,16 @@ def por_dimensao(execucoes: list[dict]) -> dict[str, dict]:
                 alvo_dim.setdefault(estado, []).append(cont.get(estado, 0))
         for dim, soma in somas.items():
             parede.setdefault(dim, []).append(soma)
+    return bruto, parede
 
+
+def por_dimensao(execucoes: list[dict]) -> dict[str, dict]:
+    """Contagem por dimensão e estado, com a VARIAÇÃO entre repetições exposta.
+
+    Guarda min e max de cada estado. Quando diferem, o consolidado imprime a
+    faixa (`2–3`): a variação é o sinal, e um número único a apagaria.
+    """
+    bruto, parede = _acumular_dimensoes(execucoes)
     consolidado = {}
     for dim in sorted(bruto):
         estados = {}
@@ -520,38 +527,23 @@ def _num(valor: float, casas: int = 1) -> str:
     return f"{valor:.{casas}f}".replace(".", ",")
 
 
-def render_markdown(dados: dict) -> str:
-    """Consolidado legível. Pior caso ao lado da mediana em toda linha."""
-    L: list[str] = []
-    L.append("# Campanha da suíte contra alvos reais")
-    L.append("")
-    L.append(f"* **Gerado em**: {dados['gerado_em']}")
-    L.append(f"* **Repetições por alvo**: {dados['repeticoes']}")
-    L.append(f"* **Seleção**: `pytest -m \"{dados['selecao']}\"`")
-    L.append(f"* **Parede total da campanha**: {_num(dados['parede_total_s'])} s")
-    L.append(f"* **Alvos medidos**: {dados['alvos_acessiveis']} de {dados['alvos_total']}")
-    L.append("")
-    L.append("Toda métrica aparece em **mediana e pior caso**: o pior caso é o que o "
-             "usuário azarado viveu, e a mediana sozinha faz alvo intermitente parecer "
-             "saudável. Veredito que muda entre repetições é marcado como **instável** "
-             "e nunca agregado em média.")
-    L.append("")
-
+def _secao_inacessiveis(dados: dict) -> list[str]:
+    """Alvos que não responderam — registrados, nunca omitidos."""
     inacessiveis = [a for a in dados["alvos"] if not a["acessivel"]]
-    if inacessiveis:
-        L.append("## Alvos inacessíveis")
-        L.append("")
-        L.append("Falha de rede num alvo não derruba a campanha — fica registrada.")
-        L.append("")
-        L.append("| Alvo | Papel | Motivo |")
-        L.append("| --- | --- | --- |")
-        for a in inacessiveis:
-            L.append(f"| `{a['host']}` | {a['papel']} | {a['motivo']} |")
-        L.append("")
-
-    # ---- Seção 1: tempo DO ALVO
-    L.append("## Tempo do alvo (o que o usuário do alvo sente)")
+    if not inacessiveis:
+        return []
+    L = ["## Alvos inacessíveis", "",
+         "Falha de rede num alvo não derruba a campanha — fica registrada.", "",
+         "| Alvo | Papel | Motivo |", "| --- | --- | --- |"]
+    for a in inacessiveis:
+        L.append(f"| `{a['host']}` | {a['papel']} | {a['motivo']} |")
     L.append("")
+    return L
+
+
+def _secao_tempo_do_alvo(dados: dict) -> list[str]:
+    """Seção 1: tempo DO ALVO (o que o usuário do alvo sente)."""
+    L = ["## Tempo do alvo (o que o usuário do alvo sente)", ""]
     medidos = [a for a in dados["alvos"] if a["acessivel"] and a.get("metricas")]
     # Alvo que recuou, foi bloqueado por robots ou ficou inacessível ENTRA na
     # tabela com "não medido" em toda a linha. Omiti-lo faria alvo que pediu
@@ -563,71 +555,80 @@ def render_markdown(dados: dict) -> str:
     if not colunas:
         L.append("Nenhum alvo rendeu métrica nesta campanha.")
         L.append("")
-    else:
-        cabecalho = "| Métrica | " + " | ".join(
-            f"{a['host']} (mediana / pior)" for a in colunas) + " |"
-        L.append(cabecalho)
-        L.append("| --- |" + " --- |" * len(colunas))
-        for chave, rotulo in METRICAS:
-            celulas = []
-            for a in colunas:
-                m = (a.get("metricas") or {}).get(chave) if a["acessivel"] else None
-                if not m:
-                    celulas.append("não medido")
-                    continue
-                casas = 3 if chave == "cls" else 0
-                texto = f"{_num(m['mediana'], casas)} / {_num(m['pior'], casas)}"
-                if m.get("faltando"):
-                    texto += f" ⚠ {m['faltando']} sem amostra"
-                celulas.append(texto)
-            L.append(f"| {rotulo} | " + " | ".join(celulas) + " |")
-        L.append("")
-
-    # ---- Seção 2: tempo DA SUÍTE
-    L.append("## Tempo da suíte (o que custa medir)")
+        return L
+    cabecalho = "| Métrica | " + " | ".join(
+        f"{a['host']} (mediana / pior)" for a in colunas) + " |"
+    L.append(cabecalho)
+    L.append("| --- |" + " --- |" * len(colunas))
+    for chave, rotulo in METRICAS:
+        celulas = []
+        for a in colunas:
+            m = (a.get("metricas") or {}).get(chave) if a["acessivel"] else None
+            if not m:
+                celulas.append("não medido")
+                continue
+            casas = 3 if chave == "cls" else 0
+            texto = f"{_num(m['mediana'], casas)} / {_num(m['pior'], casas)}"
+            if m.get("faltando"):
+                texto += f" ⚠ {m['faltando']} sem amostra"
+            celulas.append(texto)
+        L.append(f"| {rotulo} | " + " | ".join(celulas) + " |")
     L.append("")
+    return L
+
+
+def _bloco_alvo_suite(a: dict) -> list[str]:
+    """Um alvo na seção 2: parede por execução, tabela por dimensão e top-lentos."""
+    L = [f"### `{a['host']}` — {a['papel']}", ""]
+    parede = a.get("parede_por_execucao_s")
+    if parede:
+        L.append(f"Parede por execução: mediana {_num(parede['mediana'])} s, "
+                 f"pior {_num(parede['pior'])} s ({a['execucoes']} execuções).")
+        L.append("")
+    L.append("| Dimensão | passed | failed | xfail | skipped | error | "
+             "tempo somado (mediana / pior) |")
+    L.append("| --- | --- | --- | --- | --- | --- | --- |")
+    for dim, info in (a.get("dimensoes") or {}).items():
+        e = info["estados"]
+        t = info.get("tempo_s")
+        tempo = f"{_num(t['mediana'])} / {_num(t['pior'])} s" if t else "—"
+        L.append(f"| {dim} | {_faixa(e['passed'])} | {_faixa(e['failed'])} | "
+                 f"{_faixa(e['xfail'])} | {_faixa(e['skipped'])} | {_faixa(e['error'])} "
+                 f"| {tempo} |")
+    L.append("")
+    L.append("Faixa (`2–3`) marca variação entre repetições. `error` é falha FORA do "
+             "corpo do teste (fixture, navegador, rede) — não é veredito sobre o alvo, "
+             "é o teste não tendo acontecido, e por isso não se soma a `failed`. "
+             "O tempo é a SOMA dos testes da dimensão, não parede exclusiva: teste "
+             "multidimensional conta nas duas dimensões, e o custo de fixture de "
+             "sessão cai sobre o teste que a acionou.")
+    L.append("")
+    lentos = a.get("mais_lentos") or []
+    if lentos:
+        L.append(f"**Top-{len(lentos)} mais lentos** (ranqueado pela mediana):")
+        L.append("")
+        L.append("| # | Teste | Mediana | Pior caso |")
+        L.append("| --- | --- | --- | --- |")
+        for i, t in enumerate(lentos, 1):
+            L.append(f"| {i} | `{t['test']}` | {_num(t['mediana_s'], 2)} s | "
+                     f"{_num(t['pior_s'], 2)} s |")
+        L.append("")
+    return L
+
+
+def _secao_tempo_da_suite(dados: dict) -> list[str]:
+    """Seção 2: tempo DA SUÍTE (o que custa medir), um bloco por alvo acessível."""
+    L = ["## Tempo da suíte (o que custa medir)", ""]
     for a in dados["alvos"]:
         if not a["acessivel"]:
             continue
-        parede = a.get("parede_por_execucao_s")
-        L.append(f"### `{a['host']}` — {a['papel']}")
-        L.append("")
-        if parede:
-            L.append(f"Parede por execução: mediana {_num(parede['mediana'])} s, "
-                     f"pior {_num(parede['pior'])} s ({a['execucoes']} execuções).")
-            L.append("")
-        L.append("| Dimensão | passed | failed | xfail | skipped | error | "
-                 "tempo somado (mediana / pior) |")
-        L.append("| --- | --- | --- | --- | --- | --- | --- |")
-        for dim, info in (a.get("dimensoes") or {}).items():
-            e = info["estados"]
-            t = info.get("tempo_s")
-            tempo = f"{_num(t['mediana'])} / {_num(t['pior'])} s" if t else "—"
-            L.append(f"| {dim} | {_faixa(e['passed'])} | {_faixa(e['failed'])} | "
-                     f"{_faixa(e['xfail'])} | {_faixa(e['skipped'])} | {_faixa(e['error'])} "
-                     f"| {tempo} |")
-        L.append("")
-        L.append("Faixa (`2–3`) marca variação entre repetições. `error` é falha FORA do "
-                 "corpo do teste (fixture, navegador, rede) — não é veredito sobre o alvo, "
-                 "é o teste não tendo acontecido, e por isso não se soma a `failed`. "
-                 "O tempo é a SOMA dos testes da dimensão, não parede exclusiva: teste "
-                 "multidimensional conta nas duas dimensões, e o custo de fixture de "
-                 "sessão cai sobre o teste que a acionou.")
-        L.append("")
-        lentos = a.get("mais_lentos") or []
-        if lentos:
-            L.append(f"**Top-{len(lentos)} mais lentos** (ranqueado pela mediana):")
-            L.append("")
-            L.append("| # | Teste | Mediana | Pior caso |")
-            L.append("| --- | --- | --- | --- |")
-            for i, t in enumerate(lentos, 1):
-                L.append(f"| {i} | `{t['test']}` | {_num(t['mediana_s'], 2)} s | "
-                         f"{_num(t['pior_s'], 2)} s |")
-            L.append("")
+        L.extend(_bloco_alvo_suite(a))
+    return L
 
-    # ---- Seção 3: instabilidade
-    L.append("## Estabilidade do veredito entre repetições")
-    L.append("")
+
+def _secao_instabilidade(dados: dict) -> list[str]:
+    """Seção 3: estabilidade do veredito entre repetições."""
+    L = ["## Estabilidade do veredito entre repetições", ""]
     algum = False
     for a in dados["alvos"]:
         if not a["acessivel"]:
@@ -650,7 +651,33 @@ def render_markdown(dados: dict) -> str:
                  "variação real do alvo, e as duas precisam ser investigadas antes de "
                  "o número ser citado em qualquer laudo.")
         L.append("")
+    return L
 
+
+def render_markdown(dados: dict) -> str:
+    """Consolidado legível. Pior caso ao lado da mediana em toda linha.
+
+    Cabeçalho + rodapé aqui; cada seção num helper (§Q1d), o que tira o
+    `scripts/**` do gate C901 sem esconder a estrutura do relatório."""
+    L: list[str] = [
+        "# Campanha da suíte contra alvos reais",
+        "",
+        f"* **Gerado em**: {dados['gerado_em']}",
+        f"* **Repetições por alvo**: {dados['repeticoes']}",
+        f"* **Seleção**: `pytest -m \"{dados['selecao']}\"`",
+        f"* **Parede total da campanha**: {_num(dados['parede_total_s'])} s",
+        f"* **Alvos medidos**: {dados['alvos_acessiveis']} de {dados['alvos_total']}",
+        "",
+        "Toda métrica aparece em **mediana e pior caso**: o pior caso é o que o "
+        "usuário azarado viveu, e a mediana sozinha faz alvo intermitente parecer "
+        "saudável. Veredito que muda entre repetições é marcado como **instável** "
+        "e nunca agregado em média.",
+        "",
+    ]
+    L.extend(_secao_inacessiveis(dados))
+    L.extend(_secao_tempo_do_alvo(dados))
+    L.extend(_secao_tempo_da_suite(dados))
+    L.extend(_secao_instabilidade(dados))
     L.append("---")
     L.append("")
     L.append("Campanha passiva: nenhuma requisição além da navegação normal da suíte, "

@@ -26,9 +26,12 @@ max-complexity = 8
 "webqa/report_style.py" = ["E501"]
 # C901: dívida conhecida FORA da biblioteca. scripts/ e fixture_target/ são
 # ferramenta e alvo fabricado, não o motor. A isenção existe para o gate nascer
-# verde e vigiar webqa/ desde já, não para eternizar render_markdown (CC 19).
-# TODO(Q1d): refatorar scripts/campanha.py::render_markdown e reduzir esta lista.
-"scripts/**" = ["C901"]
+# verde e vigiar webqa/ desde já; a lista encolhe conforme cada script é pago.
+# campanha.py já saiu (render_markdown/por_dimensao refatorados). Falta:
+# TODO: audita_design.py::criterio_zero_requisicao_externa (9), ::main (11);
+#       estabilidade.py::main (17). Cada um num PR próprio, este é ferramenta.
+"scripts/audita_design.py" = ["C901"]
+"scripts/estabilidade.py" = ["C901"]
 "fixture_target/**" = ["C901"]
 
 [tool.bandit]
