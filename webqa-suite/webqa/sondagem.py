@@ -423,6 +423,64 @@ def sondar_caminho(client: httpx.Client, alvo: str, caminho: CaminhoSensivel,
     return veredito
 
 
+def _contabilizar_nao_conclusivo(achado, resultado: ResultadoSondagem,
+                                 recuos_seguidos: int) -> tuple[int, int]:
+    """Contabiliza um probe NÃO concluído (recuo ou falha de rede).
+
+    Devolve `(recuos_seguidos, delta_breaker)`: recuo amplia o backoff e conta 1
+    para o circuit breaker; falha de rede zera o backoff (não é recuo) mas conta
+    igual para o breaker (G1).
+    """
+    if isinstance(achado, _PedeRecuo):
+        resultado.recuos += 1
+        recuos_seguidos += 1
+    else:
+        resultado.falhas_rede += 1
+        recuos_seguidos = 0    # falha de rede não é recuo: não amplia backoff
+    return recuos_seguidos, 1
+
+
+def _sondar_caminhos(client, alvo, caminhos, log, autorizacao_id, ip_pinado,
+                     baseline_catch_all, intervalo, dormir,
+                     resultado: ResultadoSondagem) -> None:
+    """Laço de probes: rate-limit, kill-switch por iteração e circuit breaker.
+
+    Extraído de `sondar` para manter cada função sob o teto de complexidade
+    (§Q1d). Muta `resultado` in-place; o `sondar` cuida de portões e cliente.
+    """
+    recuos_seguidos = 0
+    falhas_consecutivas = 0
+    for i, caminho in enumerate(caminhos):
+        if kill_switch_active():
+            resultado.abortado_por = "kill-switch"
+            log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
+                                 evento="abortado:kill-switch")
+            return
+        if i:
+            # Piso entre requisições; após recuo (429/503), backoff exponencial
+            # com teto. Nunca antes da 1ª, e nunca abaixo do piso.
+            dormir(calcular_espera_backoff(recuos_seguidos, intervalo))
+        achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id,
+                                ip_pinado, baseline_catch_all)
+        if isinstance(achado, _PedeRecuo | _FalhaDeRede):
+            # Probe NÃO concluído (executado não sobe): contabiliza e checa breaker.
+            recuos_seguidos, delta = _contabilizar_nao_conclusivo(
+                achado, resultado, recuos_seguidos)
+            falhas_consecutivas += delta
+            if falhas_consecutivas >= MAX_FALHAS_CONSECUTIVAS:
+                resultado.abortado_por = "circuit-breaker"
+                log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
+                                     evento="abortado:circuit-breaker")
+                return
+            continue
+        # Resposta válida: probe concluído, zera backoff e breaker.
+        recuos_seguidos = 0
+        falhas_consecutivas = 0
+        resultado.executado += 1
+        if achado is not None:
+            resultado.findings.append(achado)
+
+
 def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
            client: httpx.Client | None = None, log: AuditLog | None = None,
            dry_run: bool = True, intervalo_s: float = PISO_INTERVALO_S,
@@ -476,8 +534,6 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
 
     resultado = ResultadoSondagem(alvo=alvo, esperado=esperado, run_id=run_id,
                                   ip_pinado=ip_pinado)
-    recuos_seguidos = 0
-    falhas_consecutivas = 0
     try:
         # Kill-switch checado ANTES do HEAD-fantasma: ativo desde o início, nem o
         # baseline sai (kill-switch = nenhuma requisição).
@@ -489,40 +545,8 @@ def sondar(escopo, alvo: str, caminhos: list[CaminhoSensivel], *,
         # Baseline dinâmico de soft-404: 1 HEAD-fantasma ANTES do laço. Se o alvo
         # é catch-all, os probes com a mesma assinatura viram ruído, não achado.
         baseline_catch_all = _detectar_catch_all(client, alvo, ip_pinado, log, autorizacao_id)
-        for i, caminho in enumerate(caminhos):
-            if kill_switch_active():
-                resultado.abortado_por = "kill-switch"
-                log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
-                                     evento="abortado:kill-switch")
-                break
-            if i:
-                # Piso entre requisições; após recuo (429/503), backoff exponencial
-                # com teto. Nunca antes da 1ª, e nunca abaixo do piso.
-                dormir(calcular_espera_backoff(recuos_seguidos, intervalo))
-            achado = sondar_caminho(client, alvo, caminho, log, autorizacao_id,
-                                    ip_pinado, baseline_catch_all)
-            if isinstance(achado, _PedeRecuo | _FalhaDeRede):
-                # Probe NÃO concluído (executado não sobe). Recuo amplia o backoff;
-                # ambos contam para o circuit breaker (G1).
-                if isinstance(achado, _PedeRecuo):
-                    resultado.recuos += 1
-                    recuos_seguidos += 1
-                else:
-                    resultado.falhas_rede += 1
-                    recuos_seguidos = 0    # falha de rede não é recuo: não amplia backoff
-                falhas_consecutivas += 1
-                if falhas_consecutivas >= MAX_FALHAS_CONSECUTIVAS:
-                    resultado.abortado_por = "circuit-breaker"
-                    log.registrar_evento(alvo=alvo, autorizacao_id=autorizacao_id,
-                                         evento="abortado:circuit-breaker")
-                    break
-                continue
-            # Resposta válida: probe concluído, zera backoff e breaker.
-            recuos_seguidos = 0
-            falhas_consecutivas = 0
-            resultado.executado += 1
-            if achado is not None:
-                resultado.findings.append(achado)
+        _sondar_caminhos(client, alvo, caminhos, log, autorizacao_id, ip_pinado,
+                         baseline_catch_all, intervalo, dormir, resultado)
     finally:
         if fechar_no_fim:
             client.close()
@@ -556,15 +580,7 @@ def _resultado_para_dict(r: ResultadoSondagem) -> dict:
             "run_id": r.run_id, "findings": [_finding_para_dict(f) for f in r.findings]}
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI. `--dry-run` é o padrão; sondar de verdade exige `--executar`.
-
-    Mesmo com `--executar`, os portões de `sondar` decidem: sem
-    WEBQA_DISCOVERY_AUTHORIZED=1 e sem o alvo no escopo, nada sai.
-    """
-    from webqa import escopo as escopo_mod
-    from webqa.gates import DISCOVERY_ENV, discovery_authorized
-
+def _parsear_args(argv):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--alvo", help="origem exata (https://host)")
     parser.add_argument("--multi-alvo", action="store_true",
@@ -583,90 +599,121 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if not args.alvo and not args.multi_alvo:
         parser.error("informe --alvo ou --multi-alvo")
+    return args
 
-    caminhos = carregar_caminhos(args.caminhos)
-    escopo = escopo_mod.carregar(args.escopo)
-    alvos = [e.origem for e in escopo.entradas] if args.multi_alvo else [args.alvo]
 
-    if not args.executar:
-        print(f"[dry-run] {len(caminhos)} caminhos planejados contra {len(alvos)} alvo(s):")
-        for alvo in alvos:
-            for c in caminhos:
-                print(f"  HEAD {alvo.rstrip('/')}{c.path}  ({c.categoria}/{c.severidade})")
-        print("Nenhuma requisição foi feita. Use --executar para sondar.")
-        return 0
+def _imprimir_plano(alvos: list[str], caminhos: list[CaminhoSensivel]) -> None:
+    print(f"[dry-run] {len(caminhos)} caminhos planejados contra {len(alvos)} alvo(s):")
+    for alvo in alvos:
+        for c in caminhos:
+            print(f"  HEAD {alvo.rstrip('/')}{c.path}  ({c.categoria}/{c.severidade})")
+    print("Nenhuma requisição foi feita. Use --executar para sondar.")
+
+
+def _checar_autorizacao(args, escopo, alvos: list[str]) -> int:
+    """0 = liberado; 1 = sem opt-in; 2 = alvo fora do escopo. Pré-check (Q1b) que
+    troca o `pytest.skip` cru dos gates por mensagem e código distinto."""
+    from webqa.gates import DISCOVERY_ENV, discovery_authorized
 
     if not discovery_authorized():
         print(f"Sondagem não autorizada: exporte {DISCOVERY_ENV}=1 com autorização "
               "documentada do dono do alvo. Nada foi enviado.")
         return 1
-
-    # Pré-check de escopo (Q1b): os gates em `sondar` usam pytest.skip, que fora de
-    # um teste vaza como traceback. `main()` pré-checa o predicado PURO
-    # `esta_no_escopo` e sai com mensagem — código 2, distinto do 1 (sem opt-in),
-    # para quem roda em script separar "faltou variável" de "alvo errado". Os
-    # gates internos seguem como defesa em profundidade (nunca alcançados aqui).
     fora = [a for a in alvos if not escopo.esta_no_escopo(a)]
     if fora:
         print(f"Alvo fora do escopo autorizado: {', '.join(fora)}. Adicione o host "
               f"ao {args.escopo} com autorização documentada. Nada foi enviado.")
         return 2
+    return 0
 
-    resultados = (sondar_multialvo(escopo, caminhos, dry_run=False) if args.multi_alvo
-                  else [sondar(escopo, args.alvo, caminhos, dry_run=False)])
-    for resultado in resultados:
-        print(f"Sondagem [{resultado.alvo}]: {resultado.executado}/{resultado.esperado} "
-              f"caminhos, {len(resultado.findings)} achado(s)"
-              + (f", ABORTADO por {resultado.abortado_por}" if resultado.abortado_por else ""))
-        if resultado.inconclusivo:
+
+def _imprimir_resultados(resultados: list[ResultadoSondagem]) -> None:
+    for r in resultados:
+        print(f"Sondagem [{r.alvo}]: {r.executado}/{r.esperado} caminhos, "
+              f"{len(r.findings)} achado(s)"
+              + (f", ABORTADO por {r.abortado_por}" if r.abortado_por else ""))
+        if r.inconclusivo:
             print("  Resultado INCONCLUSIVO: o run não cobriu a superfície declarada.")
-        for f in resultado.findings:
+        for f in r.findings:
             print(f"  [{f.severidade}] {f.tipo} — {f.recurso}")
 
-    todos_os_findings = [f for r in resultados for f in r.findings]
 
-    # --curl: comando de reprodução por achado (IP só no --resolve, nunca na URL).
+def _gravar_laudo(saida: Path, resultados: list[ResultadoSondagem]) -> None:
+    from webqa.correlacao import correlacionar_findings
+
+    todos = [f for r in resultados for f in r.findings]
+    correlacoes = correlacionar_findings(todos)
+    saida.write_text(
+        json.dumps({"alvos": [_resultado_para_dict(r) for r in resultados],
+                    "correlacoes": correlacoes}, ensure_ascii=False, indent=2),
+        encoding="utf-8")
+    print(f"Laudo gravado em {saida}")
+    for c in correlacoes:
+        print(f"  risco composto em {c['host']}: {c['tipo']}")
+
+
+def _classificar_baseline(caminho: Path, findings: list[Finding]) -> int:
+    """Imprime o ciclo de vida; devolve 3 se há achado novo/reaberto (reprova)."""
+    from webqa.baseline import carregar_baseline, classificar
+
+    ciclo = classificar(findings, carregar_baseline(caminho))
+    print(f"Baseline: {len(ciclo.novos)} novo(s), {len(ciclo.reabertos)} reaberto(s), "
+          f"{len(ciclo.persistentes)} persistente(s), {len(ciclo.desaparecidos)} desaparecido(s).")
+    for k in ciclo.desaparecidos:
+        print(f"  possível correção (revisão manual, não removido): {k}")
+    if ciclo.reprova:
+        print("Achado NOVO ou REABERTO — reprovando o run (exit 3).")
+        return 3
+    return 0
+
+
+def _emitir_relatorios(args, resultados: list[ResultadoSondagem]) -> int:
+    """Aplica os flags de saída (--curl/--saida/--sarif/--baseline). Devolve o
+    código de saída (3 se o baseline pegou achado novo/reaberto; 0 caso contrário)."""
+    todos = [f for r in resultados for f in r.findings]
     if args.curl:
         from webqa.curl_repro import curl_de
         print("Reprodução (curl):")
         for r in resultados:
             for f in r.findings:
                 print(f"  {curl_de(f, r.ip_pinado)}")
-
-    # --saida: laudo JSON em disco (só campos já mascarados do Finding). Inclui as
-    # anotações de risco composto (C3b) — agrupamento, NUNCA severidade nova.
     if args.saida:
-        from webqa.correlacao import correlacionar_findings
-        correlacoes = correlacionar_findings(todos_os_findings)
-        args.saida.write_text(
-            json.dumps({"alvos": [_resultado_para_dict(r) for r in resultados],
-                        "correlacoes": correlacoes},
-                       ensure_ascii=False, indent=2),
-            encoding="utf-8")
-        print(f"Laudo gravado em {args.saida}")
-        for c in correlacoes:
-            print(f"  risco composto em {c['host']}: {c['tipo']}")
-
-    # --sarif: SARIF 2.1.0 para a aba Security do GitHub.
+        _gravar_laudo(args.saida, resultados)
     if args.sarif:
         from webqa.sarif import serializar_sarif
-        args.sarif.write_text(serializar_sarif(todos_os_findings), encoding="utf-8")
+        args.sarif.write_text(serializar_sarif(todos), encoding="utf-8")
         print(f"SARIF gravado em {args.sarif}")
-
-    # --baseline: ciclo de vida. Achado NOVO ou REABERTO reprova (exit 3);
-    # desaparecido é "possível correção" (revisão manual), NUNCA removido daqui.
     if args.baseline:
-        from webqa.baseline import carregar_baseline, classificar
-        ciclo = classificar(todos_os_findings, carregar_baseline(args.baseline))
-        print(f"Baseline: {len(ciclo.novos)} novo(s), {len(ciclo.reabertos)} reaberto(s), "
-              f"{len(ciclo.persistentes)} persistente(s), "
-              f"{len(ciclo.desaparecidos)} desaparecido(s).")
-        for k in ciclo.desaparecidos:
-            print(f"  possível correção (revisão manual, não removido): {k}")
-        if ciclo.reprova:
-            print("Achado NOVO ou REABERTO — reprovando o run (exit 3).")
-            return 3
+        return _classificar_baseline(args.baseline, todos)
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI. `--dry-run` é o padrão; sondar de verdade exige `--executar`.
+
+    Mesmo com `--executar`, os portões de `sondar` decidem: sem
+    WEBQA_DISCOVERY_AUTHORIZED=1 e sem o alvo no escopo, nada sai. Orquestração
+    fina — cada etapa (plano, autorização, resultados, relatórios) é um helper,
+    para manter esta função abaixo do teto de complexidade (Q1d)."""
+    from webqa import escopo as escopo_mod
+
+    args = _parsear_args(argv)
+    caminhos = carregar_caminhos(args.caminhos)
+    escopo = escopo_mod.carregar(args.escopo)
+    alvos = [e.origem for e in escopo.entradas] if args.multi_alvo else [args.alvo]
+
+    if not args.executar:
+        _imprimir_plano(alvos, caminhos)
+        return 0
+
+    codigo = _checar_autorizacao(args, escopo, alvos)
+    if codigo:
+        return codigo
+
+    resultados = (sondar_multialvo(escopo, caminhos, dry_run=False) if args.multi_alvo
+                  else [sondar(escopo, args.alvo, caminhos, dry_run=False)])
+    _imprimir_resultados(resultados)
+    return _emitir_relatorios(args, resultados)
 
 
 if __name__ == "__main__":

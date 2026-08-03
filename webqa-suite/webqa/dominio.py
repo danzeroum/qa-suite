@@ -326,7 +326,7 @@ def _ifd_tags(tiff: bytes, offset: int, ordem: str) -> list[int]:
     return tags
 
 
-def metadados_exif(dados: bytes | None) -> set[str]:
+def metadados_exif(dados: bytes | None) -> set[str]:  # noqa: C901 — parser EXIF binário, CC 9 (teto 8); ramos são passos do formato, não lógica de negócio. TODO(Q1d): quebrar por segmento APP1.
     """`{"gps", "autoria"}` conforme o que o JPEG carrega. Sem valores.
 
     Percorre os segmentos JPEG até o APP1 com cabeçalho Exif e lê a IFD0.

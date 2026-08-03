@@ -148,7 +148,7 @@ class PoliteFetcher:
         return host_e_local(partes.hostname or "", porta)
 
     # ------------------------------------------------------------ regra
-    def preparar(self, url: str) -> Veredito:
+    def preparar(self, url: str) -> Veredito:  # noqa: C901 — máquina de etiqueta (isenção local, robots, status), CC 9 (teto 8). TODO(Q1d): extrair a leitura de robots.
         """Decide se o alvo pode ser medido, consultando o `robots.txt` uma vez.
 
         `robots.txt` inacessível, 5xx ou ilegível vira **disallow temporário**:
