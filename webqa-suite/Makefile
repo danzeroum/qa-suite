@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria
+.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -28,6 +28,11 @@ campanha: ; python scripts/campanha.py   # nivel sistema: alvos reais x N, conso
 # Rodar FORA da janela do noturno; ver docs/VPS.md §campanha.
 campanha-vps: ; docker compose -f ../docker/compose.yml run --rm campanha
 verify: ; pytest -m verification tests
+# Mutação escopada na superfície de segurança. NAO roda no PR (lento: ~1 min por
+# modulo); roda no noturno agendado e a mao. O ambiente TEM de estar limpo — este
+# harness inverte a logica dos gates de proposito. Ver
+# docs/handoff/HANDOFF-Q1-instrumentacao.md §Q5.
+mutar: ; python scripts/mutar.py . webqa/escopo.py tests/test_escopo.py tests/test_fase_c_travada.py
 lint: ; ruff check webqa checks tests scripts fixture_target
 # Mesmos comandos do CI (.github/workflows/ci.yml): rigor total na biblioteca;
 # nos checks, as exceções já documentadas nos per-file-ignores do ruff.
