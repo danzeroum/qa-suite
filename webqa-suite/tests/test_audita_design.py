@@ -24,6 +24,7 @@ from scripts.audita_design import (
     criterio_sem_vazamento_da_capa,
     criterio_tokens_custom_properties,
     criterio_zero_requisicao_externa,
+    main,
     montar_laudo,
     veredito_axe,
 )
@@ -184,3 +185,30 @@ def test_laudo_atribui_artefatos_conhecidos():
                           "test_novo": ["summary.html"]})
     assert "artefato do ARRANJO" in laudo, "reprovação do arranjo precisa vir atribuída"
     assert "a investigar" in laudo, "teste não classificado não pode passar como conhecido"
+
+
+# ---------- main() no caminho offline (sem --suite, sem navegador) ----------
+
+def test_main_dir_vazio_sai_2(tmp_path):
+    """Sem .html no diretório, o auditor não tem o que auditar: sai 2."""
+    laudo = tmp_path / "laudo.md"
+    assert main(["--dir", str(tmp_path), "--saida", str(laudo)]) == 2
+    assert not laudo.exists()
+
+
+def test_main_conforme_libera_e_escreve_laudo(tmp_path):
+    """HTML conforme: veredito LIBERADO (exit 0) e laudo gravado no destino."""
+    (tmp_path / "summary.html").write_text(CONFORME, encoding="utf-8")
+    laudo = tmp_path / "laudo.md"
+    assert main(["--dir", str(tmp_path), "--saida", str(laudo)]) == 0
+    assert "**Veredito: LIBERADO**" in laudo.read_text(encoding="utf-8")
+
+
+def test_main_bloqueante_reprovado_sai_1(tmp_path):
+    """Recurso externo é critério BLOQUEANTE: veredito BLOQUEADO (exit 1)."""
+    veneno = CONFORME.replace("<section id=\"achados\"></section>",
+                              "<section id=\"achados\"></section><img src=\"https://x.example/i.png\">")
+    (tmp_path / "summary.html").write_text(veneno, encoding="utf-8")
+    laudo = tmp_path / "laudo.md"
+    assert main(["--dir", str(tmp_path), "--saida", str(laudo)]) == 1
+    assert "**Veredito: BLOQUEADO**" in laudo.read_text(encoding="utf-8")

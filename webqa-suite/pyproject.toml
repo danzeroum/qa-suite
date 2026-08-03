@@ -27,10 +27,8 @@ max-complexity = 8
 # C901: dívida conhecida FORA da biblioteca. scripts/ e fixture_target/ são
 # ferramenta e alvo fabricado, não o motor. A isenção existe para o gate nascer
 # verde e vigiar webqa/ desde já; a lista encolhe conforme cada script é pago.
-# campanha.py já saiu (render_markdown/por_dimensao refatorados). Falta:
-# TODO: audita_design.py::criterio_zero_requisicao_externa (9), ::main (11);
-#       estabilidade.py::main (17). Cada um num PR próprio, este é ferramenta.
-"scripts/audita_design.py" = ["C901"]
+# campanha.py e audita_design.py já saíram (funções refatoradas). Falta:
+# TODO: estabilidade.py::main (17), num PR próprio. Este é ferramenta, não motor.
 "scripts/estabilidade.py" = ["C901"]
 "fixture_target/**" = ["C901"]
 
