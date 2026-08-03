@@ -9,15 +9,27 @@ line-length = 110
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP"]
+# C901: gate de complexidade ciclomática. Teto 8 (Q1d) — a 10 nenhuma função de
+# webqa/ é pega, e um gate que passa limpo no motor não vigia nada.
+select = ["E", "F", "W", "I", "B", "UP", "C901"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
 # Nos checks, capturar Exception é intencional: falha de rede num sinal
 # opcional não deve derrubar a suíte — vira skip/xfail explicado.
 [tool.ruff.lint.per-file-ignores]
-"checks/**" = ["B017", "BLE001", "S110", "S112"]
+"checks/**" = ["B017", "BLE001", "S110", "S112", "C901"]
 # webqa/report_style.py e o pacote de design sao COPIA VERBATIM do contrato
 # visual (bloco <style> da referencia, identico byte a byte). Reformatar para
 # caber em 110 colunas quebraria justamente a propriedade que se quer garantir.
 "webqa/report_style.py" = ["E501"]
+# C901: dívida conhecida FORA da biblioteca. scripts/ e fixture_target/ são
+# ferramenta e alvo fabricado, não o motor. A isenção existe para o gate nascer
+# verde e vigiar webqa/ desde já, não para eternizar render_markdown (CC 19).
+# TODO(Q1d): refatorar scripts/campanha.py::render_markdown e reduzir esta lista.
+"scripts/**" = ["C901"]
+"fixture_target/**" = ["C901"]
 
 [tool.bandit]
 skips = ["B101"]  # assert é o mecanismo do pytest
