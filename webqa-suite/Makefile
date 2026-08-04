@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit
+.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -31,6 +31,10 @@ verify: ; pytest -m verification tests
 # Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
 # Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
 cockpit: ; python scripts/cockpit.py --html
+# Medicao do motor (D5k): report/medicoes.json de coverage.json (se houver) +
+# ruff C901. O cockpit LE este arquivo; rode `make medicoes cockpit` para o motor
+# aparecer preenchido. Complexidade sempre; cobertura so apos um run --cov.
+medicoes: ; python scripts/medicoes.py
 # Mutação escopada na superfície de segurança. NAO roda no PR (lento: ~1 min por
 # modulo); roda no noturno agendado e a mao. O ambiente TEM de estar limpo — este
 # harness inverte a logica dos gates de proposito. Ver
