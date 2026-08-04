@@ -100,11 +100,35 @@ def test_motor_sem_medicao_e_nomeado_nunca_zero():
     assert "0%" not in html                           # ausência nunca vira 0%
 
 
-def test_motor_com_medicao_marca_score_baixo():
+def test_motor_cobertura_por_banda_e_vies():
     cat = _catalogo([_teste("tests/a.py::t", "suite")])
-    run = {"medicoes": {"cobertura_codigo": {"score": 62.0}}}
+    run = {"medicoes": {"cobertura_codigo": {
+        "total": 62.0, "vies": "gate roda só verification",
+        "por_arquivo": {"webqa/metricas.py": 7.0, "webqa/gates.py": 100.0}}}}
     html = montar_motor(cat, run)
-    assert "62%" in html and "ruim" in html           # <70 sinalizado
+    assert "62%" in html and "ruim" in html            # total <70 sinalizado
+    assert "Viés" in html and "verification" in html
+    assert "webqa/metricas.py" in html and "7%" in html
+
+
+def test_motor_mutacao_por_modulo_e_sobreviventes():
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    run = {"medicoes": {"mutacao": {"por_modulo": {
+        "webqa/escopo.py": {"score": 97.1, "sobreviventes": 1},
+        "webqa/report.py": {"score": 59.8, "sobreviventes": 33}}}}}
+    html = montar_motor(cat, run)
+    assert "webqa/escopo.py" in html and "97,1%" in html
+    assert "59,8%" in html and "ruim" in html          # <70 em vermelho
+    assert "33" in html                                 # sobreviventes explícitos
+
+
+def test_motor_complexidade_cauda_e_limiar():
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    run = {"medicoes": {"complexidade": {"teto": 8, "cauda": [
+        {"func": "metadados_exif", "arquivo": "webqa/dominio.py", "cc": 9}]}}}
+    html = montar_motor(cat, run)
+    assert "metadados_exif" in html and ">9<" in html
+    assert "Teto 8" in html and "não vigiaria o motor" in html
 
 
 def test_regua_pendente_e_incomparavel_sem_carimbo():

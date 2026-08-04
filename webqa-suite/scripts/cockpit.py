@@ -345,28 +345,88 @@ def montar_regua(catalogo: dict, run: dict) -> str:
             f'<h2>Comparabilidade</h2>{comp}</section>')
 
 
-def _bloco_medicao(rotulo: str, dados) -> str:
-    """Um bloco D5k: ausente → 'não instrumentada' NOMEADA, nunca 0%/barra verde."""
-    if not dados:
-        return (f'<div class="medicao ausente"><h3>{_e(rotulo)}</h3>'
-                '<p class="vazio-nota">não instrumentada — sem medição nesta leitura. '
-                'Ausência de medição não é zero por cento.</p></div>')
-    score = dados.get("score")
-    classe = "ruim" if isinstance(score, int | float) and score < 70 else "ok"
-    detalhe = f'<p class="{classe}">score {_num(score, 1)}%</p>' if score is not None else ""
-    return f'<div class="medicao"><h3>{_e(rotulo)}</h3>{detalhe}</div>'
+def _bloco_ausente(rotulo: str) -> str:
+    """Estado NOMEADO de medição ausente — nunca 0%/barra verde (D5k)."""
+    return (f'<div class="medicao ausente"><h3>{_e(rotulo)}</h3>'
+            '<p class="vazio-nota">não instrumentada — sem medição nesta leitura. '
+            'Ausência de medição não é zero por cento. (Rode a ferramenta e emita '
+            '<span class="mono">report/medicoes.json</span>.)</p></div>')
+
+
+def _classe_score(v: float) -> str:
+    return "ruim" if isinstance(v, int | float) and v < 70 else "ok"
+
+
+def _bloco_cobertura(dados: dict) -> str:
+    """Cobertura de código por banda + o viés (o gate roda só a população
+    verification; caminhos de checks/ aparecem descobertos)."""
+    total = dados.get("total")
+    banda = f'<p class="{_classe_score(total)}">total {_num(total, 1)}%</p>' if total is not None else ""
+    vies = dados.get("vies")
+    nota = f'<p class="apagado">Viés: {_e(vies)}</p>' if vies else ""
+    piores = sorted((dados.get("por_arquivo") or {}).items(), key=lambda kv: kv[1])[:5]
+    linhas = "".join(f'<tr><td class="mono">{_e(a)}</td>'
+                     f'<td class="num {_classe_score(p)}">{_num(p, 1)}%</td></tr>'
+                     for a, p in piores)
+    tabela = (f'<table class="dados"><thead><tr><th>arquivo (menor cobertura)</th>'
+              f'<th class="num">%</th></tr></thead><tbody>{linhas}</tbody></table>'
+              if linhas else "")
+    return f'<div class="medicao"><h3>Cobertura de código</h3>{banda}{nota}{tabela}</div>'
+
+
+def _bloco_mutacao(dados: dict) -> str:
+    """Score de mutação por módulo — sobreviventes explícitos; score<70 em vermelho."""
+    linhas = []
+    for mod, bloco in sorted((dados.get("por_modulo") or {}).items()):
+        sc = bloco.get("score")
+        sob = bloco.get("sobreviventes", 0)
+        linhas.append(f'<tr><td class="mono">{_e(mod)}</td>'
+                      f'<td class="num {_classe_score(sc)}">{_num(sc, 1)}%</td>'
+                      f'<td class="num">{_num(sob)}</td></tr>')
+    tabela = (f'<table class="dados"><thead><tr><th>módulo</th><th class="num">score</th>'
+              f'<th class="num">sobreviventes</th></tr></thead>'
+              f'<tbody>{"".join(linhas)}</tbody></table>' if linhas else "")
+    return f'<div class="medicao"><h3>Score de mutação</h3>{tabela}</div>'
+
+
+def _bloco_complexidade(dados: dict) -> str:
+    """Complexidade ciclomática: a cauda (funções acima do teto) + a decisão do
+    limiar 8 (a 10 nenhuma função de webqa/ é pega — o gate não vigiaria o motor)."""
+    teto = dados.get("teto", 8)
+    cauda = dados.get("cauda") or []
+    linhas = "".join(
+        f'<tr><td class="mono">{_e(c.get("arquivo", ""))}::{_e(c.get("func", ""))}</td>'
+        f'<td class="num {"ruim" if c.get("cc", 0) > teto else "ok"}">{_num(c.get("cc", 0))}</td></tr>'
+        for c in cauda)
+    if linhas:
+        corpo = (f'<p class="apagado">Teto {_num(teto)} — a 10, nenhuma função de '
+                 'webqa/ seria pega, e o gate não vigiaria o motor.</p>'
+                 '<table class="dados"><thead><tr><th>função</th><th class="num">CC</th>'
+                 f'</tr></thead><tbody>{linhas}</tbody></table>')
+    else:
+        corpo = (f'<p class="ok">Nenhuma função acima do teto {_num(teto)} — cauda '
+                 'vazia.</p>')
+    return f'<div class="medicao"><h3>Complexidade ciclomática</h3>{corpo}</div>'
+
+
+_RENDER_MEDICAO = {"cobertura_codigo": _bloco_cobertura,
+                   "mutacao": _bloco_mutacao, "complexidade": _bloco_complexidade}
 
 
 def montar_motor(catalogo: dict, run: dict) -> str:
     """Tela 3 — o motor & maturidade (D5k). Topo: o firewall entre as duas
-    'coberturas'. Cada bloco degrada honesto quando não instrumentado."""
+    'coberturas'. Cada bloco: rico quando medido, "não instrumentada" quando não —
+    ausência NUNCA vira 0/verde."""
     medicoes = run.get("medicoes") or {}
-    blocos = "".join(_bloco_medicao(rot, medicoes.get(chave)) for chave, rot in BLOCOS_D5K)
+    blocos = []
+    for chave, rotulo in BLOCOS_D5K:
+        dados = medicoes.get(chave)
+        blocos.append(_RENDER_MEDICAO[chave](dados) if dados else _bloco_ausente(rotulo))
     return ('<section id="motor" class="tela"><h1>Quão forte é a régua — cobertura, '
             'mutação, complexidade e maturidade.</h1>'
             '<p class="firewall">Cobertura de <b>código</b> (quais linhas uma execução '
             'atinge) ≠ cobertura de <b>execução</b> (quantos testes rodaram). Nomes '
-            f'parecidos, métricas diferentes — nunca somadas.</p>{blocos}</section>')
+            f'parecidos, métricas diferentes — nunca somadas.</p>{"".join(blocos)}</section>')
 
 
 def montar_entrega(catalogo: dict, run: dict) -> str:
@@ -547,10 +607,27 @@ def render_html(catalogo: dict, run: dict | None = None) -> str:
             f"{_trilho(catalogo, run)}<main>{corpo}</main></div></body></html>")
 
 
+def _medicoes_do_repo(raiz: Path) -> dict:
+    """Blocos de medição D5k de `report/medicoes.json`, quando as ferramentas
+    (--cov, ruff C901, scripts/mutar.py) o emitiram. Ausência é o caso normal:
+    o cockpit só LÊ a medição, não a produz — e ausência vira estado nomeado."""
+    caminho = raiz / "report" / "medicoes.json"
+    if not caminho.exists():
+        return {}
+    try:
+        return json.loads(caminho.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
 def _run_do_repo(raiz: Path) -> dict:
-    """Dados fora do catálogo: modo/gates do ambiente (D2k), e execução/carimbo/
-    medição (D3k–D6k preenchem). Ausência é o caso normal, sempre nomeada."""
-    return dict(estado_do_ambiente())
+    """Dados fora do catálogo: modo/gates do ambiente (D2k), medição D5k, e
+    execução/carimbo (D3k/D6k). Ausência é o caso normal, sempre nomeada."""
+    run = dict(estado_do_ambiente())
+    medicoes = _medicoes_do_repo(raiz)
+    if medicoes:
+        run["medicoes"] = medicoes
+    return run
 
 
 def main(argv: list[str] | None = None) -> int:
