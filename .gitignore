@@ -26,6 +26,11 @@ __pycache__/
 .venv/
 venv/
 
+# Artefatos de empacotamento (frente E: pip install / build do wheel).
+*.egg-info/
+build/
+dist/
+
 # Cobertura da própria suíte (Q1c/pytest-cov): dados de execução, nunca versionar.
 .coverage
 .coverage.*
