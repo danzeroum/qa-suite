@@ -150,14 +150,37 @@ def hash_dos_caminhos(caminho: str | Path) -> str:
     return "sha256:" + hashlib.sha256(dados).hexdigest()
 
 
-def _bloco_padrao(caminho: str | Path, caminhos: list[CaminhoSensivel]) -> dict:
-    """Procedência da régua no laudo: qual lista curada mediu, e de que tamanho.
+def _commit_do_padrao() -> str:
+    """Commit do PADRÃO (não do projeto consumidor), best-effort do `.git` na raiz
+    do repositório do padrão. Vazio quando instalado (sem `.git`): aí o commit é
+    baked no build (E2), nunca adivinhado do cwd — que seria o repo errado."""
+    git = Path(__file__).resolve().parent.parent.parent / ".git"
+    head = git / "HEAD"
+    try:
+        conteudo = head.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    if conteudo.startswith("ref:"):
+        try:
+            return (git / conteudo[4:].strip()).read_text(encoding="utf-8").strip()[:7]
+        except OSError:
+            return ""
+    return conteudo[:7]
 
-    `caminhos_total` torna dois laudos comparáveis mesmo sem versão do pacote: um
-    laudo de lista com 5 caminhos e outro com 40 dizem "0 achados" afirmando
-    coisas diferentes (§8.1). Versão/commit do padrão dependem da frente de
-    distribuição (E1), ainda inexistente — não são inventados aqui."""
-    return {"caminhos_sensiveis_hash": hash_dos_caminhos(caminho),
+
+def _bloco_padrao(caminho: str | Path, caminhos: list[CaminhoSensivel]) -> dict:
+    """Procedência da régua no laudo (E4): versão e commit do padrão, hash e
+    tamanho da lista curada. Obrigatória — nenhum laudo sai sem dizer sob que
+    régua mediu.
+
+    `versao` é o eixo de comparabilidade (laudos de versões diferentes não se
+    comparam), fonte única em `webqa.__version__`. `caminhos_total` distingue
+    listas de tamanhos diferentes que ambas dizem "0 achados" (§8.1). `commit` é
+    best-effort (vazio quando instalado; baked no build pela E2)."""
+    from webqa import __version__
+    return {"versao": __version__,
+            "commit": _commit_do_padrao(),
+            "caminhos_sensiveis_hash": hash_dos_caminhos(caminho),
             "caminhos_total": len(caminhos)}
 
 
