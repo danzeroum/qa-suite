@@ -456,14 +456,22 @@ def montar_laudo(catalogo: dict, run: dict) -> str:
     "não há veredito a relatar" (nunca inventa aprovação)."""
     rec = catalogo["reconciliacao"]
     ag = catalogo["agregados"]
+    p = _procedencia_partes(catalogo, run)
+    # Procedência ABRE o laudo (D3k): a régua antes de qualquer número, para que
+    # nenhuma frase seja lida fora dela.
+    regua = (f'<p class="serif">Régua desta leitura: '
+             f'<span class="mono">{_e(p["repo"])}@{_e(p["commit"])}</span>, ramo '
+             f'{_e(p["ramo"])}, modo {_e(p["modo"])}. Todo número abaixo vale sob esta '
+             'régua, e não fora dela.</p>')
     if rec["executados"] == 0:
-        prosa = ('<p class="serif">Não há veredito a relatar: nenhum teste foi '
-                 'executado nesta leitura. O catálogo lista '
-                 f'{_num(len(catalogo["testes"]))} testes à espera de um run.</p>')
+        prosa = regua + ('<p class="serif">Não há veredito a relatar: nenhum teste foi '
+                         'executado nesta leitura. O catálogo lista '
+                         f'{_num(len(catalogo["testes"]))} testes à espera de um run.</p>')
     else:
-        prosa = (f'<p class="serif">Esta leitura reconciliou {_num(rec["executados"])} '
-                 f'execuções contra {_num(len(catalogo["testes"]))} testes catalogados; '
-                 f'{_num(rec["nunca_vistos"])} nunca foram vistos por um run.</p>')
+        prosa = regua + (f'<p class="serif">Esta leitura reconciliou '
+                         f'{_num(rec["executados"])} execuções contra '
+                         f'{_num(len(catalogo["testes"]))} testes catalogados; '
+                         f'{_num(rec["nunca_vistos"])} nunca foram vistos por um run.</p>')
     # Compacto e escapando só &/</>  (dentro de <pre> aspas são literais): o <pre>
     # é parse-igual ao --json (aceite: "byte-comparável após parse"), e indentar +
     # escapar aspas multiplicaria o tamanho num catálogo cheio de strings.
@@ -562,6 +570,11 @@ def _css() -> str:
       overflow:auto; max-height:32rem; font-size:11px; }}
     .aviso-sem-run {{ background:{t['well']}; border-left:3px solid {t['nao_exec']};
       padding:.5rem .8rem; margin-bottom:1rem; font-size:13.5px; }}
+    header.espinha {{ position:sticky; top:0; z-index:2; background:{t['papel']};
+      border-bottom:1px solid {t['linha']}; padding:.5rem .9rem; font-size:12px;
+      color:{t['apagado']}; margin:-2rem -2.5rem 1rem; }}
+    header.espinha.alarme-espinha {{ border-bottom:2px solid {t['failed']};
+      color:{t['failed']}; }}
     @media print {{
       nav.trilho {{ display:none; }} main {{ max-width:none; }}
       .tela {{ break-inside:avoid; }} .cel {{ border:1px solid {t['tinta']}; }}
@@ -595,16 +608,44 @@ _TITULOS = {
 }
 
 
+def _procedencia_partes(catalogo: dict, run: dict) -> dict:
+    """Os campos da régua desta leitura, normalizados (D3k). Fonte única para a
+    espinha e para o laudo — nenhum número é citado sem eles."""
+    proc = catalogo.get("procedencia") or {}
+    return {
+        "repo": proc.get("repositorio") or "(repo local)",
+        "commit": proc.get("commit") or "sem-commit",
+        "ramo": proc.get("ramo") or "?",
+        "modo": run.get("modo", "inventario"),
+        "gates": run.get("gates_ativos") or [],
+    }
+
+
+def _espinha(catalogo: dict, run: dict) -> str:
+    """Espinha de procedência (D3k): repo@commit · ramo · modo · gates, fixada no
+    topo e presente em TODA tela. A régua deixa de ser linha de cabeçalho de uma
+    tela e vira campo estrutural que acompanha qualquer agregado — nenhum número
+    aparece sem dizer sob que régua foi medido."""
+    p = _procedencia_partes(catalogo, run)
+    gate_txt = ("⚠ gates: " + ", ".join(p["gates"])) if p["gates"] else "sem gate de rede"
+    classe = "espinha alarme-espinha" if p["gates"] else "espinha"
+    return (f'<header class="{classe}" role="contentinfo">'
+            f'<span class="mono">{_e(p["repo"])}@{_e(p["commit"])}</span> · '
+            f'ramo {_e(p["ramo"])} · modo {_e(p["modo"])} · {_e(gate_txt)}</header>')
+
+
 def render_html(catalogo: dict, run: dict | None = None) -> str:
     """Documento único, offline, com as 11 telas. `run` traz execução/carimbo/D5k
-    quando existem; ausência é sempre estado nomeado, nunca zero."""
+    quando existem; ausência é sempre estado nomeado, nunca zero. A espinha de
+    procedência (D3k) fica fixa no topo, sobre todas as telas."""
     run = run or {}
     corpo = "".join(m(catalogo, run) for _sec, ms in _MONTADORES for m in ms)
     return ("<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
             "<title>Cockpit de testes — webqa-suite</title>"
             f"<style>{_css()}</style></head><body><div class=\"layout\">"
-            f"{_trilho(catalogo, run)}<main>{corpo}</main></div></body></html>")
+            f"{_trilho(catalogo, run)}<main>{_espinha(catalogo, run)}{corpo}</main>"
+            "</div></body></html>")
 
 
 def _medicoes_do_repo(raiz: Path) -> dict:
