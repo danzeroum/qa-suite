@@ -59,3 +59,12 @@ def test_versao_e_fonte_unica_em_webqa(proj):
     assert "version" in proj["project"]["dynamic"]
     assert "version" not in proj["project"]           # não há valor estático duplicado
     assert proj["tool"]["setuptools"]["dynamic"]["version"]["attr"] == "webqa.__version__"
+
+
+def test_versao_e_string_valida_para_tag_de_release():
+    """E2: a versão precisa ser uma string PEP440 simples para uma tag `v<versao>`
+    do release casar com ela."""
+    import re
+
+    from webqa import __version__
+    assert re.fullmatch(r"\d+\.\d+(\.\d+)?([abrc]\d+|\.dev\d+)?", __version__), __version__

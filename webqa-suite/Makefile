@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes
+.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes build
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -35,6 +35,10 @@ cockpit: ; python scripts/cockpit.py --html
 # ruff C901. O cockpit LE este arquivo; rode `make medicoes cockpit` para o motor
 # aparecer preenchido. Complexidade sempre; cobertura so apos um run --cov.
 medicoes: ; python scripts/medicoes.py
+# Constroi o wheel + sdist do padrao instalavel (frente E, E2) em dist/. So a
+# biblioteca webqa/ viaja; a versao vem de webqa.__version__. Publicar (onde) e
+# decisao do dono — este alvo so PRODUZ o artefato versionado.
+build: ; python -m build
 # Mutação escopada na superfície de segurança. NAO roda no PR (lento: ~1 min por
 # modulo); roda no noturno agendado e a mao. O ambiente TEM de estar limpo — este
 # harness inverte a logica dos gates de proposito. Ver
