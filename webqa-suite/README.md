@@ -106,6 +106,48 @@ pytest -m load                              # rajada leve embutida (httpx assín
 locust -f loadtest/locustfile.py --host "$WEBQA_TARGET_URL"   # carga real com Locust
 ```
 
+## Adotar em outro projeto (padrão declarado, não copiado)
+
+A partir da frente E, um projeto **declara** a suíte em vez de copiá-la — a régua é
+uma só, versionada, com a lista curada fora do alcance do projeto (ver
+`docs/ARQUITETURA-suite-como-padrao-em-harness.md` §3/§4). Duas formas:
+
+### Via workflow reutilizável (recomendado para CI)
+
+No `.github/workflows/qa.yml` do **seu** projeto:
+
+```yaml
+jobs:
+  qa:
+    uses: danzeroum/qa-suite/.github/workflows/auditar.yml@v1
+    with:
+      target_url: https://homolog.meu-projeto.danzeroum.com
+    secrets:
+      basic_auth_user: ${{ secrets.WEBQA_USER }}   # só se o alvo pedir login
+      basic_auth_pass: ${{ secrets.WEBQA_PASS }}
+```
+
+O caminho **passivo** (o padrão, `dimensoes: "not load"`) roda **sem gate de rede**
+— é o que agentes rodam livremente, em qualquer projeto. A **Fase C** (sondagem
+ativa) é opt-in explícito (`sondagem_fase_c: true` + secret `escopo` com o
+`escopo-autorizado.yaml`); o gate vive só no passo dela, e escopo+posse ainda
+travam por host — o gate é necessário, não suficiente.
+
+### Via pacote instalável (CLI)
+
+```bash
+pip install webqa-suite            # índice a definir; `make build` gera o wheel
+webqa-sondar --alvo https://homolog.meu-projeto.danzeroum.com \
+             --caminhos data/caminhos-sensiveis.yaml
+```
+
+Todo laudo carrega a **procedência** (versão do padrão + hash da lista curada);
+dois laudos só se comparam sob a mesma régua:
+
+```bash
+python -m webqa.comparador laudo-a.json laudo-b.json   # recusa réguas diferentes
+```
+
 ## Estrutura (EAP do repositório)
 
 ```
