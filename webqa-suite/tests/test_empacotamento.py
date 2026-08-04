@@ -51,3 +51,11 @@ def test_so_a_biblioteca_viaja_no_wheel(proj):
     """checks/tests/scripts/fixture_target não são o padrão instalável."""
     pacotes = proj["tool"]["setuptools"]["packages"]
     assert pacotes == ["webqa"]
+
+
+def test_versao_e_fonte_unica_em_webqa(proj):
+    """E4: a versão do pacote é dinâmica, vinda de webqa.__version__ — sem número
+    duplicado no pyproject que pudesse divergir da régua carimbada no laudo."""
+    assert "version" in proj["project"]["dynamic"]
+    assert "version" not in proj["project"]           # não há valor estático duplicado
+    assert proj["tool"]["setuptools"]["dynamic"]["version"]["attr"] == "webqa.__version__"

@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "webqa-suite"
-version = "1.0.0"
+# Fonte ÚNICA da versão: webqa.__version__ (E4). A procedência do laudo carimba
+# essa mesma versão — se o pyproject a duplicasse, um laudo poderia mentir a régua.
+dynamic = ["version"]
 description = "Testes genéricos de qualidade (performance, funcionalidade, UX) para qualquer aplicação web via HTTP"
 requires-python = ">=3.11"
 # Dependências de RUNTIME da biblioteca webqa/ (o motor). playwright é do
@@ -32,6 +34,9 @@ webqa-sondar = "webqa.sondagem:main"
 # (verificação), scripts/ (ferramenta) e fixture_target/ (alvo fabricado) não são
 # o padrão instalável — são como ele é desenvolvido e provado.
 packages = ["webqa"]
+
+[tool.setuptools.dynamic]
+version = { attr = "webqa.__version__" }
 
 [tool.ruff]
 line-length = 110

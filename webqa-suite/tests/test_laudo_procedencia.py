@@ -60,8 +60,20 @@ def test_bloco_padrao_carrega_hash_e_total(tmp_path):
     caminhos = [CaminhoSensivel("/.git/HEAD", "vcs", "alta", "text/plain", "corrija"),
                 CaminhoSensivel("/.env", "configuracao", "alta", "", "corrija")]
     bloco = _bloco_padrao(caminho, caminhos)
-    assert bloco == {"caminhos_sensiveis_hash": hash_dos_caminhos(caminho),
-                     "caminhos_total": 2}
+    assert bloco["caminhos_sensiveis_hash"] == hash_dos_caminhos(caminho)
+    assert bloco["caminhos_total"] == 2
+
+
+def test_bloco_padrao_carrega_versao_e_commit(tmp_path):
+    """E4: procedência obrigatória — a régua carimba a VERSÃO (eixo de
+    comparabilidade, fonte única em webqa.__version__) e o commit best-effort."""
+    from webqa import __version__
+    caminho = _escrever(tmp_path, _LISTA)
+    bloco = _bloco_padrao(caminho, [])
+    assert bloco["versao"] == __version__       # fonte única, nunca divergente
+    assert "commit" in bloco                     # best-effort (vazio se instalado)
+    # as quatro chaves de procedência sempre presentes:
+    assert set(bloco) == {"versao", "commit", "caminhos_sensiveis_hash", "caminhos_total"}
 
 
 def test_laudo_carrega_a_regua_antes_dos_alvos(tmp_path):
