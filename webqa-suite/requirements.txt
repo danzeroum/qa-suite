@@ -21,3 +21,5 @@ pytest-cov>=5.0
 # extra [toml]: sem ele o bandit ignora [tool.bandit] do pyproject.toml e
 # acusa 81 falsos positivos B101 (assert é o mecanismo do pytest).
 bandit[toml]>=1.7
+# construção do wheel/sdist do padrão (frente E, E2): `make build` e o release.
+build>=1.0

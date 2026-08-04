@@ -1,0 +1,60 @@
+# Release do padrão instalável (frente E, E2): uma tag `v*` produz o wheel + sdist
+# VERSIONADO como artefato do workflow. NÃO publica em índice nenhum — publicar
+# (PyPI público, índice privado, etc.) é decisão do dono, adicionada depois como
+# um passo a mais. Aqui o padrão vira um artefato baixável e reproduzível.
+#
+# A versão do artefato vem de webqa.__version__ (pyproject dynamic); a tag deve
+# casar com ela. O wheel carrega só a biblioteca webqa/ (tool.setuptools.packages).
+name: Release (build do wheel versionado)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# Só constrói e sobe artefato; não escreve no repositório nem publica.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: webqa-suite
+
+jobs:
+  build:
+    name: Wheel + sdist do padrão
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar o construtor
+        run: pip install build
+
+      - name: Construir wheel + sdist
+        run: python -m build
+
+      # Confere a fronteira do pacote no artefato REAL: só webqa/ viaja — nenhuma
+      # dimensão (checks/), verificação (tests/) ou ferramenta (scripts/) vaza.
+      - name: Conferir a fronteira do wheel
+        run: |
+          python - <<'PY'
+          import glob, sys, zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          tops = sorted({n.split("/")[0] for n in zipfile.ZipFile(wheel).namelist()})
+          libs = [t for t in tops if not t.endswith(".dist-info")]
+          assert libs == ["webqa"], f"fronteira do wheel violada: {libs}"
+          print(f"OK: {wheel} carrega só {libs}")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webqa-suite-dist
+          path: webqa-suite/dist/
+          retention-days: 30
+          if-no-files-found: error
