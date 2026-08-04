@@ -72,7 +72,16 @@ jobs:
       # Piso só aqui (job determinístico, sem alvo externo); 78% = margem sob os
       # 81% medidos. Apagar um teste que baixe a cobertura reprova o gate.
       - name: Verificação (unidade, sem alvo externo)
-        run: pytest tests -m verification --cov=webqa --cov-report=term --cov-fail-under=78
+        run: pytest tests -m verification --cov=webqa --cov-report=term
+             --cov-report=json:report/coverage.json --cov-fail-under=78
+
+      # Liga o "motor" do cockpit (D5k): medicoes.json a partir da cobertura recém
+      # medida + ruff C901; depois o cockpit veste tudo. Ambiente limpo (sem gate
+      # de rede) — a espinha do cockpit fica serena, como deve. Não bloqueia o PR.
+      - name: Cockpit de testes (com medição)
+        run: |
+          python scripts/medicoes.py
+          python scripts/cockpit.py --html
 
       - uses: actions/upload-artifact@v4
         if: always()
