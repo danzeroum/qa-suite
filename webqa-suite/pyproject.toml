@@ -1,8 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "webqa-suite"
 version = "1.0.0"
 description = "Testes genéricos de qualidade (performance, funcionalidade, UX) para qualquer aplicação web via HTTP"
 requires-python = ">=3.11"
+# Dependências de RUNTIME da biblioteca webqa/ (o motor). playwright é do
+# navegador (dimensão browser), não do motor — fica em extra opcional para o
+# `pip install webqa-suite` do padrão não arrastar Chromium sem necessidade.
+dependencies = [
+    "httpx[http2]>=0.27",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+browser = ["playwright==1.56.0"]
+
+# Entrypoint instalável (frente E, E1): é o que torna possível DECLARAR a suíte
+# como dependência em vez de COPIÁ-la (docs/…/ARQUITETURA §9). Por ora só o motor
+# de sondagem; cockpit/catalogo/medicoes seguem como `python scripts/…` até a
+# decisão do comando unificado `webqa <sub>` (que exigiria movê-los para webqa/).
+[project.scripts]
+webqa-sondar = "webqa.sondagem:main"
+
+[tool.setuptools]
+# Só a BIBLIOTECA viaja no wheel do padrão. checks/ (dimensões), tests/
+# (verificação), scripts/ (ferramenta) e fixture_target/ (alvo fabricado) não são
+# o padrão instalável — são como ele é desenvolvido e provado.
+packages = ["webqa"]
 
 [tool.ruff]
 line-length = 110
