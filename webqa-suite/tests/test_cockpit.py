@@ -191,6 +191,41 @@ def test_num_usa_virgula_decimal():
     assert _num(1000) == "1.000"                      # milhar com ponto, pt-BR
 
 
+def test_espinha_de_procedencia_presente_e_do_json():
+    """D3k: a régua (repo@commit · ramo · modo) fica fixa no topo, vinda do JSON —
+    trocar o commit troca a espinha (nenhum literal digitado)."""
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    cat["procedencia"] = {"repositorio": "danzeroum/qa-suite", "commit": "deadbee",
+                          "ramo": "main", "assunto": ""}
+    html = render_html(cat, dict(estado_do_ambiente({})))
+    assert 'class="espinha"' in html
+    assert "danzeroum/qa-suite@deadbee" in html
+    assert "ramo main" in html and "modo inventario" in html
+    # espinha é do JSON: outro commit → outra espinha
+    cat["procedencia"]["commit"] = "f00ba12"
+    assert "f00ba12" in render_html(cat, {})
+
+
+def test_laudo_abre_com_a_regua_antes_de_qualquer_numero():
+    """D3k: a procedência é a primeira frase do laudo — a régua antes do número."""
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    cat["procedencia"] = {"repositorio": "", "commit": "abc1234", "ramo": "dev", "assunto": ""}
+    laudo = montar_laudo(cat, dict(estado_do_ambiente({})))
+    pos_regua = laudo.find("Régua desta leitura")
+    pos_numero = laudo.find("O catálogo lista")
+    assert 0 <= pos_regua < pos_numero          # régua vem ANTES do número
+    assert "abc1234" in laudo and "modo inventario" in laudo
+
+
+def test_espinha_arma_com_gate_de_rede():
+    """A espinha também denuncia gate de rede ativo (cor cromática só significa)."""
+    cat = _catalogo([_teste("tests/a.py::t", "suite")])
+    limpa = render_html(cat, dict(estado_do_ambiente({})))
+    assert 'class="espinha alarme-espinha"' not in limpa   # a regra existe no CSS; a classe não é aplicada
+    armada = render_html(cat, dict(estado_do_ambiente({"WEBQA_LOAD_AUTHORIZED": "1"})))
+    assert 'class="espinha alarme-espinha"' in armada and "WEBQA_LOAD_AUTHORIZED" in armada
+
+
 def test_html_e_offline_e_arquivo_unico():
     """Convenção da casa: zero requisição externa, nada de asset por URL."""
     import re
