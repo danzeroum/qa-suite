@@ -1,0 +1,130 @@
+# Auditoria reutilizável (frente E, E3): um projeto consumidor invoca
+#
+#   jobs:
+#     qa:
+#       uses: danzeroum/qa-suite/.github/workflows/auditar.yml@v1
+#       with:
+#         target_url: https://homolog.meu-projeto.danzeroum.com
+#       secrets:
+#         basic_auth_user: ${{ secrets.WEBQA_USER }}   # se o alvo pedir login
+#         basic_auth_pass: ${{ secrets.WEBQA_PASS }}
+#
+# O projeto DECLARA a suíte, não a copia (docs/…/ARQUITETURA §3/§4): a régua é uma
+# só, versionada em `ref`. O consumidor contribui alvo + autorização, nunca código
+# de verificação.
+#
+# Governança (§7.2 — "o ambiente do agente nunca tem os gates"): o caminho PASSIVO
+# roda sem nenhum WEBQA_*_AUTHORIZED — é o que agentes rodam livremente. A Fase C
+# (sondagem ativa) é OPT-IN explícito (`sondagem_fase_c: true` + secret `escopo`);
+# o gate vive SÓ no passo dela, nunca no ambiente geral, e o escopo+posse ainda
+# travam por host (o gate é necessário, não suficiente).
+name: Auditar alvo (reutilizável)
+
+on:
+  workflow_call:
+    inputs:
+      target_url:
+        description: "URL do alvo publicado a auditar (Trabalho A)."
+        required: true
+        type: string
+      dimensoes:
+        description: 'Seleção de markers (pytest -m). Padrão: passivo, sem carga.'
+        required: false
+        type: string
+        default: "not load"
+      ref:
+        description: "Versão da suíte (tag/branch de danzeroum/qa-suite) — a régua."
+        required: false
+        type: string
+        default: "main"
+      python_version:
+        required: false
+        type: string
+        default: "3.12"
+      sondagem_fase_c:
+        description: "Rodar a Fase C (sondagem ativa). Exige o secret `escopo`. Padrão: NÃO."
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      basic_auth_user:
+        required: false
+      basic_auth_pass:
+        required: false
+      escopo:
+        description: "Conteúdo do escopo-autorizado.yaml (só quando sondagem_fase_c)."
+        required: false
+
+# Só lê o repositório e sobe artefato — não escreve, não publica.
+permissions:
+  contents: read
+
+jobs:
+  auditar:
+    name: Auditoria do alvo
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: webqa-suite
+    steps:
+      - name: Checkout da suíte (o padrão, não o repo do consumidor)
+        uses: actions/checkout@v4
+        with:
+          repository: danzeroum/qa-suite
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: pip
+          cache-dependency-path: webqa-suite/requirements.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium (dimensão browser)
+        run: python -m playwright install --with-deps chromium
+
+      # Passivo: NENHUM gate de rede no ambiente. É o que agentes rodam à vontade.
+      # Entradas por env (nunca ${{ }} dentro de `run:`) — sem injeção de script.
+      - name: Auditoria passiva
+        env:
+          WEBQA_TARGET_URL: ${{ inputs.target_url }}
+          WEBQA_DIMENSOES: ${{ inputs.dimensoes }}
+          WEBQA_BASIC_AUTH_USER: ${{ secrets.basic_auth_user }}
+          WEBQA_BASIC_AUTH_PASS: ${{ secrets.basic_auth_pass }}
+        run: pytest -m "$WEBQA_DIMENSOES"
+
+      # Fase C — SÓ quando pedido, e com escopo (posse provada). O escopo vem por
+      # secret e é escrito só aqui; sai gitignored e é apagado ao fim.
+      - name: Preparar escopo da Fase C
+        if: ${{ inputs.sondagem_fase_c }}
+        env:
+          ESCOPO: ${{ secrets.escopo }}
+        run: |
+          test -n "$ESCOPO" || { echo "::error::sondagem_fase_c exige o secret 'escopo' (escopo-autorizado.yaml)"; exit 1; }
+          printf '%s' "$ESCOPO" > escopo-autorizado.yaml
+
+      # O gate vive AQUI, neste passo disparado por pessoa via o input — nunca no
+      # ambiente geral. escopo+posse ainda travam por host: o gate não basta.
+      - name: Sondagem Fase C (descoberta read-only)
+        if: ${{ inputs.sondagem_fase_c }}
+        env:
+          WEBQA_DISCOVERY_AUTHORIZED: "1"
+          ALVO: ${{ inputs.target_url }}
+          WEBQA_BASIC_AUTH_USER: ${{ secrets.basic_auth_user }}
+          WEBQA_BASIC_AUTH_PASS: ${{ secrets.basic_auth_pass }}
+        run: python -m webqa.sondagem --alvo "$ALVO" --executar --saida report/fase-c.json
+
+      - name: Apagar o escopo (mesmo em falha)
+        if: ${{ always() && inputs.sondagem_fase_c }}
+        run: rm -f escopo-autorizado.yaml
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webqa-auditoria
+          path: webqa-suite/report/
+          retention-days: 7
+          if-no-files-found: ignore
