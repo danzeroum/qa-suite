@@ -13,6 +13,19 @@
 name: Compatibilidade (matriz de engines, agendado)
 
 on:
+  # GATILHO TEMPORARIO — sera REVERTIDO antes do squash desta OS.
+  #
+  # O R-Q5 escrito no cabecalho deste arquivo proibe a matriz de tres engines no
+  # PR como estado permanente: ela triplicaria o tempo do job que roda em todo
+  # push. Mas o slot foi ESTENDIDO nesta OS com dois passos novos, e workflow que
+  # parseia local e nao roda no GitHub e o defeito que so o run real revela — a
+  # licao da OS-44. Sem este gatilho, o primeiro teste de verdade seria as 05:23
+  # de amanha, depois do merge.
+  #
+  # Padrao da manobra (OS-44): plantar, capturar o run, reverter, e registrar os
+  # tres estados na descricao do PR para que sobrevivam ao squash.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
   schedule:
     # 05:23 UTC, fora da janela do noturno da VPS (03h) e do job de mutação (04h).
