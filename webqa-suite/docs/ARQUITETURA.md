@@ -59,6 +59,8 @@ aplicação web apenas pelo que ela expõe via HTTP e pelo que renderiza no nave
 | `network_log` em contexto virgem por módulo | consentimento medido sem herança de estado | um carregamento a mais do alvo por módulo |
 | Bateria LGPD 100% passiva na Fase 1 | zero risco jurídico de intrusão | não verifica se "recusar" recusa de fato (Fase 2) |
 | Allowlist de terceiros em config | decisão documentada do controlador vence a heurística | allowlist mal preenchida silencia o teste |
+| Contexto de navegador próprio por variação de GUI (viewport, tema, movimento) | mede sem contaminar o `browser_page` de sessão nem as Web Vitals das outras dimensões | um carregamento a mais do alvo por variação — o mesmo preço já pago pelo `network_log` |
+| Veredito de GUI por geometria e CSS computado, não por pixel | estável entre engines, versões de fonte e revisões do navegador | não enxerga regressão puramente cromática nem deslocamento fino que não cruze um limiar |
 
 "Uma decisão só pode ser avaliada em relação ao seu contexto": os limiares
 padrão seguem Web Vitals/indústria, mas **devem** ser recalibrados para o seu produto.
