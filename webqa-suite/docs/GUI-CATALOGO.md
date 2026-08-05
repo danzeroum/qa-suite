@@ -673,6 +673,33 @@ def test_tbt_long_tasks_e_inp(contexto_gui, settings, engine, request):
     assert not problemas, "\n".join(problemas)
 ```
 
+**10. Como ficou (OS‑46) — três desvios deste esboço, e o motivo de cada um.**
+
+* **Suporte detectado em runtime, não pelo nome da engine.** O esboço pulava
+  comparando `engine != "chromium"`. O check pergunta a
+  `PerformanceObserver.supportedEntryTypes` o que existe. Uma lista de engines
+  escrita hoje envelhece em silêncio: quando o Firefox implementar `longtask`, a
+  suíte pularia dizendo que a API não existe — e "não medido" viraria permanente
+  sem nada ficar vermelho.
+* **A ordem dos vereditos: estouro antes de ausência.** O esboço pulava (`xfail`)
+  quando o INP não fosse medido, ANTES de olhar o orçamento. Um alvo que trava
+  660ms sairia do laudo como "não medi a interação". A ausência de INP só decide
+  quando não há nada mais grave a dizer — e aí sim vira `xfail`, porque passar
+  anunciaria cobertura de INP que não houve.
+* **`first-input` ao lado de `event`.** A Event Timing API descarta eventos
+  abaixo do `durationThreshold` (mínimo 16ms). Um `Tab` numa página saudável
+  custa ~16ms e cai na borda: sem `first-input`, que ignora o limiar, o check
+  pularia SEMPRE contra alvo conforme, e "não medido" ficaria indistinguível de
+  "não suportado". Medido na sonda: 16ms na página conforme, 112–120ms no alvo
+  fabricado.
+
+E um item do aceite que **não** foi cumprido como escrito: o nodeid ficou em
+`fora_do_contrato`, não em `devem_falhar`. Um desfecho condicionado a
+`WEBQA_ORIGEM` faz o contrato reprovar por AMBIENTE em toda execução fora da VPS
+— e o contrato 1:1 existe para reprovar por regressão. Mesma navalha da OS‑45
+(rede externa), mesmo critério: o contrato só aceita check cujo desfecho contra o
+fixture dependa exclusivamente do que o fixture serve.
+
 ---
 
 ### 3.10 `checks/gui/test_resiliencia.py::test_falha_de_api_produz_erro_acionavel`

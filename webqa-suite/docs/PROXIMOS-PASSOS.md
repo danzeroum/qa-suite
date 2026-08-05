@@ -512,18 +512,19 @@ consecutivas** sem flake de infraestrutura. Hoje: 0/10.
 
 Global Privacy Control (`Sec-GPC: 1`) e heurísticas de fingerprinting.
 
-### 4.6 Camada GUI não funcional — PLANEJADA, nada em código
+### 4.6 Camada GUI não funcional — EM EXECUÇÃO (Fase 2)
 
 Contrato em [`GUI.md`](GUI.md); catálogo e especificação dos dez primeiros em
 [`GUI-CATALOGO.md`](GUI-CATALOGO.md); fila executável em
-[`handoff/ordens-de-servico/OS-gui-fila.md`](handoff/ordens-de-servico/OS-gui-fila.md).
+[`handoff/ordens-de-servico/OS-gui-fila.md`](handoff/ordens-de-servico/OS-gui-fila.md),
+que é onde o estado por OS fica atualizado — não aqui.
 
 A lacuna que ela fecha: os testes de `checks/ux/` são inspeção estática do DOM, e
 `checks/frontend/test_rendering.py` registra `PerformanceObserver` só para LCP e
-`layout-shift`. Ninguém mede teclado, foco, reflow, alvo de toque, tema, INP ou
-resiliência a falha de API.
+`layout-shift` — mede pintura e estabilidade, nunca **bloqueio**. Uma página pode
+aprovar em todas as vitals de carga e ficar surda ao teclado por mais um segundo.
 
-**Quatro coisas precisam sair no MESMO PR do primeiro check**, e nenhuma é
+**Quatro coisas precisam sair no MESMO PR de cada check novo**, e nenhuma é
 opcional:
 
 1. o marcador `gui` em `pytest.ini` — `--strict-markers` transforma marcador não
@@ -533,7 +534,13 @@ opcional:
 3. a nota epistêmica em `webqa/report.py::DIMENSION_NOTES` — geometria conforme
    não é pessoa atendida, e quem lê o laudo não leu o contrato;
 4. os FAILs novos contra o alvo fixture em `fixture_target/esperado.json` (§2.8),
-   pelo nodeid exato.
+   pelo nodeid exato — **ou a exclusão com motivo escrito**, quando o desfecho do
+   check não depender só do que o fixture serve. Dois casos já existem, e o
+   critério é um só: rede externa (o axe do contraste em tema escuro, OS‑45) e
+   ambiente declarado (o veredito de interatividade, que só reprova sob
+   `WEBQA_ORIGEM=vps`, OS‑46). Nos dois, entrar em `devem_falhar` faria o contrato
+   reprovar por ambiente em vez de por regressão — destruindo a única propriedade
+   que ele existe para ter.
 
 **E uma ordem que tem prazo.** A OS‑40 (acrescentar as violações de GUI ao alvo
 fixture) é a primeira da fila porque `identidade()` muda quando `HOME`/`APP_JS`/
@@ -607,4 +614,14 @@ make telemetria        # agrega campanhas já executadas (não faz requisição)
 make vps-smoke         # valida a VPS antes de agendar o cron
 
 python scripts/estabilidade.py --recompute   # auditoria do ledger, sem gravar
+
+rm -rf report          # ANTES de comparar a contagem do dogfooding com o CI
 ```
+
+> **Resíduo em `report/` muda a contagem de skips.**
+> `tests/test_report_dogfooding.py` lê `report/campanha/*/run*/summary.json` e pula
+> quando não há execução real; com resíduo local ele deixa de pular, e o total de
+> skips do `make verify` não bate com o do CI, que começa limpo. Perseguir essa
+> diferença é procurar no código um defeito que está no disco. `make verify` avisa
+> quando o diretório existe — o aviso não apaga nada, porque o artefato pode ser
+> justamente o que se está investigando.

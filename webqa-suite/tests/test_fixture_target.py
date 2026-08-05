@@ -362,6 +362,30 @@ def test_check_de_gui_que_depende_de_CDN_fica_fora_do_contrato():
     assert alvo not in contrato["devem_falhar"]
 
 
+def test_check_com_veredito_condicionado_ao_ambiente_fica_fora_do_contrato():
+    """A mesma navalha da OS-45, aplicada ao outro tipo de dependência externa.
+
+    O check de interatividade só reprova sob `WEBQA_ORIGEM=vps`; fora do ambiente
+    oficial o estouro de TBT vira `xfail`, porque numa máquina compartilhada o
+    número mede o vizinho, não o alvo. Isso o torna inelegível para
+    `devem_falhar`: o contrato o cobraria como "a menos" em toda execução que não
+    fosse da VPS — reprovando por AMBIENTE, e não por regressão.
+
+    O critério é um só, e vale para os dois casos: o contrato 1:1 aceita apenas
+    checks cujo desfecho contra o fixture dependa exclusivamente do que o fixture
+    serve. Rede externa (axe) e origem declarada (ledger) são a mesma classe de
+    exclusão, e é por isso que este teste fica ao lado daquele.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    fora = contrato["fora_do_contrato"]
+    alvo = "checks/gui/test_interatividade.py::test_tbt_long_tasks_e_inp"
+    assert alvo in fora, (
+        "veredito condicionado a WEBQA_ORIGEM em devem_falhar tornaria o contrato "
+        "dependente do ambiente — verde na VPS, vermelho em todo lugar que importa")
+    assert "WEBQA_ORIGEM" in fora[alvo], "a exclusão precisa nomear a condição"
+    assert alvo not in contrato["devem_falhar"]
+
+
 def test_escopo_do_contrato_inclui_a_dimensao_gui():
     """Sem `gui` na seleção, os três checks nem rodariam na execução interna — e
     o contrato os cobraria como "a menos" a cada run. A seleção é lida do próprio
