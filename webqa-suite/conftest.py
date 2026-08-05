@@ -167,6 +167,35 @@ def perfis_gui():
     return carregar_perfis()
 
 
+def _contextos_de_gui(browser, settings, credenciais_navegador):
+    """Implementação ÚNICA das fixtures de contexto de GUI.
+
+    Uma só, e as duas fixtures abaixo apenas a delegam, porque a diferença entre
+    elas é só o escopo: há check que quer um contexto por teste e há check que
+    precisa de UMA observação partilhada — a caminhada de foco alimenta três
+    vereditos, e percorrer a página três vezes pagaria três vezes pela mesma
+    observação, com o risco extra de as três discordarem num alvo dinâmico.
+
+    Duas cópias deste corpo divergiriam no primeiro campo novo, e a divergência
+    apareceria como um check isolando e o outro não.
+    """
+    contextos = []
+
+    def abrir(viewport=None, **opcoes):
+        base = {"user_agent": settings.user_agent, **credenciais_navegador}
+        contexto = browser.new_context(**opcoes_de_contexto(viewport, **base, **opcoes))
+        contextos.append(contexto)
+        return contexto.new_page()
+
+    try:
+        yield abrir
+    finally:
+        # `finally`, e não depois do yield: teste que estoura no meio não pode
+        # deixar contexto de navegador vazando para o resto da sessão.
+        for contexto in contextos:
+            contexto.close()
+
+
 @pytest.fixture()
 def contexto_gui(browser, settings, credenciais_navegador, alvo_alcancavel):
     """Fábrica de páginas em contexto NOVO — uma por variação de GUI.
@@ -186,21 +215,22 @@ def contexto_gui(browser, settings, credenciais_navegador, alvo_alcancavel):
     As opções vêm de `webqa/viewports.py::opcoes_de_contexto`, que é pura — o
     detalhe vive na biblioteca, os checks só conhecem esta fixture.
     """
-    contextos = []
+    yield from _contextos_de_gui(browser, settings, credenciais_navegador)
 
-    def abrir(viewport=None, **opcoes):
-        base = {"user_agent": settings.user_agent, **credenciais_navegador}
-        contexto = browser.new_context(**opcoes_de_contexto(viewport, **base, **opcoes))
-        contextos.append(contexto)
-        return contexto.new_page()
 
-    try:
-        yield abrir
-    finally:
-        # `finally`, e não depois do yield: teste que estoura no meio não pode
-        # deixar contexto de navegador vazando para o resto da sessão.
-        for contexto in contextos:
-            contexto.close()
+@pytest.fixture(scope="module")
+def contexto_gui_modulo(browser, settings, credenciais_navegador, alvo_alcancavel):
+    """A mesma fábrica, viva pelo módulo inteiro.
+
+    Existe para a observação CARA e partilhada: a caminhada de foco percorre a
+    página com Tab, alimenta três critérios e mexe no estado do navegador —
+    refazê-la por teste seria pagar três vezes por uma observação só. Mesma
+    doutrina de `home_response` nas dimensões HTTP.
+
+    Continua sendo contexto PRÓPRIO: partilhar entre testes do mesmo módulo não
+    é o mesmo que partilhar com `browser_page`, que atende outras dimensões.
+    """
+    yield from _contextos_de_gui(browser, settings, credenciais_navegador)
 
 
 @pytest.fixture(scope="session")

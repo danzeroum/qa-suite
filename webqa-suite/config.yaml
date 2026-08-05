@@ -43,3 +43,9 @@ thresholds:
   gui_zoom_perdidos_max: 0    # WCAG 1.4.4 — conteudo que some a 200%
   gui_alvo_toque_px: 24       # WCAG 2.5.8 AA
   gui_alvo_toque_meta_px: 44  # meta de plataforma: abaixo disso e ALERTA, nao achado
+  gui_foco_invisivel_max: 0   # WCAG 2.4.7 — um controle sem indicador ja quebra a cadeia
+  # WCAG 2.4.3. FOLGADO de proposito na Fase 1: a inversao e medida por
+  # geometria, e a geometria nao conhece a intencao do layout. Grade densa
+  # produz salto legitimo; limiar zero reprovaria layout conforme.
+  gui_foco_inversoes_max: 2
+  gui_foco_obscurecido_max: 0 # WCAG 2.4.11 (nova na 2.2)
