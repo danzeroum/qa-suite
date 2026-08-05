@@ -13,6 +13,9 @@ via HTTP, produzindo relatório consolidado e executável em CI/CD.
 4. UX automatizável (heurísticas de Nielsen, arquitetura de informação, WCAG/axe).
 5. Funcional básico (links, formulários) + aceitação BDD.
 6. Carga: rajada leve embutida + cenário Locust.
+7. Qualidade não funcional da interface renderizada (reflow, foco, contraste,
+   movimento, tamanho de alvo, degradação entre engines) — **planejada e não
+   implementada**, contratada em [`GUI.md`](GUI.md).
 
 **Fora do escopo (anti-scope-creep — mudanças exigem decisão explícita)**
 - Testes caixa-branca/unitários do código do alvo.
@@ -24,6 +27,13 @@ via HTTP, produzindo relatório consolidado e executável em CI/CD.
   suíte sem torná-la um robô de navegação. Fluxo logado segue fora.
 - Pentest ofensivo (fuzzing, injeção ativa) — apenas verificações passivas.
 - Avaliação subjetiva de estética/conteúdo (exige humano).
+- Teste com usuários reais (moderado ou não), questionário SUS/SEQ, avaliação
+  heurística por especialista e verificação com leitor de tela real
+  (NVDA/JAWS/VoiceOver). Exigem pessoas, e a camada de GUI (`GUI.md §5`) existe
+  para **instrumentar** essa avaliação, nunca para substituí-la.
+- Teste de componente isolado (Storybook e similares): a suíte é caixa-preta
+  contra uma URL e não tem acesso ao código-fonte da interface do alvo. O que
+  cabe é uma galeria de estados servida pelo próprio alvo fabricado.
 
 ## EAP (Work Breakdown Structure)
 
@@ -64,6 +74,13 @@ sonda caminhos que o servidor não ofereceu, o que exige
 Note que isso **não** contradiz "pentest ofensivo" estar fora do escopo acima:
 a Fase C é sondagem autorizada e com rate-limit, não fuzzing nem injeção — e
 segue fora do escopo enquanto não houver alvo autorizado.
+
+**1.4 — a extensão de GUI é papel, não pasta.** `checks/gui/` **não** aparece na
+árvore acima porque `checks/gui/` não existe. A camada está contratada em
+[`GUI.md`](GUI.md) e enfileirada em `handoff/ordens-de-servico/OS-gui-fila.md`;
+ela entra na EAP quando entrar no disco. Uma EAP que declara alinhamento 1:1 e
+lista pasta inventada mente na direção mais cara — a de dar por entregue o que
+ainda é plano, que é o oposto do defeito que a nota abaixo corrige.
 
 **1.13/1.14/1.15 nasceram depois da redação original** desta EAP, junto com a
 medição de estabilidade e o runtime da VPS. Estão listados aqui porque a EAP só
