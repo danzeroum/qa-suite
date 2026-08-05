@@ -339,6 +339,29 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
     assert declarados == esperados
 
 
+def test_check_de_gui_que_depende_de_CDN_fica_fora_do_contrato():
+    """Check baseado em axe-core não entra em `devem_falhar` — e o motivo é o
+    mesmo dos dois irmãos dele na dimensão `ux`.
+
+    Ele baixa o axe de um CDN. Offline, PULA com motivo (o que é o
+    comportamento correto), e um `devem_falhar` que não é observado vira "a
+    menos": o contrato reprovaria por ambiente, não por regressão. A exclusão
+    protege a propriedade que o contrato existe para ter — reprovar quando um
+    check parou de detectar, e só então.
+
+    A detecção segue coberta, por outro mecanismo (§2.8): unidade sobre a
+    pré-checagem e sobre a verificação de hash, mais validação real registrada
+    no PR. Fingir que o contrato a exercita daria confiança falsa justamente na
+    regra mais fácil de errar.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    fora = contrato["fora_do_contrato"]
+    alvo = "checks/gui/test_preferencias.py::test_contraste_em_tema_escuro"
+    assert alvo in fora, "check de axe em devem_falhar tornaria o contrato dependente de rede"
+    assert "rede externa" in fora[alvo]
+    assert alvo not in contrato["devem_falhar"]
+
+
 def test_escopo_do_contrato_inclui_a_dimensao_gui():
     """Sem `gui` na seleção, os três checks nem rodariam na execução interna — e
     o contrato os cobraria como "a menos" a cada run. A seleção é lida do próprio
