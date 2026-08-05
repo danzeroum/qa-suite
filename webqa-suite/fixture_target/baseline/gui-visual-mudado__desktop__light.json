@@ -1,0 +1,9 @@
+{
+  "sha256": "edb2a57bbb57c6c5918d3e86744da267d1d1475f93e2b48d5b242f1c8eee021e",
+  "engine": "chromium",
+  "viewport": "desktop",
+  "tema": "light",
+  "pagina": "/gui/visual-mudado",
+  "gravado_em": "2026-08-05 19:50:45 UTC",
+  "motivo": "DELIBERADAMENTE DEFASADA. E uma copia da referencia de /gui/visual, gravada antes do deslocamento de 48px do bloco `.b`. Existe para que a direcao `failed` do GUI-VIS-01 seja exercida contra o alvo fabricado: sem ela o check so teria a direcao que passa, e ninguem saberia se ele reprova por regressao ou por natureza. `make referencia-visual` NAO a regrava (`regravar: false` em data/gui-perfis.yaml) — regravar apagaria o contrato."
+}

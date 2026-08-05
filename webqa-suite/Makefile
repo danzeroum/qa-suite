@@ -1,4 +1,4 @@
-.PHONY: all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes build
+.PHONY: referencia-visual all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes build
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -20,6 +20,11 @@ telemetria: ; python scripts/telemetria.py
 # Sem WEBQA_LLM_ENABLED=1 ou sem runtime local: nao gera nada e sai 0.
 sumario: ; python scripts/sumario.py
 fixture: ; python fixture_target/servir.py   # alvo fabricado, porta efemera
+# Regrava a linha de base visual do alvo FABRICADO (GUI-VIS-01/02) com manifesto
+# de procedencia. So o alvo fabricado: captura de alvo real nao e versionavel
+# (R19 — pixel nao passa pela borda de sanitizacao). Variacao com
+# `regravar: false` e PULADA de proposito.
+referencia-visual: ; python scripts/referencia_visual.py
 vps-smoke: ; scripts/vps_smoke.sh   # valida VPS antes de agendar o cron
 audita-design: ; python scripts/audita_design.py --suite   # gate do pacote de design (§12)
 campanha: ; python scripts/campanha.py   # nivel sistema: alvos reais x N, consolidado

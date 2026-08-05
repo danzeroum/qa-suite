@@ -21,9 +21,18 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 | OS‑43 | #87 | `ae71d21` | `webqa/foco.py`: a caminhada de foco e os três critérios que ela sustenta |
 | OS‑44 | #88 | `29c1814` | `webqa/movimento.py` + smoke de GUI no `quality-gate` com aferição própria |
 | OS‑45 | #89 | `dee1199` | `webqa/tema.py` + `webqa/axe.py`: contraste em tema escuro, com pré‑checagem |
-| OS‑46 | — | — | `webqa/vitals_interacao.py`: TBT, long tasks e INP aproximado |
-| OS‑47 | — | — | `webqa/degradacao.py`: 500, sem resposta, JSON truncado e perda de conexão |
-| OS‑48 | — | — | `webqa/compatibilidade.py` + `webqa/menu.py`: matriz viewport × engine no noturno |
+| OS‑46 | #90 | `7c6b357` | `webqa/vitals_interacao.py`: TBT, long tasks e INP aproximado |
+| OS‑47 | #91 | `906a6ac` | `webqa/degradacao.py`: 500, sem resposta, JSON truncado e perda de conexão |
+| OS‑48 | #92 | `15d67ce` | `webqa/compatibilidade.py` + `webqa/menu.py`: matriz viewport × engine no noturno |
+| OS‑56 | #92 | `15d67ce` | `webqa/foco.py`: fim de ordem ≠ armadilha — o falso positivo de foco no Firefox |
+| OS‑49 | — | — | `webqa/imagem.py` + `evidencias.py` + `referencia_visual.py`: contrato visual |
+
+**Por que a OS‑56 aparece aqui e não na fila abaixo.** Ela não foi planejada: nasceu
+do run real da matriz da OS‑48, que acusou três `error` do Firefox em `test_foco.py`.
+Conserto de defeito achado por execução entra no PR que o expôs — separar em PR
+próprio faria a OS‑48 mergear sabidamente quebrada numa engine. A numeração pulou
+para 56 porque 50‑55 já estão reservadas na fila abaixo, e recontar OS já custou
+caro duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`).
 
 ---
 
@@ -239,7 +248,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 | ~~**OS‑46**~~ | ~~GUI‑PERF‑01: INP, TBT, long tasks (`webqa/vitals_interacao.py`)~~ | **entregue.** Duas correções ao aceite escrito, achadas na execução: (a) o nodeid ficou em `fora_do_contrato`, não em `devem_falhar` — veredito condicionado a `WEBQA_ORIGEM` é ambiente, e o contrato 1:1 só aceita desfecho que dependa do que o fixture serve; (b) o suporte a `longtask` é detectado **em runtime** (`supportedEntryTypes`), não pelo nome da engine — a lista de engines envelhece e mente | 5 | OS‑41 |
 | ~~**OS‑47**~~ | ~~GUI‑RESIL‑01/02/03: 500, timeout, JSON truncado, offline~~ | **entregue**, com a partição do contrato declarada ANTES de codar e confirmada na validação: 500 e JSON truncado → `failed` (a home despeja o objeto de erro cru na tela) e entram em `devem_falhar`; sem resposta e offline → `xfail` (silêncio) e ficam fora, com motivo. Duas correções vindas da execução: a origem é `origem_de(target_url)`, não a URL inteira (alvo em página interna descartava a própria API como "terceiro"), e o offline só depois da carga ASSENTADA — cortar a rede no instante do `load` deixava o `fetch` no ar sobrescrever o aviso que a página já tinha mostrado | 5 | OS‑40, OS‑41 |
 | ~~**OS‑48**~~ | ~~GUI‑RESP‑03/04/05, GUI‑COMPAT‑01/02: matriz viewport × engine no noturno~~ | **entregue.** Slot estendido (dois passos novos no mesmo job), nenhum cron criado. Partição: RESP‑03 e RESP‑05 em `devem_falhar` (chromium puro, o fixture os exerce); COMPAT‑01/02 fora, porque o desfecho depende de QUAIS engines estão instaladas. Resolve a pendência da OS‑41: perfil móvel em Firefox roda como largura sem emulação, com a nota no laudo. Uma descoberta cara: sem `meta viewport` no alvo, a emulação móvel dá a ele o viewport de fallback de 980px e NENHUMA media query abaixo disso vale — a família por viewport inteira mediria desktop achando que mediu celular | 5 | OS‑41 |
-| **OS‑49** | `webqa/evidencias.py` + `webqa/imagem.py` + `webqa/referencia_visual.py` + GUI‑VIS‑01/02 contra o fixture | decoder PNG **fail‑closed** (`GUI-CATALOGO.md §4.1`), com caso de teste de PNG entrelaçado fabricado; linha de base ausente = **skip explicado**, nunca PASS; teste provando que sem `WEBQA_GUI_SCREENSHOTS=1` nenhum PNG de alvo não fabricado chega ao disco; `make referencia-visual` regrava com manifesto de procedência | 8 | OS‑40, OS‑48 |
+| ~~**OS‑49**~~ | ~~`webqa/evidencias.py` + `webqa/imagem.py` + `webqa/referencia_visual.py` + GUI‑VIS‑01/02 contra o fixture~~ | **entregue.** Decoder fail-closed com as quatro recusas testadas; diff por bloco 16×16 com tolerância por canal; referência versionada só de página FABRICADA e SEM TEXTO, com manifesto de procedência. Três achados da execução: o Playwright emite RGB (`color_type=2`), **não RGBA** como a OS previa, e em vários IDAT — as duas viraram contrato em teste; e o smoke da OS‑44 pegou que o check media as páginas do contrato visual seja qual for a `target_url`, reprovando contra a página conforme — passou a exigir a RAIZ do alvo | 8 | OS‑40, OS‑48 |
 
 ## Fase 3 — maturidade
 
