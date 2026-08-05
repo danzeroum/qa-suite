@@ -26,7 +26,7 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 | OS‑48 | #92 | `15d67ce` | `webqa/compatibilidade.py` + `webqa/menu.py`: matriz viewport × engine no noturno |
 | OS‑56 | #92 | `15d67ce` | `webqa/foco.py`: fim de ordem ≠ armadilha — o falso positivo de foco no Firefox |
 | OS‑49 | #93 | `cd16e9f` | `webqa/imagem.py` + `evidencias.py` + `referencia_visual.py`: contrato visual |
-| OS‑50 | — | — | `webqa/rede_simulada.py`: pintura sob 3G e bloqueio sob CPU ×4, por CDP |
+| OS‑50 | #94 | `2381493` | `webqa/rede_simulada.py`: pintura sob 3G e bloqueio sob CPU ×4, por CDP |
 | OS‑57 | — | — | `scripts/afere_ancoras.py`: guarda bidirecional das âncoras `arquivo:linha`, com cobertura declarada |
 
 **Por que a OS‑56 aparece aqui e não na fila abaixo.** Ela não foi planejada: nasceu
@@ -35,6 +35,29 @@ Conserto de defeito achado por execução entra no PR que o expôs — separar e
 próprio faria a OS‑48 mergear sabidamente quebrada numa engine. A numeração pulou
 para 56 porque 50‑55 já estão reservadas na fila abaixo, e recontar OS já custou
 caro duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`).
+
+---
+
+### Coreografia de drenagem — a regra que custou um rebase para aprender
+
+A política da casa é **squash**. Um squash-merge cria em `main` um commit
+**novo**, sem laço de ancestralidade com a pilha que ele resume — e essa é a
+consequência que morde: depois do squash, a ponta antiga da branch continua
+descendendo dos commits **pré‑squash**, então a base comum entre branch e `main`
+recua para antes da OS que acabou de entrar, e o GitHub tenta remesclar o que já
+está lá. O sintoma é um `405 Pull Request has merge conflicts` numa branch cujo
+conteúdo você acabou de conferir como idêntico a `main` mais a OS da vez.
+
+> **Regra permanente.** Depois de todo squash, a sincronização da branch é
+> **sempre**
+> `git rebase --onto origin/main <ponta-mergeada> <ponta-nova>`,
+> com `range-diff` provando `=` em cada commit. **Nunca** `reset --hard` para uma
+> ponta pré‑squash: ela parece certa (o conteúdo bate) e traz a ancestralidade
+> errada junto.
+
+Aprendida na drenagem da OS‑50 (#94), onde o ciclo curto — uma OS de ponta a
+ponta antes de abrir a seguinte — fez a surpresa custar **um** rebase em vez de
+três.
 
 ---
 
