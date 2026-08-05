@@ -50,3 +50,9 @@ thresholds:
   gui_foco_inversoes_max: 2
   gui_foco_obscurecido_max: 0 # WCAG 2.4.11 (nova na 2.2)
   gui_animacoes_sob_rm_max: 0 # WCAG 2.3.3 — sob reduced-motion, nada se mexe
+  # GUI-PERF-01 (OS-46). Orcamento de interatividade: so reprova sob
+  # WEBQA_ORIGEM=vps; fora do ambiente oficial o estouro vira xfail com motivo.
+  # Afrouxar estes numeros para caber na maquina mais barulhenta seria o R5.
+  gui_tbt_ms: 200             # Total Blocking Time — faixa "bom" do Lighthouse
+  gui_inp_ms: 200             # INP aproximado; "bom" do Core Web Vitals
+  gui_long_tasks_max: 5       # tarefas acima de 50ms; TBT e contagem NAO se reduzem

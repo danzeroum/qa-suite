@@ -15,7 +15,13 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 
 | OS | PR | Commit | Entrega |
 |---|---|---|---|
-| — | — | — | nada. A camada é **planejada**; `checks/gui/` não existe |
+| OS‑40 | #84 | `554754e` | violações de GUI no alvo fabricado, de uma vez só (custo do ledger declarado) |
+| OS‑41 | #85 | `4527f81` | dimensão `gui` de ponta a ponta, `webqa/viewports.py`, contexto isolado |
+| OS‑42 | #86 | `783b50b` | `webqa/geometria.py`: reflow, zoom 200%, alvo de toque com as exceções da 2.5.8 |
+| OS‑43 | #87 | `ae71d21` | `webqa/foco.py`: a caminhada de foco e os três critérios que ela sustenta |
+| OS‑44 | #88 | `29c1814` | `webqa/movimento.py` + smoke de GUI no `quality-gate` com aferição própria |
+| OS‑45 | #89 | `dee1199` | `webqa/tema.py` + `webqa/axe.py`: contraste em tema escuro, com pré‑checagem |
+| OS‑46 | — | — | `webqa/vitals_interacao.py`: TBT, long tasks e INP aproximado |
 
 ---
 
@@ -228,7 +234,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 | OS | Entrega | Aceite resumido | Est. | Depende de |
 |---|---|---|---|---|
 | **OS‑45** | GUI‑CONTR‑01: contraste em tema escuro. Move `_fetch_axe_verified` de `checks/ux/test_acessibilidade.py:26` para `webqa/`, importado pelos dois lugares | versão pinada e SHA‑384 preservados; alvo sem tema escuro **pula com motivo** (a pré‑checagem compara o fundo computado claro × escuro — sem ela o axe mediria o tema claro de novo e o teste passaria fingindo cobertura) | 5 | OS‑41 |
-| **OS‑46** | GUI‑PERF‑01: INP, TBT, long tasks (`webqa/vitals_interacao.py`) | mesma disciplina de `VITALS_JS` que `tests/test_vitals_js.py` já fixa: observers fora da callback com `buffered`, **toda leitura dentro dela**, `null` inicial. Veredito duro só sob `WEBQA_ORIGEM=vps`; no CI é `xfail` com motivo. Sem `longtask` (webkit) → skip instruído | 5 | OS‑41 |
+| ~~**OS‑46**~~ | ~~GUI‑PERF‑01: INP, TBT, long tasks (`webqa/vitals_interacao.py`)~~ | **entregue.** Duas correções ao aceite escrito, achadas na execução: (a) o nodeid ficou em `fora_do_contrato`, não em `devem_falhar` — veredito condicionado a `WEBQA_ORIGEM` é ambiente, e o contrato 1:1 só aceita desfecho que dependa do que o fixture serve; (b) o suporte a `longtask` é detectado **em runtime** (`supportedEntryTypes`), não pelo nome da engine — a lista de engines envelhece e mente | 5 | OS‑41 |
 | **OS‑47** | GUI‑RESIL‑01/02/03: 500, timeout, JSON truncado, offline | interceptação **no cliente** e só de endpoint de **mesma origem** (terceiro nunca); teto de tentativas; ausência de mensagem é `xfail` (heurística de vocabulário é fraca em alvo i18n), tela branca e stack trace são `failed` | 5 | OS‑40, OS‑41 |
 | **OS‑48** | GUI‑RESP‑03/04/05, GUI‑COMPAT‑01/02: matriz viewport × engine no noturno | **estende** o slot de `compatibilidade.yml` (05:23 UTC), não cria cron novo; skips por engine contados no painel; CLS por viewport reusando `VITALS_JS` | 5 | OS‑41 |
 | **OS‑49** | `webqa/evidencias.py` + `webqa/imagem.py` + `webqa/referencia_visual.py` + GUI‑VIS‑01/02 contra o fixture | decoder PNG **fail‑closed** (`GUI-CATALOGO.md §4.1`), com caso de teste de PNG entrelaçado fabricado; linha de base ausente = **skip explicado**, nunca PASS; teste provando que sem `WEBQA_GUI_SCREENSHOTS=1` nenhum PNG de alvo não fabricado chega ao disco; `make referencia-visual` regrava com manifesto de procedência | 8 | OS‑40, OS‑48 |
