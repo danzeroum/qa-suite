@@ -10,11 +10,14 @@ Sem rede e sem navegador: `opcoes_de_contexto` é pura, e os perfis vêm de YAML
 import pytest
 
 from webqa.viewports import (
+    ENGINES_SEM_EMULACAO_MOVEL,
     ENV_VIEWPORTS,
     VIEWPORTS_PADRAO,
     Viewport,
     carregar_perfis,
+    nota_de_emulacao,
     opcoes_de_contexto,
+    sem_emulacao_movel,
     viewports_configurados,
 )
 
@@ -143,3 +146,62 @@ def test_extras_passam_adiante_e_vencem():
     opcoes = opcoes_de_contexto(_PERFIS["mobile"], color_scheme="dark", is_mobile=False)
     assert opcoes["color_scheme"] == "dark"
     assert opcoes["is_mobile"] is False, "o que o check pede explicitamente vence o perfil"
+
+
+# ---------- A pendência da OS-41, decidida na OS-48 ----------
+
+def test_firefox_recebe_o_perfil_movel_como_LARGURA_sem_emulacao():
+    """A decisão: o contexto abre, sem `is_mobile`/`has_touch`.
+
+    A alternativa — pular o perfil móvel no Firefox — apagaria da matriz de
+    compatibilidade exatamente a combinação "engine alternativa × tela estreita",
+    que é onde a incompatibilidade de layout mais aparece. Perder o veredito de
+    largura em três dos cinco perfis para não perder o de toque em nenhum é
+    trocar o achado provável pelo raro.
+    """
+    movel = Viewport("mobile", 390, 844, mobile=True, toque=True)
+    opcoes = opcoes_de_contexto(movel, engine="firefox")
+    assert opcoes["viewport"] == {"width": 390, "height": 844}, "a LARGURA continua valendo"
+    assert "is_mobile" not in opcoes, "o Firefox recusa is_mobile e o contexto nem abriria"
+    assert "has_touch" not in opcoes
+
+
+def test_chromium_continua_recebendo_a_emulacao_completa():
+    """Sem este par, o teste acima passaria também se a emulação tivesse sumido
+    para todo mundo — provaria a ausência sem provar a presença."""
+    movel = Viewport("mobile", 390, 844, mobile=True, toque=True)
+    opcoes = opcoes_de_contexto(movel, engine="chromium")
+    assert opcoes["is_mobile"] is True and opcoes["has_touch"] is True
+
+
+def test_engine_omitida_mantem_o_comportamento_anterior():
+    """Chamada sem `engine` não pode mudar de significado: é a que o resto da
+    suíte já fazia antes desta OS."""
+    movel = Viewport("mobile", 390, 844, mobile=True, toque=True)
+    assert opcoes_de_contexto(movel)["is_mobile"] is True
+
+
+def test_perfil_de_desktop_nao_muda_em_engine_nenhuma():
+    desktop = Viewport("desktop", 1366, 768)
+    for engine in ("chromium", "firefox", "webkit", None):
+        opcoes = opcoes_de_contexto(desktop, engine=engine)
+        assert "is_mobile" not in opcoes and "has_touch" not in opcoes
+
+
+def test_a_nota_da_nao_emulacao_existe_e_diz_o_que_NAO_foi_exercido():
+    """A diferença precisa aparecer NO LAUDO. Um resultado de "perfil móvel" que
+    na verdade mediu largura sem emulação, e não diz isso, mente por omissão."""
+    movel = Viewport("mobile", 390, 844, mobile=True, toque=True)
+    nota = nota_de_emulacao("firefox", movel)
+    assert "SEM emulação" in nota and "390px" in nota
+    assert "toque NÃO foi exercido" in nota
+    assert nota_de_emulacao("chromium", movel) == "", "sem omissão, sem nota"
+    assert nota_de_emulacao("firefox", Viewport("desktop", 1366, 768)) == ""
+
+
+def test_a_lista_de_engines_sem_emulacao_e_um_lugar_so():
+    """Quando o Firefox implementar (ou outra engine deixar de aceitar), muda-se
+    num lugar — e não num `if engine == 'firefox'` espalhado pelos checks."""
+    assert sem_emulacao_movel("firefox") and sem_emulacao_movel(" FIREFOX ")
+    assert not sem_emulacao_movel("chromium") and not sem_emulacao_movel(None)
+    assert ENGINES_SEM_EMULACAO_MOVEL == ("firefox",)

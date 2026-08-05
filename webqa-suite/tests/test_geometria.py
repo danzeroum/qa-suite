@@ -14,11 +14,16 @@ import pytest
 
 from webqa.geometria import (
     Caixa,
+    Interativo,
     classificar_alvos,
     excecao_de,
+    fracao_da_menor,
+    interativos_de,
     perdidos_entre,
     resumo_de_caixas,
     resumo_de_isentos,
+    resumo_de_sobreposicoes,
+    sobreposicoes,
 )
 
 pytestmark = pytest.mark.verification
@@ -271,3 +276,104 @@ def test_coletor_mede_o_clicavel_e_nao_o_icone_interno(navegador):
 
     assert [c["seletor"] for c in coletados] == ["a#acao"], "o svg interno não é alvo"
     assert coletados[0]["largura"] >= 40, "a caixa medida tem de incluir o padding do clicável"
+
+
+# ---------- Sobreposição entre interativos (GUI-RESP-03, OS-48) ----------
+
+def _inter(seletor, x, y, largura=100.0, altura=40.0, ancestrais=()):
+    return Interativo(caixa=Caixa(seletor=seletor, x=x, y=y, largura=largura, altura=altura),
+                      ancestrais=frozenset(ancestrais))
+
+
+def test_caixas_separadas_nao_se_sobrepoem():
+    itens = [_inter("a", 0, 0), _inter("b", 200, 0)]
+    assert sobreposicoes(itens, limite=0.30) == ()
+
+
+def test_caixas_que_so_se_encostam_nao_se_sobrepoem():
+    """Encostar não é cobrir — a interseção de dois retângulos adjacentes é uma
+    linha, e linha não tem área."""
+    itens = [_inter("a", 0, 0, largura=100), _inter("b", 100, 0, largura=100)]
+    assert sobreposicoes(itens, limite=0.0) == ()
+
+
+def test_a_borda_de_30_por_cento_exatos_ainda_esta_dentro():
+    """O comparador é `>`, não `>=`. Mesma disciplina de borda do 25% da
+    cobertura de foco (OS-43) e dos 50ms do TBT (OS-46): a borda é decisão, e
+    decisão tem teste — senão o próximo refactor a move sem ninguém perceber."""
+    # Duas caixas de 100x40; sobreposição de 30px de largura = 1200 de 4000 = 30%.
+    itens = [_inter("a", 0, 0), _inter("b", 70, 0)]
+    assert fracao_da_menor(itens[0].caixa, itens[1].caixa) == pytest.approx(0.30)
+    assert sobreposicoes(itens, limite=0.30) == ()
+
+
+def test_um_pouco_acima_da_borda_reprova():
+    itens = [_inter("a", 0, 0), _inter("b", 69, 0)]
+    achados = sobreposicoes(itens, limite=0.30)
+    assert len(achados) == 1 and achados[0].fracao > 0.30
+
+
+def test_par_ancestral_descendente_e_EXCLUIDO():
+    """Um `<a>` dentro de um `<nav>` clicável cobre 100% de si mesmo dentro do
+    pai. Chamar isso de sobreposição acusaria de defeito o aninhamento normal de
+    qualquer menu — e o check seria desligado na primeira semana."""
+    pai = _inter("nav", 0, 0, largura=300, altura=60)
+    filho = _inter("nav > a", 10, 10, largura=80, altura=30, ancestrais=[0])
+    assert sobreposicoes([pai, filho], limite=0.30) == ()
+
+
+def test_a_exclusao_vale_nos_dois_sentidos():
+    """A ordem em que o coletor devolveu os elementos não pode decidir o
+    veredito: o par é o mesmo par."""
+    filho = _inter("nav > a", 10, 10, largura=80, altura=30)
+    pai = _inter("nav", 0, 0, largura=300, altura=60, ancestrais=[])
+    filho = Interativo(caixa=filho.caixa, ancestrais=frozenset([1]))
+    assert sobreposicoes([filho, pai], limite=0.30) == ()
+
+
+def test_irmaos_sobrepostos_continuam_sendo_achado():
+    """O par ancestral-descendente sai; o par que importa fica. Sem este teste, a
+    exclusão poderia ter engolido tudo e o arquivo passaria mesmo assim."""
+    itens = [_inter("button.a", 0, 0), _inter("button.b", 20, 0)]
+    assert len(sobreposicoes(itens, limite=0.30)) == 1
+
+
+def test_fracao_e_da_MENOR_caixa():
+    """Um botão pequeno inteiramente coberto por um painel grande está 100%
+    inacessível. Dividir pela área do painel daria uma fração minúscula — a
+    métrica diria "quase nada" sobre um controle que ninguém consegue tocar."""
+    painel = _inter("div.painel", 0, 0, largura=1000, altura=1000)
+    botao = _inter("button", 10, 10, largura=50, altura=20)
+    assert fracao_da_menor(painel.caixa, botao.caixa) == pytest.approx(1.0)
+
+
+def test_caixa_sem_area_nao_produz_divisao_por_zero():
+    assert fracao_da_menor(Caixa("a", 0, 0, 0, 0), Caixa("b", 0, 0, 10, 10)) == 0.0
+
+
+def test_ordena_do_pior_para_o_melhor():
+    """Quem for corrigir começa pelo par mais coberto."""
+    itens = [_inter("a", 0, 0), _inter("b", 50, 0), _inter("c", 95, 0)]
+    achados = sobreposicoes(itens, limite=0.0)
+    assert achados[0].fracao >= achados[-1].fracao
+
+
+def test_traduz_o_bruto_do_coletor_com_ancestrais():
+    itens = interativos_de([{"seletor": "nav", "x": 0, "y": 0, "largura": 10, "altura": 10,
+                             "ancestrais": []},
+                            {"seletor": "a", "x": 0, "y": 0, "largura": 5, "altura": 5,
+                             "ancestrais": [0]}])
+    assert itens[1].ancestrais == frozenset([0])
+    assert sobreposicoes(itens, limite=0.30) == ()
+
+
+def test_coletor_vazio_nao_estoura():
+    assert interativos_de(None) == () and sobreposicoes([], limite=0.30) == ()
+
+
+def test_o_resumo_nomeia_o_par_e_a_fracao():
+    """"Há sobreposição" sem o par e sem o número não diz o que corrigir nem
+    quanto falta."""
+    itens = [_inter("button.a", 0, 0), _inter("button.b", 10, 0)]
+    texto = resumo_de_sobreposicoes(sobreposicoes(itens, limite=0.30))
+    assert "button.a" in texto and "button.b" in texto and "%" in texto

@@ -405,6 +405,8 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
         "checks/gui/test_preferencias.py::test_reduced_motion_respeitado",
         "checks/gui/test_resiliencia.py::test_erro_500_na_api_nao_vaza_detalhe_tecnico",
         "checks/gui/test_resiliencia.py::test_json_truncado_nao_vaza_detalhe_tecnico",
+        "checks/gui/test_responsividade.py::test_sem_sobreposicao_de_interativos",
+        "checks/gui/test_responsividade.py::test_navegacao_principal_utilizavel_em_mobile",
     }
     declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
     assert declarados == esperados
@@ -485,6 +487,30 @@ def test_check_com_veredito_condicionado_ao_ambiente_fica_fora_do_contrato():
         "dependente do ambiente — verde na VPS, vermelho em todo lugar que importa")
     assert "WEBQA_ORIGEM" in fora[alvo], "a exclusão precisa nomear a condição"
     assert alvo not in contrato["devem_falhar"]
+
+
+def test_check_que_depende_das_engines_instaladas_fica_fora_do_contrato():
+    """Terceira aplicação da mesma navalha, e a que fecha o critério.
+
+    A família `gui_compat` compara engines num run só. Com menos de duas ela
+    PULA — comparar uma engine consigo mesma é sempre verde. Logo o desfecho
+    contra o alvo fabricado depende de QUAIS engines estão instaladas, que é
+    ambiente, exatamente como a rede externa do axe (OS-45) e a origem declarada
+    do ledger (OS-46).
+
+    O critério, agora escrito por inteiro: o contrato 1:1 aceita apenas nodeids
+    cujo desfecho contra o fixture dependa **só do que o fixture serve**. Rede,
+    origem declarada e binários instalados são as três formas de o ambiente
+    entrar na conta, e nenhuma delas pode.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    fora = contrato["fora_do_contrato"]
+    for nome in ("test_geometria_dos_marcos_nao_diverge_entre_engines",
+                 "test_sem_erro_de_console_exclusivo_de_uma_engine"):
+        alvo = f"checks/gui/test_compatibilidade.py::{nome}"
+        assert alvo in fora, "comparação entre engines em devem_falhar dependeria de binários"
+        assert "engines estão instaladas" in fora[alvo], "a exclusão precisa nomear a condição"
+        assert alvo not in contrato["devem_falhar"]
 
 
 def test_escopo_do_contrato_inclui_a_dimensao_gui():

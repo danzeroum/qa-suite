@@ -153,7 +153,7 @@ Cada uma é imposta por um teste, não por combinação. A coluna da direita é 
 | 5 | Nenhum check consome `require_active_probes` hoje | `tests/test_fase_c_travada.py:314-326` | o primeiro check que o consumir **altera esse teste**, num PR que diga isso — e o arquivo é protegido por CODEOWNERS |
 | 6 | `report/` nunca é versionado | `.gitignore:1-4,19`; R8 | guardar linha de base visual de alvo real em `report/` **ou** em qualquer lugar versionado (§3.4) |
 | 7 | `sanitize_text` é a borda de escrita **de texto** | `webqa/sanitize.py:156`; `webqa/report.py:236-238` varre a string já serializada | supor que uma captura de tela está sanitizada. Ela não está — não existe mascarador de pixel. É o R19 |
-| 8 | `browser_page` é de sessão e compartilhada | `conftest.py:150-156`; preço registrado em `ARQUITETURA.md:55` | mudar viewport, tema ou movimento nela. Toda variação abre contexto próprio, no molde de `network_log` (`conftest.py:207`) |
+| 8 | `browser_page` é de sessão e compartilhada | `conftest.py:200-205`; preço registrado em `ARQUITETURA.md:55` | mudar viewport, tema ou movimento nela. Toda variação abre contexto próprio, no molde de `network_log` (`conftest.py:326`) |
 | 9 | Ausência nunca vira zero | `PROXIMOS-PASSOS.md §2.1`; `webqa/metricas.py:26-45` recusa `None` | tratar elemento não renderizado como `0 px`, ou linha de base ausente como aprovação |
 | 10 | `error` ≠ `failed` | `PROXIMOS-PASSOS.md §2.2`; `webqa/report.py:157-162` | contar contexto que não abriu como achado. É o teste **não tendo acontecido** |
 | 11 | Cor nunca é o único portador de significado | `PROXIMOS-PASSOS.md §2.5`; `report_html.py:380-383` (severidade é **inline e tipográfica**, porque a folha não tem classe para ela) | inventar semáforo para diff visual. E note a simetria: isto é, ao mesmo tempo, **critério que a camada testa no alvo** (WCAG 1.4.1) |
@@ -187,7 +187,7 @@ que hoje está em 0/10 (`PROXIMOS-PASSOS.md §4.4`).
 
 **b) Parametrizar muda o nodeid, e o nodeid é o contrato do alvo fixture.**
 
-`conftest.py:105-113` explica que a fixture `browser` **não** é parametrizada
+`conftest.py:107-115` explica que a fixture `browser` **não** é parametrizada
 quando há uma engine só, de propósito: assim o nodeid fica `::test_x` e não
 `::test_x[chromium]`, "preservando o contrato 1:1 do alvo fixture
 (`esperado.json`, §2.8) sem tocá‑lo".
@@ -525,7 +525,50 @@ o ledger existe para medir.
 
 **Chromium‑only com skip honesto.** Emulação CDP (rede, CPU, memória) não existe
 em Firefox e WebKit. Ali o teste **pula com instrução**, nunca passa — a mesma
-regra da fixture `browser` para engine sem binário (`conftest.py:117-121`).
+regra da fixture `browser` para engine sem binário (`conftest.py:180-182`).
+
+### Diferenças por engine — o que já custou caro
+
+Conhecimento de PLATAFORMA, não de um teste: mora aqui porque envelhece devagar e
+porque quem tropeçar nele de novo vai procurar no contrato, não numa spec.
+
+**1. O Firefox não devolve o foco ao documento no fim da ordem de tabulação.**
+
+* **Sintoma** — três `error` (não `failed`) em `checks/gui/test_foco.py`, só no
+  Firefox, dizendo *"Armadilha de foco: em 200 Tabs o foco nunca voltou ao
+  início, girando entre 1 elemento(s)"*. Chromium e WebKit passam pelo mesmo alvo
+  sem acusar nada.
+* **Causa** — no Chromium, depois do último elemento focável o Tab **dá a volta**
+  e o foco reentra no documento. No Firefox/Linux ele vai para a interface do
+  navegador (barra de endereços), e `document.activeElement` **congela no último
+  focável** e não muda mais. Rastro medido: passos 1–15 percorrem os mesmos 15
+  elementos, na mesma ordem, nas duas engines; do 16 ao 200 o Firefox repete o
+  último. Não há defeito nenhum no alvo.
+* **Por que virou `error` e não `failed`** — o veredito de armadilha mora numa
+  *fixture* (`paradas`), e falha de fixture é erro de setup: os três critérios de
+  foco nem chegam a rodar naquela engine. Verde não fica, mas medida também não.
+* **Discriminador** — sonda `Shift+Tab` no ponto de estagnação, com prioridade,
+  mais cobertura do inventário de focáveis (`GUI-CATALOGO.md §3.3`). Fim de
+  ordem **solta** o foco; armadilha devolve ao mesmo elemento. A cobertura
+  sozinha não basta: com a armadilha no último focável não sobra ninguém por
+  visitar e os dois casos ficam idênticos.
+* **Onde** — achado pelo run real da matriz na OS‑48 (o gatilho temporário que a
+  produziu), consertado na OS‑56.
+
+**2. O Firefox recusa `is_mobile`.** O perfil móvel roda ali como **largura sem
+emulação** (`is_mobile`/`has_touch` omitidos), e a nota acompanha o laudo dizendo
+o que **não** foi exercido — comportamento de toque. Pular o perfil apagaria da
+matriz a combinação "engine alternativa × tela estreita", que é onde a
+incompatibilidade de layout mais aparece (`webqa/viewports.py`, OS‑48).
+
+**3. `longtask` e Event Timing só existem no Chromium.** Detectado em runtime por
+`PerformanceObserver.supportedEntryTypes`, nunca por lista de engines: lista
+envelhece em silêncio e passaria a mentir no dia em que o Firefox implementar
+(`webqa/vitals_interacao.py`, OS‑46).
+
+**A regra que os três compartilham:** capacidade se **pergunta ao navegador**, e
+diferença de engine vira skip nomeado ou nota no laudo — nunca um veredito sobre
+o alvo.
 
 **Sanitização.** Texto passa pela borda de escrita. **Imagem não passa** — e o
 documento diz isso em voz alta, porque a alternativa é uma falsa sensação de

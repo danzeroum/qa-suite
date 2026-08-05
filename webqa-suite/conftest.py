@@ -111,8 +111,57 @@ def soup(home_response) -> BeautifulSoup:
 _ENGINES = engines_configurados()
 
 
+@pytest.fixture(scope="session")
+def playwright_sessao():
+    """UMA instância de Playwright para a sessão inteira.
+
+    Existe porque a família `gui_compat` precisa de DUAS engines vivas ao mesmo
+    tempo, dentro de um teste só (o nodeid é único; a comparação entre engines
+    acontece no corpo). Abrir um segundo `sync_playwright()` no mesmo processo
+    para conseguir isso não é opção: a API síncrona mantém um despachante por
+    instância, e dois no mesmo thread disputam o mesmo laço.
+
+    Fixture separada, e não uma dentro da outra, para que `browser` continue
+    sendo o que sempre foi — uma engine por vez, parametrizada.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        pytest.skip("Playwright não instalado (pip install playwright).")
+    with sync_playwright() as p:
+        yield p
+
+
+@pytest.fixture(scope="session")
+def motores_gui(playwright_sessao):
+    """{engine: Browser} das engines configuradas que ESTÃO instaladas.
+
+    Devolve o que conseguiu abrir, e o chamador decide o que fazer com o
+    tamanho: com menos de duas não há comparação possível, e o check pula
+    dizendo quantas havia (`webqa/compatibilidade.py::motivo_de_pular`).
+    Preencher a lacuna com a engine que existe daria sempre verde — comparar uma
+    engine consigo mesma é sempre verde, e esse verde seria indistinguível do
+    legítimo.
+
+    Engine ausente é registrada pelo nome: o aceite do noturno exige que a soma
+    de executados e pulados feche, e um skip anônimo faz uma engine sumir da
+    conta sem ninguém notar.
+    """
+    abertos, ausentes = {}, {}
+    for engine in _ENGINES:
+        try:
+            abertos[engine] = getattr(playwright_sessao, engine).launch()
+        except Exception as exc:       # engine sem binário instalado
+            ausentes[engine] = str(exc).splitlines()[0][:160]
+    try:
+        yield {"abertos": abertos, "ausentes": ausentes}
+    finally:
+        for instancia in abertos.values():
+            instancia.close()
+
+
 @pytest.fixture(scope="session", params=_ENGINES if len(_ENGINES) > 1 else None)
-def browser(request, settings):
+def browser(request, settings, playwright_sessao):
     """Instância de navegador por sessão, uma por engine configurada (contextos é
     que são isolados). As engines vêm de `WEBQA_BROWSER_ENGINES` (default só
     `chromium`; o noturno roda a matriz chromium/firefox/webkit — C3).
@@ -121,19 +170,18 @@ def browser(request, settings):
     (falha explicada > falha misteriosa). Engine não instalada nunca conta como
     aprovação — o teste é pulado, não passa em silêncio."""
     engine = getattr(request, "param", _ENGINES[0])
+    # A instância de Playwright vem de `playwright_sessao`, e não de um
+    # `sync_playwright()` próprio: a API síncrona mantém um despachante por
+    # instância, e uma segunda no mesmo processo estoura com "Sync API inside the
+    # asyncio loop" assim que outra fixture (`motores_gui`) abre a dela. Uma só,
+    # partilhada, é o que permite a comparação entre engines existir.
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        pytest.skip("Playwright não instalado (pip install playwright).")
-
-    with sync_playwright() as p:
-        try:
-            instance = getattr(p, engine).launch()
-        except Exception as exc:  # engine ausente/sem binário
-            pytest.skip(f"{engine} indisponível: rode "
-                        f"`python -m playwright install {engine}` ({exc}).")
-        yield instance
-        instance.close()
+        instance = getattr(playwright_sessao, engine).launch()
+    except Exception as exc:  # engine ausente/sem binário
+        pytest.skip(f"{engine} indisponível: rode "
+                    f"`python -m playwright install {engine}` ({exc}).")
+    yield instance
+    instance.close()
 
 
 @pytest.fixture(scope="session")
@@ -183,7 +231,11 @@ def _contextos_de_gui(browser, settings, credenciais_navegador):
 
     def abrir(viewport=None, **opcoes):
         base = {"user_agent": settings.user_agent, **credenciais_navegador}
-        contexto = browser.new_context(**opcoes_de_contexto(viewport, **base, **opcoes))
+        # A engine é passada porque a tradução do perfil DEPENDE dela (o Firefox
+        # recusa `is_mobile`) — e a decisão de como lidar com isso vive em
+        # `webqa/viewports.py`, não aqui. Esta fixture segue casca fina.
+        contexto = browser.new_context(
+            **opcoes_de_contexto(viewport, engine=browser.browser_type.name, **base, **opcoes))
         contextos.append(contexto)
         return contexto.new_page()
 

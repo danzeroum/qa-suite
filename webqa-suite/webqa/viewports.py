@@ -126,26 +126,64 @@ def com_zoom(viewport: Viewport, percentual: int) -> Viewport:
     )
 
 
-def opcoes_de_contexto(viewport: Viewport | None = None, **extra) -> dict:
+# Engines que recusam `is_mobile`. Lista, e não um `if engine == "firefox"`
+# espalhado: quando o Firefox implementar (ou outra engine deixar de aceitar),
+# muda-se aqui e a decisão continua num lugar só.
+ENGINES_SEM_EMULACAO_MOVEL = ("firefox",)
+
+
+def sem_emulacao_movel(engine: str | None) -> bool:
+    """A engine recusa emulação móvel?"""
+    return (engine or "").strip().lower() in ENGINES_SEM_EMULACAO_MOVEL
+
+
+def nota_de_emulacao(engine: str | None, viewport: Viewport | None) -> str:
+    """A frase que acompanha o laudo quando a emulação foi omitida.
+
+    Existe porque a diferença precisa aparecer NO LAUDO, não só no código: um
+    resultado de "perfil móvel" que na verdade mediu largura sem emulação, e não
+    diz isso, mente por omissão sobre o que foi exercido.
+    """
+    if not (sem_emulacao_movel(engine) and viewport is not None and viewport.mobile):
+        return ""
+    return (f"Nota: em {engine} o perfil `{viewport.nome}` roda como LARGURA "
+            f"({viewport.largura}px) SEM emulação móvel — a engine recusa `is_mobile`. "
+            "Veredito de largura vale; comportamento de toque NÃO foi exercido.")
+
+
+def opcoes_de_contexto(viewport: Viewport | None = None, *, engine: str | None = None,
+                       **extra) -> dict:
     """Kwargs de `browser.new_context(...)` para um viewport, mais o que vier.
 
     Função PURA: nenhum navegador, nenhum I/O. É o que torna possível provar o
     isolamento sem subir Chromium — e o que mantém o `conftest.py` como casca
     fina sobre a biblioteca.
 
-    `is_mobile`/`has_touch` só entram quando são verdadeiros. Não é economia de
-    bytes: **o Firefox recusa `is_mobile`**, e mandá-lo sempre faria todo perfil
-    de desktop quebrar naquela engine por um campo que ele nem usa. O perfil
-    móvel EM Firefox segue sendo um problema em aberto — quem ligar a matriz
-    completa (OS-48) decide entre skip honesto e viewport sem emulação, e essa
-    decisão precisa ser tomada por escrito, não herdada daqui em silêncio.
+    `is_mobile`/`has_touch` só entram quando são verdadeiros, porque **o Firefox
+    recusa `is_mobile`** e mandá-lo sempre faria todo perfil de desktop quebrar
+    naquela engine por um campo que ele nem usa.
+
+    **A pendência da OS-41, decidida na OS-48 e escrita aqui.** O perfil móvel em
+    Firefox roda como LARGURA SEM EMULAÇÃO: `is_mobile` e `has_touch` são
+    omitidos, o contexto abre, e a nota de `nota_de_emulacao` acompanha o laudo.
+
+    A alternativa — pular o perfil móvel no Firefox — foi recusada com motivo:
+    ela apagaria da matriz de compatibilidade exatamente a combinação
+    "engine alternativa × tela estreita", que é onde a incompatibilidade de
+    layout mais aparece. Perder o veredito de largura em três dos cinco perfis
+    para não perder o de toque em nenhum é trocar o achado provável pelo raro.
+
+    O limite é real e por isso vai escrito no laudo: naquela engine o perfil
+    móvel mede largura, não toque. Check cujo veredito dependa da EMULAÇÃO — e
+    não da largura — deve pular pontualmente, com motivo; nenhum dos checks de
+    hoje é o caso, porque todos julgam por largura.
     """
     opcoes: dict = {}
     if viewport is not None:
         opcoes["viewport"] = {"width": viewport.largura, "height": viewport.altura}
-        if viewport.mobile:
+        if viewport.mobile and not sem_emulacao_movel(engine):
             opcoes["is_mobile"] = True
-        if viewport.toque:
+        if viewport.toque and not sem_emulacao_movel(engine):
             opcoes["has_touch"] = True
     opcoes.update(extra)
     return opcoes

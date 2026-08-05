@@ -61,3 +61,12 @@ thresholds:
   # outro check. Tentativas com comparador `>`: recuo exponencial e legitimo.
   gui_console_erros_pos_falha_max: 3
   gui_resil_tentativas_max: 5
+  # GUI-RESP-03/05 e GUI-COMPAT-01 (OS-48).
+  # Fracao da MENOR caixa: um botao pequeno coberto por um painel grande esta
+  # 100% inacessivel, e dividir pela area do painel diria "quase nada".
+  gui_sobreposicao_fracao: 0.30
+  gui_sobreposicao_max: 0
+  # Antialiasing, sub-pixel e metricas de fonte diferem por engine. Abaixo de 4px
+  # o desvio e da engine, nao do layout — e reprovar por isso enterraria o sinal
+  # verdadeiro numa lista de diferencas de 1px.
+  gui_compat_tolerancia_px: 4

@@ -74,11 +74,30 @@ resiliencia:
     - "unavailable"
     - "try again"
 
+# Marcos comparados entre engines (GUI-COMPAT-01, OS-48).
+#
+# Lista CURTA e declarada, e não "todo elemento": antialiasing de fonte,
+# arredondamento de sub-pixel e métricas de fonte diferem por engine, então
+# comparar tudo produziria dezenas de divergências de 1px que não são defeito —
+# e o sinal verdadeiro (o cabeçalho que só no WebKit cobre o conteúdo) morreria
+# no ruído. Quem conhece o alvo decide o que é estrutural nele.
+#
+# Marco ausente numa engine é achado à parte (`ausentes_de`), e o mais grave:
+# não produz desvio de pixel nenhum porque não há caixa para medir.
+compatibilidade:
+  marcos:
+    - "body"
+    - "h1"
+    - "main, #gui"
+    - "form"
+    - "nav, [role=navigation]"
+
 # Mapa critério WCAG -> teste. É o insumo do VPAT/ACR (docs/GUI.md §6) e existe
 # para que ninguém precise deduzir cobertura a partir de nome de arquivo.
 # Preenchido conforme cada check nasce; hoje declara a INTENÇÃO das OS-42/43/44.
 wcag:
   "1.4.3":  [GUI-CONTR-01]
+  "2.1.1":  [GUI-RESP-05]
   "1.4.4":  [GUI-TIPO-01]
   "1.4.10": [GUI-RESP-01]
   "2.3.3":  [GUI-MOV-01]

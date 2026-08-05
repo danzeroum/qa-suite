@@ -209,6 +209,100 @@ def perdidos_entre(normal: dict, ampliado: dict) -> Perdas:
     return Perdas(marcos=marcos, textos=textos)
 
 
+# ---------- Sobreposição entre interativos (GUI-RESP-03) ----------
+
+
+@dataclass(frozen=True)
+class Interativo:
+    """Um controle clicável e os ancestrais dele que TAMBÉM são controles.
+
+    Os ancestrais vêm por índice porque a exclusão que interessa é estrutural,
+    não geométrica: um `<a>` dentro de um `<nav>` clicável cobre 100% de si
+    mesmo dentro do pai, e chamar isso de sobreposição acusaria de defeito o
+    aninhamento normal de qualquer menu.
+    """
+
+    caixa: Caixa
+    ancestrais: frozenset[int] = frozenset()
+
+
+@dataclass(frozen=True)
+class Sobreposicao:
+    """Dois controles que dividem área — com a fração, que é o que decide."""
+
+    a: Caixa
+    b: Caixa
+    fracao: float
+
+    def __str__(self) -> str:
+        return (f"{self.a.seletor} × {self.b.seletor} — {self.fracao * 100:.0f}% "
+                f"da menor caixa ({self.a.largura:.0f}x{self.a.altura:.0f} e "
+                f"{self.b.largura:.0f}x{self.b.altura:.0f}px)")
+
+
+def area_de_intersecao(a: Caixa, b: Caixa) -> float:
+    """Área do retângulo comum. Zero quando só se encostam."""
+    largura = min(a.x + a.largura, b.x + b.largura) - max(a.x, b.x)
+    altura = min(a.y + a.altura, b.y + b.altura) - max(a.y, b.y)
+    return max(0.0, largura) * max(0.0, altura)
+
+
+def fracao_da_menor(a: Caixa, b: Caixa) -> float:
+    """Interseção como fração da MENOR das duas caixas.
+
+    Da menor, e não da soma nem da maior: um botão pequeno inteiramente coberto
+    por um painel grande está 100% inacessível, e dividir pela área do painel
+    daria uma fração minúscula — a métrica diria "quase nada" sobre um controle
+    que ninguém consegue tocar.
+    """
+    menor = min(a.largura * a.altura, b.largura * b.altura)
+    if menor <= 0:
+        return 0.0
+    return area_de_intersecao(a, b) / menor
+
+
+def sobreposicoes(interativos, *, limite: float) -> tuple[Sobreposicao, ...]:
+    """Pares que dividem mais que `limite` da menor caixa, do pior para o melhor.
+
+    O comparador é `>`, não `>=`: na fração exata do limite o par ainda está
+    dentro do que se admite. Mesma disciplina de borda do 25% da cobertura de
+    foco (OS-43) e dos 50ms do TBT (OS-46) — a borda é decisão, e decisão tem
+    teste.
+    """
+    itens = list(interativos)
+    achados = []
+    for i, um in enumerate(itens):
+        for j in range(i + 1, len(itens)):
+            outro = itens[j]
+            if j in um.ancestrais or i in outro.ancestrais:
+                continue
+            fracao = fracao_da_menor(um.caixa, outro.caixa)
+            if fracao > limite:
+                achados.append(Sobreposicao(um.caixa, outro.caixa, fracao))
+    return tuple(sorted(achados, key=lambda s: -s.fracao))
+
+
+def interativos_de(brutos) -> tuple[Interativo, ...]:
+    """Traduz o que `JS_INTERATIVOS` devolveu."""
+    return tuple(
+        Interativo(
+            caixa=Caixa(seletor=str(b.get("seletor") or "?"),
+                        x=float(b.get("x") or 0.0), y=float(b.get("y") or 0.0),
+                        largura=float(b.get("largura") or 0.0),
+                        altura=float(b.get("altura") or 0.0)),
+            ancestrais=frozenset(int(i) for i in (b.get("ancestrais") or ())),
+        )
+        for b in (brutos or ())
+    )
+
+
+def resumo_de_sobreposicoes(achados, teto: int = 10) -> str:
+    linhas = [f"  {s}" for s in list(achados)[:teto]]
+    if len(list(achados)) > teto:
+        linhas.append(f"  … e mais {len(list(achados)) - teto}")
+    return "\n".join(linhas)
+
+
 # ---------- Resumos para a mensagem do assert ----------
 
 
@@ -294,6 +388,38 @@ JS_ALVOS_DE_TOQUE = """
     const r = el.getBoundingClientRect();
     return {seletor: seletorDe(el), x: r.x, y: r.y, largura: r.width, altura: r.height,
             inline: dentroDeFrase(el), acao: acaoDe(el)};
+  });
+}
+"""
+
+# Interativos visíveis + a ancestralidade ENTRE eles (GUI-RESP-03).
+#
+# A ancestralidade vai por índice, calculada aqui e não no Python, porque só o
+# navegador tem a árvore: reconstruí-la a partir do seletor de texto seria
+# adivinhar. `contains` responde a pergunta exata — "este controle está DENTRO
+# daquele?" — e é o que exclui o link dentro do nav do veredito.
+JS_INTERATIVOS = """
+() => {
+""" + _SELETOR + """
+  const SEL = 'a[href], button, input:not([type=hidden]), select, textarea, ' +
+              '[role=button], [role=link], [tabindex]:not([tabindex="-1"])';
+  const visivel = (el) => {
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden' || el.closest('[aria-hidden=true]')) {
+      return false;
+    }
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const nos = [...document.querySelectorAll(SEL)].filter(visivel);
+  return nos.map((el, i) => {
+    const r = el.getBoundingClientRect();
+    const ancestrais = [];
+    nos.forEach((outro, j) => {
+      if (j !== i && outro.contains(el)) { ancestrais.push(j); }
+    });
+    return {seletor: seletorDe(el), x: r.x, y: r.y, largura: r.width, altura: r.height,
+            ancestrais: ancestrais};
   });
 }
 """
