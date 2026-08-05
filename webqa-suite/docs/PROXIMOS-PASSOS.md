@@ -4,10 +4,11 @@ Documento de passagem para quem assume o projeto. Não repete o que os outros
 docs já explicam: aponta para eles, diz **onde o trabalho parou** e registra as
 decisões que um leitor do código sozinho não teria como deduzir.
 
-Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
+Base deste documento: `1ecd9e6`, na branch `claude/webqa-gui-usability-tests-njfmhq`
+(pós docs da camada GUI).
 
-A verificação da própria suíte tem hoje **638 testes coletados**; num ambiente
-limpo o resultado é **635 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **965 testes coletados**; num ambiente
+limpo o resultado é **962 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
