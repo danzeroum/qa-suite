@@ -40,6 +40,10 @@ mascaras: []
 # Vocabulário do check de resiliência (GUI-RESIL-01, OS-47).
 resiliencia:
   # Termos que uma mensagem de erro voltada ao visitante nunca deve conter.
+  # A comparação é sem acento e sem caixa (webqa/degradacao.py), e roda só sobre
+  # TEXTO VISÍVEL — o mesmo termo em comentário, atributo ou <script> não conta.
+  # Sem esse recorte a lista reprovaria meia internet pelo fonte de uma
+  # biblioteca, e falso positivo é o defeito mais caro que uma bateria tem.
   termos_proibidos:
     - "Traceback"
     - "NullPointer"
@@ -47,6 +51,15 @@ resiliencia:
     - "500 Internal"
     - "SQLSTATE"
     - "Exception in"
+    # Os três abaixo entraram na OS-47 com caso real medido: são o que o
+    # navegador produz quando a resposta da API não é o que o código esperava, e
+    # o que uma página despeja na tela quando trata a falha com
+    # `catch(e => elemento.textContent = e)`. Medidos contra o alvo fabricado:
+    # "SyntaxError: Unexpected token '<'" sob 500 com corpo HTML e
+    # "SyntaxError: Unterminated string in JSON" sob resposta truncada.
+    - "SyntaxError"
+    - "TypeError"
+    - "Failed to fetch"
   # Sinal de que existe mensagem de erro reconhecível. É HEURÍSTICA e o check
   # a trata como tal: ausência vira alerta, nunca reprovação — vocabulário não
   # cobre alvo internacionalizado, e reprovar com heurística fraca custa a

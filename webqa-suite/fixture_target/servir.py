@@ -283,6 +283,7 @@ _CORPO_GUI = """
   <p><span class="gira" aria-hidden="true">*</span> processando</p>
   <p class="aviso-tema">Aviso que some no tema escuro.</p>
   <p id="pedidos">carregando pedidos...</p>
+  <p id="estoque">carregando estoque...</p>
   <div class="rolagem-longa"></div>
   <p><button>Finalizar</button></p>
 </section>
@@ -336,6 +337,19 @@ fetch("/gui/api/pedidos")
   .then(function (r) {{ return r.json(); }})
   .then(function (d) {{
     document.getElementById("pedidos").textContent = d.total + " pedidos";
+  }});
+// VIOLACAO (gui, GUI-RESIL-02): trata a falha e despeja a mensagem CRUA do erro
+// na tela. E o OUTRO lado do mesmo defeito do #pedidos: la a pagina nao avisa
+// nada, aqui ela avisa — e o aviso e para o programador, nao para quem esta
+// comprando (Nielsen H9). Consome o MESMO endpoint de proposito: dois widgets
+// lendo a mesma API e o caso comum, e mantem o inventario de endpoints em um so.
+fetch("/gui/api/pedidos")
+  .then(function (r) {{ return r.json(); }})
+  .then(function (d) {{
+    document.getElementById("estoque").textContent = d.itens.length + " em estoque";
+  }})
+  .catch(function (e) {{
+    document.getElementById("estoque").textContent = "Erro: " + e;
   }});
 </script>
 </body></html>
