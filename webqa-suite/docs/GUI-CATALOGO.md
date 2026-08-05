@@ -123,9 +123,21 @@ não entrou.
 | ID | Cenário | Nível | Métrica | Ferramenta | Sev | Freq |
 |---|---|---|---|---|---|---|
 | GUI-PERF-01 | INP aproximado, TBT e long tasks | S | `gui_inp_ms`, `gui_tbt_ms`, `gui_long_tasks_n` | `PerformanceObserver('longtask','event')` — chromium; skip instruído nas demais | C | PR |
-| GUI-PERF-02 | CWV sob rede 3G e CPU 4× mais lenta, com **orçamento próprio** | S | LCP/FCP/TBT sob restrição | CDP `Network.emulateNetworkConditions`, `Emulation.setCPUThrottlingRate` | A | N |
-| GUI-PERF-03 | Jank de rolagem | S | % de quadros acima de 32 ms | amostragem por `requestAnimationFrame` | M | N |
-| GUI-PERF-04 | Crescimento de heap em navegação repetida | E | % de crescimento após 5 idas e voltas | CDP `Performance.getMetrics` | M | RC |
+| GUI-PERF-02 | Pintura sob rede 3G, com **orçamento próprio** | S | `gui_fcp_ms_rede_lenta`, `gui_lcp_ms_rede_lenta` | CDP `Network.emulateNetworkConditions` (chromium; skip nomeado nas demais) | A | PR |
+| GUI-PERF-03 | Bloqueio sob CPU 4× mais lenta, com **orçamento próprio** | S | `gui_tbt_ms_cpu_lento` | CDP `Emulation.setCPUThrottlingRate` | A | PR |
+| GUI-PERF-04 | Jank de rolagem | S | % de quadros acima de 32 ms | amostragem por `requestAnimationFrame` | M | N |
+| GUI-PERF-05 | Crescimento de heap em navegação repetida | E | % de crescimento após 5 idas e voltas | CDP `Performance.getMetrics` | M | RC |
+
+> **Renumeração declarada (OS-50).** O que era um item só — "CWV sob rede 3G **e**
+> CPU 4× mais lenta" — virou **dois**, porque a implementação mostrou que são dois
+> vereditos com correções diferentes: bytes bloqueantes se resolvem dividindo a
+> folha, e trabalho síncrono se resolve fatiando o script. Um `failed` que
+> misturasse os dois não diria por onde começar. Em consequência, jank de rolagem
+> foi de `-03` para `-04` e heap de `-04` para `-05`. A renumeração foi conferida
+> antes: nenhum dos dois está implementado e **nenhum documento, código ou laudo
+> os referencia** — o custo é estas duas linhas. O projeto já colidiu numeração
+> duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`), e é por isso que a conferência veio
+> antes da edição, e não depois.
 
 ### 1.10 `GUI-RESIL` — resiliência da interface
 
@@ -199,7 +211,7 @@ chaves planas (`webqa/config.py:32-33`). Toda medida por `metricas.registrar`,
 que descarta `None` — ausência não é zero. Nenhum teste parametrizado: a iteração
 acontece **dentro do corpo**, um nodeid por check (`GUI.md §2.3b`). Fixture nova
 `contexto_gui(**opcoes)`, que abre `browser.new_context(...)` próprio e fecha no
-`finally`, no molde de `network_log` (`conftest.py:207`) — **nenhum destes toca
+`finally`, no molde de `network_log` (`conftest.py:338-349`) — **nenhum destes toca
 `browser_page`**. Cada check ganha unidade em `tests/` sobre dado fabricado e
 contraparte que reprova de propósito em `fixture_target/paginas_gui/`.
 
@@ -927,3 +939,35 @@ funções, e é bom que sejam, porque cada filtro fica testável isoladamente co
 vetor conhecido. E o gate de complexidade vale em `webqa/`, que é onde o módulo
 mora — escondê‑lo no check para escapar dele seria contornar a guarda, não
 cumpri‑la.
+
+### 4.2 Bloqueio por relógio × por trabalho — o alvo precisa poder reagir
+
+Descoberto medindo, na OS‑50, e vale para qualquer alvo que alguém queira
+exercitar com throttling de CPU.
+
+O bloqueio plantado na home do alvo fabricado é `while (Date.now() < fim)`: um
+laço com prazo de **relógio**. Emular CPU quatro vezes mais lenta reduz
+instruções por segundo — não o relógio. O laço sai no mesmo instante, a tarefa
+dura os mesmos 110 ms, e a degradação **não tem efeito nenhum**. Medido: TBT de
+**363 ms sob CPU ×4 contra 357 ms sem throttle**, 2% de diferença.
+
+O perigo não é o número errado, é o número *plausível*: um check de CPU lenta
+apontado para essa página relata "a degradação não mudou nada" e está certo pelo
+motivo errado — ele mediu um alvo que **não pode reagir ao que ele emula**. Quem
+lê conclui que o alvo é robusto.
+
+> **Consequência para toda OS que emular CPU:** a violação de referência precisa
+> ser **computacional** — trabalho de quantidade fixa, cujo tempo escala com a
+> velocidade da máquina. `/gui/pesado` faz isso, e o resultado é a propriedade
+> que torna a família interessante: **invisível sem throttle (TBT 0, nenhuma
+> tarefa longa) e severa sob ×4 (TBT ~1300 ms em dez tarefas longas)**. É a
+> classe de defeito que passa em toda medição de laboratório e falha na mão de
+> quem usa — a razão de a família existir.
+
+O dimensionamento é apertado dos dois lados e a janela é estreita por aritmética:
+com fator fixo em 4, o bloco precisa ficar **abaixo** de 50 ms sem throttle e bem
+**acima** de 50 ms com ele, o que o confina a 21–50 ms na máquina de referência.
+O grau de liberdade que sobra é a **contagem** de blocos, não o tamanho de cada
+um. Máquina muito mais rápida encolhe o bloco e pode apagar o sinal — limite
+conhecido, e o motivo de o veredito duro desta família só existir sob
+`WEBQA_ORIGEM=vps`, onde a máquina é uma só e conhecida.

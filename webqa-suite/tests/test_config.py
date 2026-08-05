@@ -27,7 +27,7 @@ def test_todo_orcamento_de_gui_e_lido_por_algum_check():
     alguém o ajusta esperando mudar um veredito, e nada acontece. O defeito não
     tem sintoma — a régua parece configurável e não é.
 
-    A dimensão `gui` chegou a onze orçamentos em sete OSs, e o risco cresce com a
+    A dimensão `gui` chegou a vinte orçamentos em nove OSs, e o risco cresce com a
     contagem. A varredura é textual de propósito: importar os checks aqui exigiria
     Playwright, e a pergunta ("alguém lê esta chave?") não precisa de navegador.
     """
