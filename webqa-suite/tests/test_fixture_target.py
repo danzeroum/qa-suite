@@ -216,7 +216,10 @@ def test_iscas_ficam_fora_da_identidade(monkeypatch):
     ("min-width: 900px", "GUI-RESP-01 (reflow a 320px, WCAG 1.4.10)"),
     ("height: 24px; overflow: hidden", "GUI-TIPO-01 (zoom 200%, WCAG 1.4.4)"),
     (".sem-foco:focus { outline: none", "GUI-FOCO-01 (foco visível, WCAG 2.4.7)"),
-    ('tabindex="2">Comprar', "GUI-FOCO-02 (ordem de tabulação, WCAG 2.4.3)"),
+    ('tabindex="4">Comprar', "GUI-FOCO-02 (ordem de tabulação, WCAG 2.4.3)"),
+    # Quatro botões em ordem reversa geram TRÊS inversões: o limiar do check é
+    # folgado (2) de propósito, e um par só passaria sem exercer nada.
+    ('tabindex="1">Voltar', "GUI-FOCO-02 (o limiar folgado precisa ser ultrapassado)"),
     ("position: fixed", "GUI-FOCO-03 (foco obscurecido, WCAG 2.4.11)"),
     ("width: 16px; height: 16px", "GUI-ALVO-01 (alvo de toque, WCAG 2.5.8)"),
     # Dois alvos colados, e não um: um alvo pequeno SOZINHO é conforme pela
@@ -327,6 +330,9 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
         "checks/gui/test_alvos.py::test_area_minima_de_toque",
         "checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px",
         "checks/gui/test_reflow.py::test_zoom_200_nao_perde_conteudo",
+        "checks/gui/test_foco.py::test_indicador_de_foco_visivel",
+        "checks/gui/test_foco.py::test_ordem_de_tabulacao_segue_a_ordem_visual",
+        "checks/gui/test_foco.py::test_foco_nao_obscurecido",
     }
     declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
     assert declarados == esperados

@@ -3,6 +3,9 @@
   "escopo": "pytest -m \"lgpd or seguranca or gui\"",
   "devem_falhar": [
     "checks/gui/test_alvos.py::test_area_minima_de_toque",
+    "checks/gui/test_foco.py::test_foco_nao_obscurecido",
+    "checks/gui/test_foco.py::test_indicador_de_foco_visivel",
+    "checks/gui/test_foco.py::test_ordem_de_tabulacao_segue_a_ordem_visual",
     "checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px",
     "checks/gui/test_reflow.py::test_zoom_200_nao_perde_conteudo",
     "checks/lgpd/test_consentimento.py::test_sem_cookies_nao_essenciais_pre_aceite",

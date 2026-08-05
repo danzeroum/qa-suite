@@ -254,10 +254,16 @@ _ESTILO_GUI = """
 }
 """
 
-# VIOLACAO (gui, GUI-FOCO-02): na tela, "Comprar" vem antes de "Cancelar"; os
-# tabindex invertem a ordem de tabulacao (WCAG 2.4.3). O par usa tabindex
-# positivo de proposito — e o jeito de descolar ordem visual de ordem de foco
-# sem depender de CSS de layout.
+# VIOLACAO (gui, GUI-FOCO-02): na tela a ordem e Comprar, Cancelar, Salvar,
+# Voltar; os tabindex a invertem por completo (WCAG 2.4.3). tabindex positivo de
+# proposito — e o jeito de descolar ordem visual de ordem de foco sem depender de
+# CSS de layout.
+#
+# Sao QUATRO botoes, e nao dois, porque o limiar do check e folgado (2) na Fase 1:
+# a inversao e medida por geometria, e a geometria nao conhece a intencao do
+# layout, entao grade densa produz salto legitimo. Um par invertido gera UMA
+# inversao e passaria no limiar — o alvo fabricado precisa ultrapassa-lo para
+# exercer o check de verdade. Quatro em ordem reversa geram tres.
 _CORPO_GUI = """
 <section id="gui">
   <h2>Area de compra</h2>
@@ -267,8 +273,10 @@ _CORPO_GUI = """
   linha e cortada pelo overflow hidden e deixa de estar disponivel.</p>
   <p><button class="sem-foco">Buscar</button></p>
   <p>
-    <button tabindex="2">Comprar</button>
-    <button tabindex="1">Cancelar</button>
+    <button tabindex="4">Comprar</button>
+    <button tabindex="3">Cancelar</button>
+    <button tabindex="2">Salvar</button>
+    <button tabindex="1">Voltar</button>
   </p>
   <p><a class="alvo-pequeno" href="/gui/estados" aria-label="Galeria de estados"></a><a
      class="alvo-pequeno" href="/gui/estados#armadilha" aria-label="Armadilha de foco"></a></p>
