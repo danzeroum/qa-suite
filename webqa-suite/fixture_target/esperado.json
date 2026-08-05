@@ -1,7 +1,10 @@
 {
-  "descricao": "Contrato do alvo fixture: FAILs que as dimensões lgpd e seguranca DEVEM produzir contra fixture_target/servir.py. Conferido por tests/test_alvo_fixture.py — nem a mais (regressão que reprova alvo conforme) nem a menos (check que parou de detectar).",
-  "escopo": "pytest -m \"lgpd or seguranca\"",
+  "descricao": "Contrato do alvo fixture: FAILs que as dimensões lgpd, seguranca e gui DEVEM produzir contra fixture_target/servir.py. Conferido por tests/test_alvo_fixture.py — nem a mais (regressão que reprova alvo conforme) nem a menos (check que parou de detectar).",
+  "escopo": "pytest -m \"lgpd or seguranca or gui\"",
   "devem_falhar": [
+    "checks/gui/test_alvos.py::test_area_minima_de_toque",
+    "checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px",
+    "checks/gui/test_reflow.py::test_zoom_200_nao_perde_conteudo",
     "checks/lgpd/test_consentimento.py::test_sem_cookies_nao_essenciais_pre_aceite",
     "checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento",
     "checks/lgpd/test_pii_transito.py::test_forms_pii_post_https",

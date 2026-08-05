@@ -233,10 +233,15 @@ _ESTILO_GUI = """
    que a viewport, focar o ultimo botao rola o MINIMO necessario, o que o
    deixa rente ao rodape, exatamente sob a barra. */
 .rolagem-longa { height: 1200px; }
-/* VIOLACAO (gui, GUI-ALVO-01): 16x16 px, abaixo dos 24 exigidos, sem
-   espacamento nem equivalente maior que sirva de excecao (WCAG 2.5.8). */
+/* VIOLACAO (gui, GUI-ALVO-01): 16x16 px, abaixo dos 24 exigidos (WCAG 2.5.8).
+   Sao DOIS, colados: um alvo pequeno SOZINHO e conforme pela excecao de
+   espacamento da propria norma — um circulo de 24px centrado nele nao
+   encostaria em ninguem. Com o vizinho a 2px, os circulos se cruzam e a
+   excecao cai. Foi o check que mostrou isso: a primeira versao do fixture
+   declarava violacao onde a norma perdoa. */
 .alvo-pequeno { display: inline-block; width: 16px; height: 16px;
                 background: #567; }
+.alvo-pequeno + .alvo-pequeno { margin-left: 2px; }
 /* VIOLACAO (gui, GUI-MOV-01): animacao infinita e NENHUMA media query de
    prefers-reduced-motion que a suprima (WCAG 2.3.3). */
 @keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -257,13 +262,16 @@ _CORPO_GUI = """
 <section id="gui">
   <h2>Area de compra</h2>
   <p class="faixa-larga">Faixa de largura fixa que nao reflui.</p>
-  <p class="altura-travada">Texto que some quando o usuario amplia a fonte.</p>
+  <p class="altura-travada">Este paragrafo cabe em uma linha na largura cheia e
+  passa a ocupar duas quando o usuario amplia a fonte, momento em que a segunda
+  linha e cortada pelo overflow hidden e deixa de estar disponivel.</p>
   <p><button class="sem-foco">Buscar</button></p>
   <p>
     <button tabindex="2">Comprar</button>
     <button tabindex="1">Cancelar</button>
   </p>
-  <p><a class="alvo-pequeno" href="/gui/estados" aria-label="Galeria de estados"></a></p>
+  <p><a class="alvo-pequeno" href="/gui/estados" aria-label="Galeria de estados"></a><a
+     class="alvo-pequeno" href="/gui/estados#armadilha" aria-label="Armadilha de foco"></a></p>
   <p><span class="gira" aria-hidden="true">*</span> processando</p>
   <p class="aviso-tema">Aviso que some no tema escuro.</p>
   <p id="pedidos">carregando pedidos...</p>

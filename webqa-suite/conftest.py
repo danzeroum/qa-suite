@@ -26,7 +26,7 @@ from webqa.http_utils import Timing, make_client, timed_get
 from webqa.navegacao import percorrer
 from webqa.navegador import engines_configurados
 from webqa.trackers import LoggedRequest, NetworkLog
-from webqa.viewports import opcoes_de_contexto
+from webqa.viewports import carregar_perfis, opcoes_de_contexto
 
 
 @pytest.fixture(scope="session")
@@ -154,6 +154,17 @@ def browser_page(browser, credenciais_navegador, alvo_alcancavel):
     page = browser.new_page(**credenciais_navegador)
     yield page
     page.close()
+
+
+@pytest.fixture(scope="session")
+def perfis_gui():
+    """Perfis de viewport de `data/gui-perfis.yaml`.
+
+    Fixture, e não import no check: o alvo do check é o que MEDIR, não de
+    onde a configuração vem. Sessão porque o YAML não muda no meio da
+    execução — reler por teste seria I/O sem pergunta correspondente.
+    """
+    return carregar_perfis()
 
 
 @pytest.fixture()

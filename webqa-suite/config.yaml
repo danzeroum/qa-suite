@@ -37,3 +37,9 @@ thresholds:
   max_console_errors: 0
   a11y_critical_max: 0
   a11y_serious_max: 0
+  # Dimensao gui (OS-42). So NUMERO cabe aqui: load_settings faz float() em
+  # toda chave. Viewport, mascara e politica vao para data/gui-perfis.yaml.
+  gui_overflow_x_px: 0        # WCAG 1.4.10 — rolagem horizontal a 320 CSS px
+  gui_zoom_perdidos_max: 0    # WCAG 1.4.4 — conteudo que some a 200%
+  gui_alvo_toque_px: 24       # WCAG 2.5.8 AA
+  gui_alvo_toque_meta_px: 44  # meta de plataforma: abaixo disso e ALERTA, nao achado

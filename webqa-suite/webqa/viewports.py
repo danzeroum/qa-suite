@@ -103,6 +103,29 @@ def viewports_configurados(env: Mapping[str, str] | None = None,
     return tuple(disponiveis[nome] for nome in escolhidos)
 
 
+def com_zoom(viewport: Viewport, percentual: int) -> Viewport:
+    """O mesmo perfil sob N% de ampliação, emulada por viewport lógico menor.
+
+    200% de zoom é, para efeito de layout, uma viewport com metade da largura e
+    da altura: o conteúdo ocupa o dobro do espaço relativo. É a forma de emular
+    ampliação que funciona igual nas três engines — o Playwright não expõe o
+    atalho de zoom do navegador de maneira estável entre elas.
+
+    O nome carrega o percentual (`desktop@200%`) porque ele aparece na mensagem
+    do assert, e "desktop" duas vezes com números diferentes confunde quem lê.
+    """
+    if percentual <= 0:
+        raise ValueError(f"percentual de zoom precisa ser positivo: {percentual!r}")
+    fator = 100 / percentual
+    return Viewport(
+        nome=f"{viewport.nome}@{percentual}%",
+        largura=max(1, round(viewport.largura * fator)),
+        altura=max(1, round(viewport.altura * fator)),
+        mobile=viewport.mobile,
+        toque=viewport.toque,
+    )
+
+
 def opcoes_de_contexto(viewport: Viewport | None = None, **extra) -> dict:
     """Kwargs de `browser.new_context(...)` para um viewport, mais o que vier.
 
