@@ -4,8 +4,7 @@ Documento de passagem para quem assume o projeto. Não repete o que os outros
 docs já explicam: aponta para eles, diz **onde o trabalho parou** e registra as
 decisões que um leitor do código sozinho não teria como deduzir.
 
-Base deste documento: `1ecd9e6`, na branch `claude/webqa-gui-usability-tests-njfmhq`
-(pós docs da camada GUI).
+Base deste documento: `main` em `55ad6b6` (pós docs da camada GUI).
 
 A verificação da própria suíte tem hoje **965 testes coletados**; num ambiente
 limpo o resultado é **962 passed / 3 skipped**. Os 3 skips são de
