@@ -238,16 +238,47 @@ def test_home_serve_a_violacao_de_gui(home, marcador, check):
     assert marcador in corpo, f"violação ausente da home — {check} não teria o que detectar"
 
 
-def test_home_consome_a_api_sem_tratar_falha(home):
-    """GUI-RESIL-01: o fetch não tem `.catch` nem checa `r.ok`.
+def _consumidores_da_api(corpo: str) -> list[str]:
+    """As cadeias `fetch("/gui/api/pedidos")…;` da home, uma por consumidor.
 
-    É a violação inteira. O alvo responde 200; quem força o erro é o check, no
-    cliente (`page.route`) — e aí o parágrafo fica preso em "carregando".
+    Recortar por `</script>` juntava os dois num trecho só — e foi o que este
+    par de testes pegou quando o segundo consumidor nasceu (OS-47): a guarda do
+    primeiro passou a ler o `.catch` do segundo e acusou tratamento onde não há.
+    """
+    partes = corpo.split('fetch("/gui/api/pedidos")')[1:]
+    return [parte.split("});", 1)[0] for parte in partes]
+
+
+def test_home_consome_a_api_sem_tratar_falha(home):
+    """GUI-RESIL-02: o primeiro fetch não tem `.catch` nem checa `r.ok`.
+
+    É metade da violação. O alvo responde 200; quem força o erro é o check, no
+    cliente (`page.route`) — e aí o parágrafo fica preso em "carregando", que é
+    o SILÊNCIO: a página não avisa nada, e o desfecho é `xfail`.
     """
     corpo, _ = home
-    trecho = corpo.split('fetch("/gui/api/pedidos")', 1)[1].split("</script>", 1)[0]
+    trecho = _consumidores_da_api(corpo)[0]
     assert ".catch" not in trecho, "o fetch trata a falha — não há violação a detectar"
     assert "r.ok" not in trecho, "o fetch checa o status — não há violação a detectar"
+
+
+def test_home_tambem_despeja_o_erro_cru_na_tela(home):
+    """GUI-RESIL-01/03: a outra metade, e a que produz `failed` determinístico.
+
+    Sem ela o fixture só exerceria o silêncio, e os quatro checks terminariam em
+    `xfail` — nenhum entraria no contrato, e a classe "termo técnico vazado", que
+    é a mais grave das três, nunca seria exercida contra alvo de verdade.
+
+    O anti-padrão é literal e comum: `catch(e => elemento.textContent = e)`.
+    Medido no navegador: sob 500 com corpo HTML a tela mostra
+    `SyntaxError: Unexpected token '<'`.
+    """
+    corpo, _ = home
+    consumidores = _consumidores_da_api(corpo)
+    assert len(consumidores) == 2, "a home tem dois consumidores da mesma API"
+    assert '.catch' in consumidores[1], "o segundo consumidor trata a falha…"
+    assert 'textContent = "Erro: " + e' in consumidores[1], "…e despeja o erro cru"
+    assert 'id="estoque"' in corpo, "o elemento que recebe o erro precisa existir"
 
 
 def test_app_js_bloqueia_a_thread_principal():
@@ -272,6 +303,44 @@ def test_pagina_de_gui_responde_com_a_violacao(caminho, marcador):
         status, corpo, _ = _get(alvo.url + caminho)
     assert status == 200
     assert marcador in corpo
+
+
+@pytest.mark.parametrize("marcador", [
+    "AbortController",            # pedido que não responde vira falha tratada
+    "if (!r.ok)",                 # 500 com corpo válido não é sucesso
+    "Tente novamente",            # a mensagem é para gente, e usa o vocabulário
+    "addEventListener('offline'", # o navegador avisa; esta página escuta
+    "<main>",                     # há conteúdo principal: não é tela branca
+])
+def test_pagina_resiliente_e_o_lado_CONFORME_do_contrato(marcador):
+    """Os quatro checks de resiliência precisam ser vistos PASSANDO em algum lugar.
+
+    Contra `/privacidade` eles pulam (aquela página não faz chamada nenhuma), e
+    check que nunca foi visto passando é check de que ninguém sabe se reprova por
+    regressão ou por natureza. Mesma razão de `test_transparencia_passa_no_fixture`
+    existir: o contrato precisa provar os dois lados, senão um check que reprova
+    tudo passaria por "funcionando".
+
+    Vive em `paginas_gui/`, logo FORA de `identidade()` — o lado conforme não
+    custa reinício de sequência no ledger.
+    """
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + "/gui/resiliente")
+    assert status == 200
+    assert marcador in corpo
+
+
+def test_pagina_resiliente_nao_e_linkada_na_home():
+    """Omissão deliberada, e o teste existe para que ninguém a "conserte".
+
+    Um `<a>` a mais na home mudaria a contagem de alvos de toque e a caminhada de
+    foco — que são exatamente o que três checks do contrato medem. Esta página é
+    endereçada direto, como alvo (`WEBQA_TARGET_URL`), no papel que
+    `/privacidade` já cumpre no smoke.
+    """
+    with AlvoFixture() as alvo:
+        _, corpo, _ = _get(alvo.url)
+    assert 'href="/gui/resiliente"' not in corpo
 
 
 def test_galeria_de_gui_e_alcancavel_por_link(home):
@@ -334,9 +403,41 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
         "checks/gui/test_foco.py::test_ordem_de_tabulacao_segue_a_ordem_visual",
         "checks/gui/test_foco.py::test_foco_nao_obscurecido",
         "checks/gui/test_preferencias.py::test_reduced_motion_respeitado",
+        "checks/gui/test_resiliencia.py::test_erro_500_na_api_nao_vaza_detalhe_tecnico",
+        "checks/gui/test_resiliencia.py::test_json_truncado_nao_vaza_detalhe_tecnico",
     }
     declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
     assert declarados == esperados
+
+
+def test_particao_dos_checks_de_resiliencia_segue_o_desfecho_e_nao_o_arquivo():
+    """Os quatro modos de falha moram no mesmo arquivo e caem em lados OPOSTOS.
+
+    É o teste que impede a simplificação errada — "são todos de resiliência,
+    ponham os quatro no contrato". A partição não é por assunto, é por desfecho:
+
+    * **500** e **JSON truncado** terminam em `failed` determinístico contra o
+      fixture, porque a home despeja o objeto de erro cru na tela. Entram;
+    * **não responde** e **offline** terminam em `xfail`, porque a home fica em
+      silêncio — e silêncio é ausência de mensagem, que a spec classificou como
+      sinal e não prova. Ficam fora, com motivo.
+
+    Pôr um xfail em `devem_falhar` faria o contrato cobrá-lo como "a menos" em
+    toda execução, reprovando por classificação e não por regressão.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    prefixo = "checks/gui/test_resiliencia.py::"
+    dentro = {i for i in contrato["devem_falhar"] if i.startswith(prefixo)}
+    fora = {i for i in contrato["fora_do_contrato"] if i.startswith(prefixo)}
+
+    assert dentro == {prefixo + "test_erro_500_na_api_nao_vaza_detalhe_tecnico",
+                      prefixo + "test_json_truncado_nao_vaza_detalhe_tecnico"}
+    assert fora == {prefixo + "test_api_que_nao_responde_avisa_o_visitante",
+                    prefixo + "test_perda_de_conexao_e_comunicada"}
+    for excluido in fora:
+        assert "xfail" in contrato["fora_do_contrato"][excluido], (
+            "a exclusão precisa nomear o desfecho que a motivou, senão vira "
+            "'não sei classificar' com aparência de decisão")
 
 
 def test_check_de_gui_que_depende_de_CDN_fica_fora_do_contrato():

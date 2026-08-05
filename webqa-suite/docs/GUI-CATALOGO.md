@@ -791,6 +791,42 @@ def test_falha_de_api_produz_erro_acionavel(contexto_gui, settings, endpoints_xh
     assert laudo.erros_console <= settings.threshold("gui_console_erros_pos_falha_max")
 ```
 
+**11. Como ficou (OS‑47) — quatro checks, e a partição do contrato.**
+
+Um check por modo de falha, **nunca parametrizado**: o contrato é por nodeid
+exato, e `::test_x[500]` não sobrevive a alguém reordenar a lista. A partição foi
+escrita antes de codar e confirmada na validação — ela segue o DESFECHO, não o
+assunto, e é por isso que quatro checks do mesmo arquivo caem em lados opostos:
+
+| Check | Modo | Contra o fixture | Contrato |
+|---|---|---|---|
+| `test_erro_500_na_api_nao_vaza_detalhe_tecnico` | 500 com corpo HTML | **failed** — `SyntaxError: Unexpected token '<'` na tela | `devem_falhar` |
+| `test_json_truncado_nao_vaza_detalhe_tecnico` | 200 cortado no meio | **failed** — `SyntaxError: Unterminated string in JSON` | `devem_falhar` |
+| `test_api_que_nao_responde_avisa_o_visitante` | pedido pendente na janela | **xfail** — silêncio | `fora_do_contrato` |
+| `test_perda_de_conexao_e_comunicada` | `set_offline` após a carga | **xfail** — silêncio | `fora_do_contrato` |
+
+Três desvios do esboço acima, todos vindos da execução:
+
+* **a origem, e não a `target_url`.** Comparar o endpoint com a URL inteira do
+  alvo descartava a própria API como "terceiro" quando o alvo é uma página
+  interna (`/gui/resiliente` × `/gui/api/pedidos`), e os três checks pulavam
+  dizendo que não havia o que interceptar. A comparação é com `origem_de(...)`.
+* **offline só depois da carga ASSENTADA.** Cortar a rede no instante do `load`
+  invertia o resultado: o evento disparava, a página conforme mostrava o aviso, e
+  o `fetch` que ainda estava no ar resolvia com sucesso e SOBRESCREVIA o aviso. O
+  check acusava de silêncio uma página que tinha avisado. "A conexão caiu com a
+  página aberta" e "caiu no meio da carga" são cenários diferentes.
+* **erros de console contados contra a carga saudável.** O alvo fabricado produz
+  três numa carga limpa (tracker sem DNS, `.js` servido como HTML). Cobrá‑los
+  aqui seria cobrar deste check o defeito de outro.
+
+E duas adições ao alvo fabricado, feitas de uma vez só com o custo conferido
+(sequência do ledger em 0/10, logo reinício de graça): um segundo consumidor da
+mesma API com `catch(e => elemento.textContent = e)` — o anti‑padrão que produz a
+classe `failed`, sem o qual os quatro checks terminariam em `xfail` e nenhum
+entraria no contrato — e a página CONFORME `/gui/resiliente`, em `paginas_gui/`
+(fora de `identidade()`, custo zero), que é onde os quatro são vistos **passando**.
+
 ---
 
 ## 4. O que ficou fora, e por quê

@@ -87,10 +87,64 @@ código-fonte desta página.</p>
 # de tratamento fique visível.
 API_PEDIDOS = '{"total": 3, "itens": ["a", "b", "c"]}\n'
 
+# Página CONFORME que consome a MESMA API — o outro lado do contrato do GUI-RESIL.
+#
+# Sem ela, os quatro checks de resiliência só teriam a direção "reprova": contra
+# `/privacidade` eles PULAM, porque aquela página não faz chamada nenhuma, e um
+# check que nunca foi visto passando é um check que ninguém sabe se reprova por
+# regressão ou por natureza. É a mesma razão de `test_transparencia_passa_no_fixture`
+# existir no contrato: provar os dois lados, senão um check que reprova tudo
+# passaria por "funcionando".
+#
+# NÃO é linkada pela home, e a omissão é deliberada: um `<a>` a mais lá dentro
+# mudaria a contagem de alvos de toque e a caminhada de foco, que são justamente
+# o que três checks do contrato medem. Esta página é endereçada direto, como
+# alvo (`WEBQA_TARGET_URL`), no mesmo papel que `/privacidade` cumpre no smoke.
+#
+# O que ela faz de certo, e que o `#estoque` da home faz de errado:
+#   * `AbortController` com prazo — pedido que não responde vira falha tratada,
+#     em vez de "carregando..." para sempre;
+#   * `r.ok` conferido — 500 com corpo válido não é sucesso;
+#   * o `catch` mostra mensagem PARA GENTE, e nunca o objeto de erro;
+#   * escuta o evento `offline`, que é o navegador avisando a página de que a
+#     conexão caiu — quem não escuta não tem como contar a ninguém.
+_RESILIENTE_JS = """
+function mostrar(texto) { document.getElementById('pedidos').textContent = texto; }
+var controlador = new AbortController();
+var prazo = setTimeout(function () { controlador.abort(); }, 2000);
+fetch('/gui/api/pedidos', {signal: controlador.signal})
+  .then(function (r) {
+    if (!r.ok) { throw new Error('resposta ' + r.status); }
+    return r.json();
+  })
+  .then(function (d) { clearTimeout(prazo); mostrar(d.total + ' pedidos'); })
+  .catch(function () {
+    clearTimeout(prazo);
+    mostrar('Nao foi possivel carregar seus pedidos agora. Tente novamente em instantes.');
+  });
+window.addEventListener('offline', function () {
+  mostrar('Voce esta sem conexao com a internet. Tente novamente quando ela voltar.');
+});
+"""
+
+RESILIENTE_HTML = f"""<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meus pedidos — Loja Fixture</title>
+</head><body>
+<main>
+  <h1>Meus pedidos</h1>
+  <p id="pedidos">carregando pedidos...</p>
+</main>
+<script>{_RESILIENTE_JS}</script>
+</body></html>
+"""
+
 # Caminhos servidos por `servir.py`. Mapa, e não uma cadeia de `elif`, porque o
 # teste que prova a ausência destas páginas no hash itera sobre ele — a lista
 # de páginas e a lista conferida são a mesma coisa, e não podem divergir.
 PAGINAS_GUI: dict[str, tuple[bytes, str]] = {
     "/gui/estados": (ESTADOS_HTML.encode("utf-8"), "text/html; charset=utf-8"),
+    "/gui/resiliente": (RESILIENTE_HTML.encode("utf-8"), "text/html; charset=utf-8"),
     "/gui/api/pedidos": (API_PEDIDOS.encode("utf-8"), "application/json"),
 }

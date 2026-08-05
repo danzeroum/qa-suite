@@ -56,3 +56,8 @@ thresholds:
   gui_tbt_ms: 200             # Total Blocking Time — faixa "bom" do Lighthouse
   gui_inp_ms: 200             # INP aproximado; "bom" do Core Web Vitals
   gui_long_tasks_max: 5       # tarefas acima de 50ms; TBT e contagem NAO se reduzem
+  # GUI-RESIL (OS-47). Erros de console contados em relacao a carga SAUDAVEL: o
+  # alvo que ja erra antes da falha nao pode ser cobrado aqui pelo defeito de
+  # outro check. Tentativas com comparador `>`: recuo exponencial e legitimo.
+  gui_console_erros_pos_falha_max: 3
+  gui_resil_tentativas_max: 5
