@@ -1,0 +1,356 @@
+# Cobertura DECLARADA das âncoras `arquivo:linha` da documentação.
+#
+# Conferido por `scripts/afere_ancoras.py` e por `tests/test_ancoras.py`. Leia o
+# módulo para o PORQUÊ; aqui fica só o mapa.
+#
+# Três estados, e todo documento precisa de um:
+#
+#   auditado  — as âncoras foram LIDAS uma a uma e cada uma tem fragmento
+#               distintivo abaixo. A guarda é bidirecional: âncora fora do mapa
+#               reprova, entrada órfã também.
+#   pendente  — ainda não auditado, COM MOTIVO e com a tranche em que entra. É
+#               contado e impresso em toda execução: cobertura parcial silenciosa
+#               induz mais confiança do que cobertura nenhuma.
+#   congelado — fotografia de um estado passado, COM MOTIVO. Atualizar as âncoras
+#               falsificaria o que o documento existe para registrar.
+#
+# O fragmento é CURTO e distintivo (nome de função, chave, trecho de comentário
+# que só existe ali) — nunca a linha inteira. Linha inteira transforma qualquer
+# ajuste de redação em vermelho, e guarda que grita por qualquer coisa é
+# desligada.
+#
+# Tranche 1 (OS-57): GUI.md, GUI-CATALOGO.md, OS-gui-fila.md, PROXIMOS-PASSOS.md.
+# Dez âncoras mentiam e foram corrigidas no mesmo PR.
+
+documentos:
+  webqa-suite/docs/ARQUITETURA.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 2 — contratos vivos e muito CITADOS por outros documentos. São a prioridade
+      seguinte justamente porque a tranche 1 já mostrou que apontar para eles envelhece
+      mal: três das dez mentiras corrigidas na OS-57 eram âncoras PARA ARQUITETURA.md e
+      ESCOPO-EAP.md, escritas de fora.
+  webqa-suite/docs/CAMPANHA.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 3 — documentos operacionais e de planejamento. Citam menos código e são
+      menos citados; o custo de uma âncora velha aqui é menor, e por isso vêm depois.
+      Ordem por risco, não por conveniência.
+  webqa-suite/docs/ESCOPO-EAP.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 2 — contratos vivos e muito CITADOS por outros documentos. São a prioridade
+      seguinte justamente porque a tranche 1 já mostrou que apontar para eles envelhece
+      mal: três das dez mentiras corrigidas na OS-57 eram âncoras PARA ARQUITETURA.md e
+      ESCOPO-EAP.md, escritas de fora.
+  webqa-suite/docs/GUI-CATALOGO.md:
+    estado: auditado
+    ancoras:
+      "PROXIMOS-PASSOS.md:585": "stdlib primeiro"
+      "frontend/test_html_quality.py:45": "def test_meta_viewport_responsivo"
+      "webqa/navegador.py:24": "def engines_configurados"
+      "backend/test_security_headers.py:33": "def test_content_security_policy_existe"
+      "tests/test_convencoes.py:209-224": "def test_modulo_de_sondagem_nao_importa_llm"
+      "webqa/config.py:32-33": "def threshold"
+      "conftest.py:338-349": "def network_log"
+      "webqa/axe.py:27": "def baixar_axe_verificado"
+      "checks/frontend/test_rendering.py:26-46": "VITALS_JS"
+      "webqa/sanitize.py:29-34": "Nada aqui casa por ENTROPIA"
+      "ARQUITETURA.md:12-13": "caixa-preta"
+      "ESCOPO-EAP.md:34": "Storybook"
+      "ESCOPO-EAP.md:28": "Pentest ofensivo"
+      "webqa/gates.py:121-131": "def require_active_probes"
+      "tests/test_fase_c_travada.py:314-326": "def test_nenhum_check_consome_o_gate_ativo_hoje"
+      "ESCOPO-EAP.md:19-24": "anti-scope-creep"
+      "pyproject.toml:46-51": "max-complexity = 8"
+  webqa-suite/docs/GUI.md:
+    estado: auditado
+    ancoras:
+      "checks/frontend/test_rendering.py:30-35": "largest-contentful-paint"
+      "checks/frontend/test_rendering.py:37-43": "first-contentful-paint"
+      "webqa/axe.py:21-24": "AXE_SHA384"
+      "webqa/navegador.py:24": "def engines_configurados"
+      "checks/seguranca/test_headers_e_conteudo.py:5-11": "por asset, não pelo HTML principal"
+      "checks/frontend/test_html_quality.py:45": "def test_meta_viewport_responsivo"
+      "checks/ux/test_acessibilidade.py:55,63": "def test_imagens_com_alt"
+      "lgpd/test_terceiros.py:78": "def test_sri_scripts_externos"
+      "seguranca/test_arquivos_e_metadados.py:191": "def test_assets_de_terceiro_declaram_sri"
+      "checks/backend/test_security_headers.py:25,39": "def test_protecao_contra_clickjacking"
+      "webqa/gates.py:12": "WEBQA_ACTIVE_PROBES_AUTHORIZED=1"
+      "webqa/gates.py:12,121-131": "def require_active_probes"
+      "ESCOPO-EAP.md:28": "Pentest ofensivo"
+      "pytest.ini:4": "--strict-markers"
+      "pytest.ini:5-15": "markers ="
+      "tests/test_fase_c_travada.py:42-44,146-160": "CAMINHOS_DE_SONDAGEM"
+      "tests/test_fase_c_travada.py:47-49,194-198": "SIMBOLOS_DA_FASE_C"
+      "tests/test_convencoes.py:30-41,50-75": "PREFIXO_DE_COLETA"
+      "tests/test_fase_c_travada.py:314-326": "def test_nenhum_check_consome_o_gate_ativo_hoje"
+      "webqa/sanitize.py:156": "def sanitize_text"
+      "webqa/report.py:236-238": "sobre a string SERIALIZADA"
+      "conftest.py:200-205": "def browser_page"
+      "ARQUITETURA.md:55": "Fixture única da home"
+      "conftest.py:338-349": "def network_log"
+      "webqa/metricas.py:26-45": "def registrar"
+      "webqa/report.py:157-162": "é a terceira distinção"
+      "report_html.py:380-383": "O estilo é inline"
+      "tests/test_report_html.py:257-259": "congelada byte a byte"
+      "tests/test_estabilidade_html.py:181-187": "def test_painel_nao_inventa_classe_fora_da_folha"
+      "webqa/report.py:222-232": "iteração de DESIGN"
+      "tests/test_derivadores_ligados.py:31-35": "DERIVADORES_SUMMARY"
+      "webqa/dominio.py:76-79": "severidade inválida"
+      "pyproject.toml:41-51": "max-complexity = 8"
+      "pyproject.toml:56": "\"checks/**\""
+      "checks/ux/test_acessibilidade.py:24": "pytestmark"
+      "docker/entrypoint.sh:93": "pytest -m lgpd"
+      "conftest.py:107-115": "preservando o contrato 1:1"
+      "ARQUITETURA.md:44": "checks só dependem de fixtures"
+      "conftest.py:3-5": "Arquitetura em camadas"
+      "pyproject.toml:46-51": "max-complexity = 8"
+      "webqa/config.py:18-33": "def threshold"
+      "webqa/config.py:36-38,45-47": "def _env_override"
+      "webqa/config.py:45-47": "float(_env_override"
+      "webqa/navegador.py:9-12": "matriz completa no noturno"
+      "webqa/baseline.py:1-18": "Ciclo de vida do achado da Fase C"
+      "PROXIMOS-PASSOS.md:585": "stdlib primeiro"
+      "webqa/report.py:27-30": "DIMENSIONS = ("
+      "webqa/report.py:34-41": "DIMENSION_NOTES = {"
+      "webqa/report_html.py:90-96": "OBSERVACOES = {"
+      "ARQUITETURA.md:59": "em contexto virgem por módulo"
+      "checks/functional/test_links.py:9-16": "transformaria diagnóstico em rajada"
+      "conftest.py:180-182": "engine ausente/sem binário"
+      "RECOMENDACOES.md:16-19": "automatizamos os proxies objetivos"
+      "tests/test_convencoes.py:209-224": "def test_modulo_de_sondagem_nao_importa_llm"
+  webqa-suite/docs/LGPD.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 2 — contratos vivos e muito CITADOS por outros documentos. São a prioridade
+      seguinte justamente porque a tranche 1 já mostrou que apontar para eles envelhece
+      mal: três das dez mentiras corrigidas na OS-57 eram âncoras PARA ARQUITETURA.md e
+      ESCOPO-EAP.md, escritas de fora.
+  webqa-suite/docs/LLM.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 3 — documentos operacionais e de planejamento. Citam menos código e são
+      menos citados; o custo de uma âncora velha aqui é menor, e por isso vêm depois.
+      Ordem por risco, não por conveniência.
+  webqa-suite/docs/PLANO-TESTE-alvo-autenticado.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 3 — documentos operacionais e de planejamento. Citam menos código e são
+      menos citados; o custo de uma âncora velha aqui é menor, e por isso vêm depois.
+      Ordem por risco, não por conveniência.
+  webqa-suite/docs/PROXIMOS-PASSOS.md:
+    estado: auditado
+    # Zero âncoras `arquivo:linha` — e a ausência é achado, não lacuna:
+    # este é o documento MAIS citado do repositório e ele próprio cita por
+    # `§seção`, nunca por linha. Quem o cita de fora é que precisa da guarda.
+    ancoras: {}
+  webqa-suite/docs/RECOMENDACOES.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 2 — contratos vivos e muito CITADOS por outros documentos. São a prioridade
+      seguinte justamente porque a tranche 1 já mostrou que apontar para eles envelhece
+      mal: três das dez mentiras corrigidas na OS-57 eram âncoras PARA ARQUITETURA.md e
+      ESCOPO-EAP.md, escritas de fora.
+  webqa-suite/docs/RISCOS.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 2 — contratos vivos e muito CITADOS por outros documentos. São a prioridade
+      seguinte justamente porque a tranche 1 já mostrou que apontar para eles envelhece
+      mal: três das dez mentiras corrigidas na OS-57 eram âncoras PARA ARQUITETURA.md e
+      ESCOPO-EAP.md, escritas de fora.
+  webqa-suite/docs/SEGURANCA.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 2 — contratos vivos e muito CITADOS por outros documentos. São a prioridade
+      seguinte justamente porque a tranche 1 já mostrou que apontar para eles envelhece
+      mal: três das dez mentiras corrigidas na OS-57 eram âncoras PARA ARQUITETURA.md e
+      ESCOPO-EAP.md, escritas de fora.
+  webqa-suite/docs/TELEMETRIA.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 3 — documentos operacionais e de planejamento. Citam menos código e são
+      menos citados; o custo de uma âncora velha aqui é menor, e por isso vêm depois.
+      Ordem por risco, não por conveniência.
+  webqa-suite/docs/VPS.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 3 — documentos operacionais e de planejamento. Citam menos código e são
+      menos citados; o custo de uma âncora velha aqui é menor, e por isso vêm depois.
+      Ordem por risco, não por conveniência.
+  webqa-suite/docs/design-audit.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 3 — documentos operacionais e de planejamento. Citam menos código e são
+      menos citados; o custo de uma âncora velha aqui é menor, e por isso vêm depois.
+      Ordem por risco, não por conveniência.
+  webqa-suite/docs/dimensao-seguranca-consolidado.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 3 — documentos operacionais e de planejamento. Citam menos código e são
+      menos citados; o custo de uma âncora velha aqui é menor, e por isso vêm depois.
+      Ordem por risco, não por conveniência.
+  webqa-suite/docs/handoff-cockpit-dev/LEIA-PRIMEIRO.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — cópia vendorizada do handoff de outra trilha (cockpit). Auditá-la
+      exigiria decidir antes se ela deve seguir a árvore de origem ou esta; decisão de
+      dono, não de OS de guarda.
+  webqa-suite/docs/handoff-cockpit-dev/OS-27-cockpit-html.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — cópia vendorizada do handoff de outra trilha (cockpit). Auditá-la
+      exigiria decidir antes se ela deve seguir a árvore de origem ou esta; decisão de
+      dono, não de OS de guarda.
+  webqa-suite/docs/handoff-cockpit-dev/docs/ARQUITETURA-suite-como-padrao-em-harness.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — cópia vendorizada do handoff de outra trilha (cockpit). Auditá-la
+      exigiria decidir antes se ela deve seguir a árvore de origem ou esta; decisão de
+      dono, não de OS de guarda.
+  webqa-suite/docs/handoff-cockpit-dev/docs/HANDOFF-Q1-instrumentacao.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — cópia vendorizada do handoff de outra trilha (cockpit). Auditá-la
+      exigiria decidir antes se ela deve seguir a árvore de origem ou esta; decisão de
+      dono, não de OS de guarda.
+  webqa-suite/docs/handoff-cockpit-dev/docs/PLANO-DESENVOLVIMENTO-consolidado.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — cópia vendorizada do handoff de outra trilha (cockpit). Auditá-la
+      exigiria decidir antes se ela deve seguir a árvore de origem ou esta; decisão de
+      dono, não de OS de guarda.
+  webqa-suite/docs/handoff/FASE-C-HANDOFF.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/FASE-C-metricas-e-cobertura.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/FASE-C-revisao-1.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/FASE-C-revisao-2.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/FASE-C-revisao-3.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/FASE-C.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/HANDOFF-Q1-instrumentacao.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/LEIA-PRIMEIRO.md:
+    estado: congelado
+    motivo: >-
+      registro congelado do handoff original: descreve o estado do repositório num commit
+      específico e vale como fotografia daquele momento. Atualizar as âncoras o faria
+      descrever um repositório que não é o que ele documenta.
+  webqa-suite/docs/handoff/PR-C0d-REVISAO.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/PROMPT-INICIAL.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/docs/BRIEF-DESIGN.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/docs/SEGURANCA.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/ordens-de-servico/OS-C1c-dns-rebind.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/ordens-de-servico/OS-abertas.md:
+    estado: congelado
+    motivo: >-
+      mesmo motivo, e explícito no próprio documento: a linha 3 fixa o estado em
+      `b22af7d`. É fotografia, não contrato vivo.
+  webqa-suite/docs/handoff/ordens-de-servico/OS-fase-c-fila.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/ordens-de-servico/OS-gui-fila.md:
+    estado: auditado
+    ancoras:
+      "tests/test_fase_c_travada.py:42-44": "CAMINHOS_DE_SONDAGEM"
+      "ARQUITETURA.md:44": "checks só dependem de fixtures"
+      "pytest.ini:4": "--strict-markers"
+      "conftest.py:200-205": "def browser_page"
+      "conftest.py:338-349": "def network_log"
+      "webqa/navegador.py:24-48": "def engines_configurados"
+      "config.py:45-47": "float(_env_override"
+      "tests/test_convencoes.py:50-75": "def test_biblioteca_nao_tem_funcao_com_prefixo_de_coleta"
+      "pyproject.toml:46-56": "\"checks/**\""
+      "conftest.py:105-113": "preservando o contrato 1:1"
+      "dominio.py:76-79": "severidade inválida"
+      "tests/test_convencoes.py:209-224": "def test_modulo_de_sondagem_nao_importa_llm"
+      "checks/ux/test_acessibilidade.py:24": "pytestmark"
+      "docker/entrypoint.sh:93": "pytest -m lgpd"
+      "tests/test_fase_c_travada.py:314-326": "def test_nenhum_check_consome_o_gate_ativo_hoje"
+  webqa-suite/docs/handoff/ordens-de-servico/plano-c1d-c1f-validado.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.
+  webqa-suite/docs/handoff/ordens-de-servico/triagem-sugestoes-fase-c.md:
+    estado: pendente
+    motivo: >-
+      TRANCHE 4 — material histórico do handoff da Fase C. Não é congelado (não declara
+      estado fixo em commit), mas descreve trabalho concluído: âncora velha aqui confunde
+      menos do que num contrato em uso. Vem por último, e vir por último está escrito para
+      que ninguém leia o verde da guarda como 'a documentação inteira está conferida'.

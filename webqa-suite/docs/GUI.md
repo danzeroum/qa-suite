@@ -58,7 +58,7 @@ abaixo foi conferido.
 |---|---|---|---|---|
 | `frontend` (render) | `checks/frontend/test_rendering.py` | FCP, LCP, CLS, DCL, peso transferido, console limpo — uma página, um viewport (o default do Playwright), rede e CPU sem restrição. Precisão importa aqui: os **únicos `PerformanceObserver`** são `largest-contentful-paint` e `layout-shift` (`:30-35`); FCP e DCL vêm de `getEntriesByType` lido **depois** da janela, dentro da callback (`:37-43`) | sistema | INP, TBT, TTI, long tasks, FPS, memória; qualquer viewport que não o default |
 | `frontend` (estático) | `test_html_quality.py`, `test_assets.py` | doctype, `lang`, charset, `<title>`, `meta viewport`, peso do HTML, contagem de CSS/JS, scripts bloqueantes, `img` com dimensões | integração | tudo que só existe depois do CSS aplicado |
-| `ux` (a11y) | `checks/ux/test_acessibilidade.py` | axe‑core 4.9.1 (SHA‑384 verificado, `:20-24`) na **home**, contagem por impacto; `img[alt]` e rótulo de input por sopa | sistema | teclado, reflow, zoom, movimento, alvo de toque, tema escuro, páginas internas |
+| `ux` (a11y) | `checks/ux/test_acessibilidade.py` | axe‑core 4.9.1 (SHA‑384 verificado em `webqa/axe.py:21-24`) na **home**, contagem por impacto; `img[alt]` e rótulo de input por sopa | sistema | teclado, reflow, zoom, movimento, alvo de toque, tema escuro, páginas internas |
 | `ux` (heurísticas) | `test_heuristicas_nielsen.py` | `<title>`, favicon, 404 com link de saída, input tipado, link descritivo, botão de envio | integração | tudo que é comportamento (feedback, recuperação, estado) |
 | `ux` (AI) | `test_arquitetura_informacao.py` | h1 único, saltos de heading, `<nav>` rotulado, sitemap/robots, `<main>` | integração | jornada: caminho esperado × real, becos sem saída |
 | `functional` | `test_links.py`, `test_forms.py` + `webqa/navegacao.py` | crawler educado, formulários (método, HTTPS, autocomplete) | sistema | estados de formulário (erro, carregando, vazio) |
@@ -91,7 +91,7 @@ existe infla a contagem sem informação nova, que é exatamente o argumento com
 - **Meta viewport** — já em `checks/frontend/test_html_quality.py:45`. A lacuna
   real é diferente: aquele check faz `grep` por `width=device-width` e **não**
   acusa `user-scalable=no` nem `maximum-scale=1`, que é o que bloqueia zoom.
-- **`alt` de imagem e rótulo de input** — já em `checks/ux/test_acessibilidade.py:72,80`.
+- **`alt` de imagem e rótulo de input** — já em `checks/ux/test_acessibilidade.py:55,63`.
 - **Contraste** — o axe **já** o avalia, mas de forma **opaca**: a suíte só conta
   violações por impacto, nunca nomeia a regra, nunca fixa razão e nunca roda num
   segundo tema. A lacuna é a nomeação e a variação, não a checagem.
@@ -145,7 +145,7 @@ nomeia literalmente "submeter formulário, clicar em banner"):
 - exercer direito de titular pela interface;
 - qualquer clique que **navegue** ou **envie**.
 
-**Fora do escopo, com ou sem gate** (`ESCOPO-EAP.md:25`): injetar payload de XSS,
+**Fora do escopo, com ou sem gate** (`ESCOPO-EAP.md:28`): injetar payload de XSS,
 fuzzing de campo, qualquer coisa ofensiva. O que a camada faz em segurança de
 interface é **passivo por parsing** — ler a diretiva da CSP que já veio no
 cabeçalho, não testá‑la com carga.
@@ -168,21 +168,21 @@ Cada uma é imposta por um teste, não por combinação. A coluna da direita é 
 | 9 | Ausência nunca vira zero | `PROXIMOS-PASSOS.md §2.1`; `webqa/metricas.py:26-45` recusa `None` | tratar elemento não renderizado como `0 px`, ou linha de base ausente como aprovação |
 | 10 | `error` ≠ `failed` | `PROXIMOS-PASSOS.md §2.2`; `webqa/report.py:157-162` | contar contexto que não abriu como achado. É o teste **não tendo acontecido** |
 | 11 | Cor nunca é o único portador de significado | `PROXIMOS-PASSOS.md §2.5`; `report_html.py:380-383` (severidade é **inline e tipográfica**, porque a folha não tem classe para ela) | inventar semáforo para diff visual. E note a simetria: isto é, ao mesmo tempo, **critério que a camada testa no alvo** (WCAG 1.4.1) |
-| 12 | Folha de estilo congelada byte a byte | `PROXIMOS-PASSOS.md §2.4`; `tests/test_report_html.py:225`; `tests/test_estabilidade_html.py:181-187` reprova classe sem regra na folha | criar classe CSS. Compor com as existentes (`.fora-escopo`, `.chip-neutro`, `.chip-dim`) ou usar estilo inline, como a severidade faz |
-| 13 | Métrica nova vai ao JSON; seção nova no HTML é design | `webqa/report.py:222-226` — "acrescentar seção ali é iteração de DESIGN, não de instrumentação" | renderizar tríptico de diff no `summary.html` sem OS de design, `make audita-design` e entrada em `tests/test_derivadores_ligados.py:31-35` |
+| 12 | Folha de estilo congelada byte a byte | `PROXIMOS-PASSOS.md §2.4`; `tests/test_report_html.py:257-259`; `tests/test_estabilidade_html.py:181-187` reprova classe sem regra na folha | criar classe CSS. Compor com as existentes (`.fora-escopo`, `.chip-neutro`, `.chip-dim`) ou usar estilo inline, como a severidade faz |
+| 13 | Métrica nova vai ao JSON; seção nova no HTML é design | `webqa/report.py:222-232` — "acrescentar seção ali é iteração de DESIGN, não de instrumentação" | renderizar tríptico de diff no `summary.html` sem OS de design, `make audita-design` e entrada em `tests/test_derivadores_ligados.py:31-35` |
 | 14 | `Finding` só aceita severidade `alta/media/baixa` e fase `A/B/C` | `webqa/dominio.py:76-79` | construir `Finding` na dimensão `gui`. Os checks daqui seguem o padrão de `ux`/`frontend`: assert simples + `metricas.registrar` |
 | 15 | Verificação **e** validação no mesmo PR | `PROXIMOS-PASSOS.md §5.2` | entregar check sem unidade em `tests/` sobre dado fabricado |
 | 16 | "A garantia existe, a ligação não" | `PROXIMOS-PASSOS.md §2.10`; `tests/test_derivadores_ligados.py` | propor chave de configuração sem teste que prove que **algum check a lê**. Threshold que ninguém lê é exatamente essa classe de defeito |
 | 17 | Loopback prova a lógica, nunca a fronteira | `PROXIMOS-PASSOS.md §2.11` | dar por provado, contra o alvo fixture (`127.0.0.1`, isento de etiqueta), qualquer comportamento que dependa de rede pública |
 | 18 | C901 máx. 8 e linha 110 na biblioteca | `pyproject.toml:41-51`; `checks/**` tem isenção em `:56` | esconder o algoritmo de geometria dentro do check para escapar do gate. Ele vive em `webqa/`, decomposto — que é também onde ele fica testável sem navegador |
-| 19 | axe‑core está pinado com hash | `checks/ux/test_acessibilidade.py:20-24` | subir a versão do axe dentro de uma OS desta camada. O SHA‑384 é controle de segurança, não número de versão. Mapear critério→regra só depois de confirmar que a regra existe na 4.9.1 |
+| 19 | axe‑core está pinado com hash | `webqa/axe.py:21-24` (movido para lá na OS‑45; era privado no check) | subir a versão do axe dentro de uma OS desta camada. O SHA‑384 é controle de segurança, não número de versão. Mapear critério→regra só depois de confirmar que a regra existe na 4.9.1 |
 | 20 | `mutacao.yml` exige ambiente sem gate | `.github/workflows/mutacao.yml` | depender de variável de gate ligada para o teste passar |
 
 ### 2.3 Consequências operacionais — três que custam caro
 
 **a) A dupla dimensão `lgpd` tem preço, e o preço é a sequência do ledger.**
 
-`checks/ux/test_acessibilidade.py:17` declara `[ux, lgpd, browser]` porque no
+`checks/ux/test_acessibilidade.py:24` declara `[ux, lgpd, browser]` porque no
 Brasil acessibilidade em sítio é obrigação legal (LBI, Lei 13.146/2015, Art. 63).
 O argumento vale igual para os checks de foco, reflow e contraste desta camada.
 
@@ -440,7 +440,7 @@ não‑entrelaçado; `zlib.decompress` + `struct` (stdlib) dão os bytes. A mét
 primária **não** é pixel a pixel: é a **fração de blocos 16×16** cujo erro médio
 por canal ultrapassa um delta. Isso mata o falso positivo de antialiasing e de
 sub‑pixel rendering sem SSIM nem LPIPS — que exigiriam `numpy`/`Pillow`, já
-rejeitadas com fundamento registrado (`PROXIMOS-PASSOS.md:547`).
+rejeitadas com fundamento registrado (`PROXIMOS-PASSOS.md:585`).
 
 O decoder é **fail‑closed**: PNG entrelaçado, paletizado ou com profundidade
 diferente de 8 bits levanta erro nomeando o motivo, e o check vira `error` — nunca
@@ -498,7 +498,7 @@ supor o contrário é o R19. Por isso a hierarquia da casa ("não coletar > masc
 > fabricado chega ao disco.
 
 **O que NÃO entra agora:** renderizar as evidências no `summary.html`. Isso é
-iteração de **design**, não de instrumentação (`webqa/report.py:222-226`), e
+iteração de **design**, não de instrumentação (`webqa/report.py:222-232`), e
 exigiria OS própria, `make audita-design` verde e entrada em
 `tests/test_derivadores_ligados.py::DERIVADORES_SUMMARY:31-35`. O JSON é livre;
 o HTML tem contrato.

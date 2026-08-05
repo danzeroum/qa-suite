@@ -27,6 +27,7 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 | OS‑56 | #92 | `15d67ce` | `webqa/foco.py`: fim de ordem ≠ armadilha — o falso positivo de foco no Firefox |
 | OS‑49 | #93 | `cd16e9f` | `webqa/imagem.py` + `evidencias.py` + `referencia_visual.py`: contrato visual |
 | OS‑50 | — | — | `webqa/rede_simulada.py`: pintura sob 3G e bloqueio sob CPU ×4, por CDP |
+| OS‑57 | — | — | `scripts/afere_ancoras.py`: guarda bidirecional das âncoras `arquivo:linha`, com cobertura declarada |
 
 **Por que a OS‑56 aparece aqui e não na fila abaixo.** Ela não foi planejada: nasceu
 do run real da matriz da OS‑48, que acusou três `error` do Firefox em `test_foco.py`.
@@ -64,6 +65,15 @@ Fase 3 — maturidade
 ```
 
 ---
+
+> **Âncoras dentro de ordens já emitidas.** Os blocos `xml` abaixo são o registro
+> do que foi **pedido**, e o texto do pedido não se reescreve. As âncoras
+> `arquivo:linha` dentro deles são exceção declarada: elas são ponteiro de
+> navegação, não afirmação sobre o passado, e um ponteiro quebrado não ajuda
+> ninguém. Quando o alvo se desloca, o número é atualizado e a frase fica
+> intacta; quando o alvo **deixa de existir**, o número é removido e a menção
+> vira "(à época, linha N)" — inventar um número novo para algo que sumiu seria
+> a mentira que `scripts/afere_ancoras.py` existe para impedir.
 
 ## Fila (ordem de execução)
 
@@ -112,7 +122,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 ```xml
 <lang>Python 3.11 + pytest + Playwright 1.56.0 — pytest.ini, webqa/report.py, webqa/report_html.py, webqa/viewports.py, conftest.py, data/gui-perfis.yaml</lang>
 <task>Criar a dimensão `gui` de ponta a ponta — marcador, laudo, nota epistêmica — mais a fixture de contexto isolado e a matriz de viewports. Nenhum check ainda.</task>
-<context>Dimensão só aparece no laudo se estiver em report.py::DIMENSIONS (27-30); fora dela agrupa como `other`. --strict-markers (pytest.ini:4) transforma marcador não registrado em erro de coleta, e as descrições ali são ASCII sem acento. browser_page é de sessão e compartilhada com checks/frontend/test_rendering.py (conftest.py:150-156): mexer em viewport ou tema nela contamina as Web Vitals das outras dimensões (R20). O molde de contexto virgem é o network_log (conftest.py:207). A doutrina de matriz por env, fail-closed, é webqa/navegador.py:24-48. load_settings faz float() em TODA chave de thresholds (config.py:45-47), então booleano não cabe lá.</context>
+<context>Dimensão só aparece no laudo se estiver em report.py::DIMENSIONS (27-30); fora dela agrupa como `other`. --strict-markers (pytest.ini:4) transforma marcador não registrado em erro de coleta, e as descrições ali são ASCII sem acento. browser_page é de sessão e compartilhada com checks/frontend/test_rendering.py (conftest.py:200-205): mexer em viewport ou tema nela contamina as Web Vitals das outras dimensões (R20). O molde de contexto virgem é o network_log (conftest.py:338-349). A doutrina de matriz por env, fail-closed, é webqa/navegador.py:24-48. load_settings faz float() em TODA chave de thresholds (config.py:45-47), então booleano não cabe lá.</context>
 <rules>
 - Pense passo a passo antes de responder.
 - Quatro pontos de integração no MESMO PR: pytest.ini (markers), report.py::DIMENSIONS, report.py::DIMENSION_NOTES, report_html.py::OBSERVACOES. Faltando um, a dimensão existe no pytest e não no laudo.
@@ -245,7 +255,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 
 | OS | Entrega | Aceite resumido | Est. | Depende de |
 |---|---|---|---|---|
-| **OS‑45** | GUI‑CONTR‑01: contraste em tema escuro. Move `_fetch_axe_verified` de `checks/ux/test_acessibilidade.py:26` para `webqa/`, importado pelos dois lugares | versão pinada e SHA‑384 preservados; alvo sem tema escuro **pula com motivo** (a pré‑checagem compara o fundo computado claro × escuro — sem ela o axe mediria o tema claro de novo e o teste passaria fingindo cobertura) | 5 | OS‑41 |
+| **OS‑45** | GUI‑CONTR‑01: contraste em tema escuro. Move `_fetch_axe_verified` do check de acessibilidade (à época, linha 26) para `webqa/`, importado pelos dois lugares | versão pinada e SHA‑384 preservados; alvo sem tema escuro **pula com motivo** (a pré‑checagem compara o fundo computado claro × escuro — sem ela o axe mediria o tema claro de novo e o teste passaria fingindo cobertura) | 5 | OS‑41 |
 | ~~**OS‑46**~~ | ~~GUI‑PERF‑01: INP, TBT, long tasks (`webqa/vitals_interacao.py`)~~ | **entregue.** Duas correções ao aceite escrito, achadas na execução: (a) o nodeid ficou em `fora_do_contrato`, não em `devem_falhar` — veredito condicionado a `WEBQA_ORIGEM` é ambiente, e o contrato 1:1 só aceita desfecho que dependa do que o fixture serve; (b) o suporte a `longtask` é detectado **em runtime** (`supportedEntryTypes`), não pelo nome da engine — a lista de engines envelhece e mente | 5 | OS‑41 |
 | ~~**OS‑47**~~ | ~~GUI‑RESIL‑01/02/03: 500, timeout, JSON truncado, offline~~ | **entregue**, com a partição do contrato declarada ANTES de codar e confirmada na validação: 500 e JSON truncado → `failed` (a home despeja o objeto de erro cru na tela) e entram em `devem_falhar`; sem resposta e offline → `xfail` (silêncio) e ficam fora, com motivo. Duas correções vindas da execução: a origem é `origem_de(target_url)`, não a URL inteira (alvo em página interna descartava a própria API como "terceiro"), e o offline só depois da carga ASSENTADA — cortar a rede no instante do `load` deixava o `fetch` no ar sobrescrever o aviso que a página já tinha mostrado | 5 | OS‑40, OS‑41 |
 | ~~**OS‑48**~~ | ~~GUI‑RESP‑03/04/05, GUI‑COMPAT‑01/02: matriz viewport × engine no noturno~~ | **entregue.** Slot estendido (dois passos novos no mesmo job), nenhum cron criado. Partição: RESP‑03 e RESP‑05 em `devem_falhar` (chromium puro, o fixture os exerce); COMPAT‑01/02 fora, porque o desfecho depende de QUAIS engines estão instaladas. Resolve a pendência da OS‑41: perfil móvel em Firefox roda como largura sem emulação, com a nota no laudo. Uma descoberta cara: sem `meta viewport` no alvo, a emulação móvel dá a ele o viewport de fallback de 980px e NENHUMA media query abaixo disso vale — a família por viewport inteira mediria desktop achando que mediu celular | 5 | OS‑41 |
@@ -260,6 +270,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 | **OS‑52** | GUI‑TIPO‑02/03, GUI‑RESP i18n/RTL, GUI‑CONTR‑03 (`forced-colors`) | página RTL fabricada reprova quando o layout quebra; zoom 400 % sob demanda | 5 | OS‑48 |
 | **OS‑53** | Evidência de conformidade: exportador SARIF de GUI, PDF executivo, VPAT parcial | exportador é função **pura** lendo `summary.json` (a dimensão `gui` não constrói `Finding` — `dominio.py:76-79`); PDF por `page.pdf()` do Chromium, zero dep; mapa critério→teste vem de `data/gui-perfis.yaml`, nunca digitado no template | 5 | OS‑45..49 |
 | **OS‑54** | Protocolo humano — rodada piloto | roteiro, consentimento com prazo de retenção declarado e expurgo executado, SUS/SEQ, e a ponte achado→backlog com severidade Nielsen | 5 | OS‑51 |
+| ~~**OS‑57**~~ | ~~`scripts/afere_ancoras.py` + `data/ancoras.yaml`: mecanizar a conferência das âncoras `arquivo:linha`~~ | **entregue.** Guarda bidirecional sobre documentos AUDITADOS, cobertura declarada por documento (`auditado`/`pendente`/`congelado`, todos com motivo) e placar de pendentes impresso em toda execução. Tranche 1 (GUI.md, GUI‑CATALOGO.md, OS‑gui‑fila.md, PROXIMOS‑PASSOS.md): **85 âncoras conferidas, 10 mentiam** e foram corrigidas no mesmo PR. Duas descobertas do desenho: 21 das 91 âncoras eram citadas a partir de raízes implícitas (`ARQUITETURA.md:44` de `docs/`) e teriam sido ignoradas como "inexistentes", deixando um buraco de 23% com a guarda parecendo completa; e o `PROXIMOS-PASSOS.md` não tem âncora `arquivo:linha` NENHUMA — cita por `§seção`, então o risco dele é ser citado, não citar | 5 | — |
 | **OS‑55** | GUI‑EXPL‑01: LLM local sobre a jornada **já coletada** | gate `WEBQA_LLM_ENABLED`; a LLM **não** clica (`tests/test_convencoes.py:209-224`); saída nunca vira veredito; detector de omissão sobre o texto, como `scripts/sumario.py` já faz | 8 | OS‑51 |
 
 ---
@@ -267,7 +278,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 ## Pendências do dono (não‑código)
 
 - **Decidir sobre a dimensão dupla `gui + lgpd`.** Acessibilidade é obrigação
-  legal (LBI Art. 63) e `checks/ux/test_acessibilidade.py:17` já reivindica as
+  legal (LBI Art. 63) e `checks/ux/test_acessibilidade.py:24` já reivindica as
   duas dimensões. Estender isso aos checks de GUI os coloca no noturno
   (`docker/entrypoint.sh:93` roda `pytest -m lgpd`) e sujeita a sequência de dez
   noites à oscilação deles. A recomendação registrada em `GUI.md §2.3a` é **não**
