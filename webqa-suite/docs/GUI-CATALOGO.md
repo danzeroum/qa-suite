@@ -911,6 +911,15 @@ e o diff visual emite veredito sobre uma imagem que não existe.
 > Há caso de teste com PNG entrelaçado fabricado — um detector que nunca detectou
 > nada não está provado.
 
+> **Cumprido na OS‑49, com uma hipótese CORRIGIDA.** O aceite acima previa que
+> o Playwright emite RGBA; medido, o Chromium 1.56 emite **`color_type=2` (RGB,
+> três canais)** — e em **vários chunks IDAT**, o que derrubaria um decoder que
+> lesse só o primeiro. As duas viraram teste com navegador
+> (`tests/test_imagem.py::test_png_real_do_playwright_e_RGB_de_8_bits_nao_entrelacado`),
+> que é o que transforma a hipótese em contrato: um upgrade que mude o formato
+> reprova ali, com o motivo à mão, em vez de virar um diff visual inexplicável.
+> As quatro recusas têm caso próprio, incluindo o PNG entrelaçado fabricado.
+
 Duas consequências para a estimativa da OS: o *unfiltering* do PNG tem cinco
 tipos por linha (None, Sub, Up, Average, Paeth) e não cabe numa função sob
 `C901 max-complexity = 8` (`pyproject.toml:46-51`) — são umas quatro ou cinco

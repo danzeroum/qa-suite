@@ -407,6 +407,7 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
         "checks/gui/test_resiliencia.py::test_json_truncado_nao_vaza_detalhe_tecnico",
         "checks/gui/test_responsividade.py::test_sem_sobreposicao_de_interativos",
         "checks/gui/test_responsividade.py::test_navegacao_principal_utilizavel_em_mobile",
+        "checks/gui/test_visual.py::test_paginas_estaveis_contra_a_linha_de_base",
     }
     declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
     assert declarados == esperados

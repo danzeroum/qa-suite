@@ -148,3 +148,50 @@ PAGINAS_GUI: dict[str, tuple[bytes, str]] = {
     "/gui/resiliente": (RESILIENTE_HTML.encode("utf-8"), "text/html; charset=utf-8"),
     "/gui/api/pedidos": (API_PEDIDOS.encode("utf-8"), "application/json"),
 }
+
+
+# Páginas do contrato VISUAL — e a razão de elas serem SEM TEXTO.
+#
+# Métrica de fonte varia entre sistema operacional, versão de engine e fontes
+# instaladas. Um pixel-diff sobre texto renderizado seria loteria entre o local e
+# o CI: verde numa máquina, vermelho na outra, sem nada ter mudado no alvo. Só
+# formas sólidas alinhadas ao pixel — sem fonte, sem raio de borda, sem sombra,
+# sem gradiente, sem transformação — produzem a mesma matriz em toda parte.
+#
+# Texto só entraria aqui MASCARADO por região declarada no perfil, e não há texto
+# nenhum de propósito: a máscara é para alvo real, não para o contrato.
+def _pagina_visual(deslocamento: int, titulo: str) -> str:
+    """As duas páginas visuais, do mesmo molde, diferindo por UM número.
+
+    É o que torna a divergência legível: o diff acusa exatamente os blocos onde
+    `.b` está, e o código diz por quê numa linha.
+    """
+    return f"""<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{titulo}</title>
+<style>
+  html, body {{ margin: 0; padding: 0; background: #ffffff; }}
+  div {{ position: absolute; }}
+  .a {{ left: 40px;  top: 40px;  width: 160px; height: 120px; background: #1155aa; }}
+  .b {{ left: {240 + deslocamento}px; top: 40px; width: 120px; height: 120px;
+        background: #aa2211; }}
+  .c {{ left: 40px;  top: 220px; width: 320px; height: 80px;  background: #227733; }}
+</style>
+</head><body><div class="a"></div><div class="b"></div><div class="c"></div></body></html>
+"""
+
+
+VISUAL_HTML = _pagina_visual(0, "Contrato visual — estavel")
+
+# VIOLAÇÃO deliberada (gui, GUI-VIS-01): esta página nasceu deslocada em relação
+# à referência versionada dela, que é uma cópia da referência da página estável.
+# Não é bug do alvo — é o único jeito honesto de exercer a direção `failed` do
+# diff visual contra o alvo fabricado. O manifesto da referência declara isso, e
+# `make referencia-visual` NÃO a regrava (senão o defeito se autocorrigiria e o
+# check nunca mais reprovaria).
+VISUAL_MUDADO_HTML = _pagina_visual(48, "Contrato visual — deslocado")
+
+PAGINAS_GUI["/gui/visual"] = (VISUAL_HTML.encode("utf-8"), "text/html; charset=utf-8")
+PAGINAS_GUI["/gui/visual-mudado"] = (VISUAL_MUDADO_HTML.encode("utf-8"),
+                                     "text/html; charset=utf-8")

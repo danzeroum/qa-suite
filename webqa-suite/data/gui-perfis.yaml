@@ -74,6 +74,23 @@ resiliencia:
     - "unavailable"
     - "try again"
 
+# Contrato visual (GUI-VIS-01/02, OS-49). Só páginas FABRICADAS: `report/` nunca
+# é versionado e captura de alvo real não é versionável por causa do R19 —
+# pixel não passa pela borda de sanitização.
+visual:
+  paginas:
+    # `regravar: false` na página deslocada é o que mantém a direção `failed`
+    # viva: `make referencia-visual` a pularia, senão o defeito se
+    # autocorrigiria no primeiro regravamento e o check nunca mais reprovaria.
+    - caminho: "/gui/visual"
+      viewport: "desktop"
+      regravar: true
+      componentes: [".a", ".c"]
+    - caminho: "/gui/visual-mudado"
+      viewport: "desktop"
+      regravar: false
+      componentes: []
+
 # Marcos comparados entre engines (GUI-COMPAT-01, OS-48).
 #
 # Lista CURTA e declarada, e não "todo elemento": antialiasing de fonte,

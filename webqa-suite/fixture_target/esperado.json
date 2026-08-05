@@ -13,6 +13,7 @@
     "checks/gui/test_resiliencia.py::test_json_truncado_nao_vaza_detalhe_tecnico",
     "checks/gui/test_responsividade.py::test_navegacao_principal_utilizavel_em_mobile",
     "checks/gui/test_responsividade.py::test_sem_sobreposicao_de_interativos",
+    "checks/gui/test_visual.py::test_paginas_estaveis_contra_a_linha_de_base",
     "checks/lgpd/test_consentimento.py::test_sem_cookies_nao_essenciais_pre_aceite",
     "checks/lgpd/test_consentimento.py::test_sem_trackers_antes_do_consentimento",
     "checks/lgpd/test_pii_transito.py::test_forms_pii_post_https",

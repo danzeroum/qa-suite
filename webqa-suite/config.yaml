@@ -70,3 +70,8 @@ thresholds:
   # o desvio e da engine, nao do layout — e reprovar por isso enterraria o sinal
   # verdadeiro numa lista de diferencas de 1px.
   gui_compat_tolerancia_px: 4
+  # GUI-VIS-01/02 (OS-49). Tolerancia POR CANAL, com comparador `>`: no desvio
+  # exatamente igual o bloco ainda esta dentro. Absorve antialiasing de borda sem
+  # absorver mudanca de forma — a pagina do contrato e sem texto justamente para
+  # que esse numero possa ser baixo.
+  gui_visual_tolerancia_canal: 8
