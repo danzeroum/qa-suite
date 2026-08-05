@@ -67,7 +67,7 @@ não entrou.
 | GUI-FOCO-01 | Indicador de foco visível em todo elemento focável (WCAG 2.4.7) | S | nº de paradas sem diferença de estilo com/sem foco | Playwright + `webqa/foco.py` | C | PR |
 | GUI-FOCO-02 | Ordem de tabulação segue a ordem visual (WCAG 2.4.3) | S | nº de inversões geométricas na sequência | `webqa/foco.py` + `geometria.py` | A | PR |
 | GUI-FOCO-03 | Foco não obscurecido por barra fixa (WCAG 2.4.11 — **nova na 2.2**) | S | nº de paradas cobertas > 25 % | Playwright `elementFromPoint` | A | PR |
-| GUI-FOCO-04 | Todo interativo visível é alcançável por Tab; sem armadilha de foco | S | inalcançáveis; ciclo que não escapa | `webqa/foco.py`, com teto de 200 Tabs | C | N |
+| GUI-FOCO-04 | Todo interativo visível é alcançável por Tab; sem armadilha de foco | S | inalcançáveis; ciclo que não escapa | `webqa/foco.py`: teto de 200 Tabs + sonda `Shift+Tab` e cobertura (§3.3) | C | N |
 | GUI-FOCO-05 | Atalho para o conteúdo principal (skip link) presente e funcional (WCAG 2.4.1) | S | existe e leva o foco ao destino | Playwright | M | N |
 
 ### 1.3 `GUI-CONTR` — contraste e tema
@@ -329,11 +329,46 @@ def test_zoom_200_nao_perde_conteudo(contexto_gui, settings, perfis):
 teclado precisa saber onde está; `outline: none` sem substituto é a regressão de
 CSS mais comum que existe.
 
-**2. Pré‑condições.** `contexto_gui()` padrão + `webqa/foco.py::caminhada`, que
-pressiona Tab até repetir a primeira parada ou atingir o teto de 200 e devolve
-`list[Parada]` com seletor, caixa e estilo computado com e sem foco. **Uma
-caminhada, três vereditos** (3.3, 3.4 e 3.5 a consomem) — mesma economia que
-`home_response` faz para as dimensões HTTP.
+**2. Pré‑condições.** `contexto_gui()` padrão + `webqa/foco.py::caminhar`, que
+devolve uma `Caminhada` com as `Parada`s (seletor, caixa e estilo computado com e
+sem foco). **Uma caminhada, três vereditos** (3.3, 3.4 e 3.5 a consomem) — mesma
+economia que `home_response` faz para as dimensões HTTP.
+
+A caminhada **para de três maneiras**, e as três são término normal do laço:
+
+| Como para | O que significa |
+|---|---|
+| a parada repete a primeira | deu a volta na ordem de tabulação (comportamento do Chromium) |
+| `ler_foco()` devolve `None` | o foco saiu do documento — fim natural |
+| o teto de 200 Tabs estoura | ou é armadilha, ou é fim de ordem: quem decide são os discriminadores abaixo |
+
+**O terceiro caso é o que exige julgamento**, e ele tem dois discriminadores,
+nessa ordem de prioridade:
+
+1. **sonda `Shift+Tab`** (`voltar_tab`, injetada) — um toque só, no ponto de
+   estagnação. Se o foco **solta** e vai para o elemento anterior, a caminhada
+   tinha chegado ao fim da ordem; se **volta ao mesmo elemento**, algo o prende.
+   É evidência comportamental, por isso vem primeiro;
+2. **cobertura** — o inventário de focáveis (`focaveis`, também injetado, vindo
+   de `JS_ALVOS_DE_TOQUE`). Estagnar com focáveis por visitar é armadilha;
+   estagnar tendo visitado todos, fim de ordem.
+
+**Por que os dois, e não só a cobertura.** A cobertura sozinha não separa nada
+quando a armadilha está no **último** focável — que é exatamente o caso da
+plantada em `/gui/estados`: não sobra ninguém por visitar, e os dois casos ficam
+idênticos. A cobertura pega a armadilha do meio da página; a sonda pega a do fim.
+A validação da OS‑56 descobriu isso do jeito caro: o conserto por cobertura,
+sozinho, **apagava** a detecção da armadilha plantada.
+
+**Fim de ordem é término NORMAL — os três vereditos rodam.** Não é skip: tratá‑lo
+como ausência de medida trocaria um falso positivo por um falso silêncio, e os
+três critérios de foco continuariam sem medir nada na engine afetada. Só
+`armadilha` interrompe (`pytest.fail` na fixture, WCAG 2.1.2).
+
+**Sem sonda e sem inventário a caminhada NÃO afirma armadilha.** Coletor que
+falhou é ausência de medida, e ausência de medida não vira acusação — acusar
+errado é o defeito que a OS‑56 consertou. Ver `docs/GUI.md §Diferenças por
+engine` para o comportamento de plataforma que motivou tudo isto.
 
 **3. Passos.** Esperar `networkidle` (widget que rouba foco no load falsearia a
 primeira parada) → caminhar → em cada parada, ler `outline`, `box-shadow`,
