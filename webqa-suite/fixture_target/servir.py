@@ -246,6 +246,25 @@ _ESTILO_GUI = """
    prefers-reduced-motion que a suprima (WCAG 2.3.3). */
 @keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .gira { display: inline-block; animation: girar 2s linear infinite; }
+/* VIOLACAO (gui, GUI-RESP-03): dois controles que se cobrem. O deslocamento e
+   NEGATIVO e para a esquerda de proposito: puxar para a direita empurraria a
+   largura do documento e plantaria de carona uma rolagem horizontal que ja tem
+   dono (GUI-RESP-01) — a violacao ficaria medida duas vezes e a correcao de uma
+   apagaria a outra. `position: relative` nao tira o elemento do fluxo, entao a
+   altura da linha e a ordem de tabulacao seguem as mesmas. */
+.acao-b { position: relative; left: -64px; }
+/* VIOLACAO (gui, GUI-RESP-05): abaixo de 700px a navegacao some e quem a abre e
+   um <div onclick> — nao recebe foco, nao responde a Enter, nao e anunciado
+   como acionavel. Funciona em todo teste manual feito com mouse, que e o que
+   torna este defeito tao comum. Acima de 700px a nav e visivel: o check PASSA
+   no perfil desktop e reprova no mobile, e sem os dois lados nao daria para
+   distinguir "reprova sempre" de "reprova onde deve". */
+.menu-gatilho { display: none; width: 44px; height: 44px; background: #567;
+                color: #fff; text-align: center; line-height: 44px; }
+@media (max-width: 700px) {
+  .nav-principal { display: none; }
+  .menu-gatilho { display: block; }
+}
 /* VIOLACAO (gui, GUI-CONTR-01): o tema escuro existe (logo, o check nao pula)
    e nele o aviso fica em ~1.6:1, longe dos 4.5:1 (WCAG 1.4.3). */
 @media (prefers-color-scheme: dark) {
@@ -282,6 +301,7 @@ _CORPO_GUI = """
      class="alvo-pequeno" href="/gui/estados#armadilha" aria-label="Armadilha de foco"></a></p>
   <p><span class="gira" aria-hidden="true">*</span> processando</p>
   <p class="aviso-tema">Aviso que some no tema escuro.</p>
+  <p><button class="acao-a">Aplicar cupom</button><button class="acao-b">Remover</button></p>
   <p id="pedidos">carregando pedidos...</p>
   <p id="estoque">carregando estoque...</p>
   <div class="rolagem-longa"></div>
@@ -292,6 +312,14 @@ _CORPO_GUI = """
 
 HOME = f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
+<!-- NAO e violacao: e o que torna as demais observaveis. Sem `meta viewport`, a
+     emulacao movel do Chromium da a esta pagina o viewport de layout de
+     fallback (980px), e NENHUMA media query abaixo disso chega a valer — a
+     navegacao mobile de GUI-RESP-05 nunca se esconderia, e a familia inteira de
+     checks por viewport mediria o layout de desktop achando que mediu o de
+     celular. E a mesma licao que fez `reflow_aa` nascer sem emulacao
+     (data/gui-perfis.yaml), aplicada ao alvo em vez do perfil. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Loja Fixture — alvo deliberadamente nao conforme</title>
 <style>{_ESTILO_GUI}</style>
 <!-- VIOLACAO: script de terceiro sem integrity/crossorigin (SRI) -->
@@ -304,6 +332,9 @@ HOME = f"""<!doctype html>
 <script src="/bundle.js"></script>
 </head><body>
 <h1>Loja Fixture</h1>
+<div class="menu-gatilho"
+     onclick="document.querySelector('.nav-principal').style.display='block'">&#9776;</div>
+<nav class="nav-principal"><a href="/privacidade">Privacidade</a></nav>
 <!-- VIOLACAO: imagem sem atributo alt (WCAG / LBI Art. 63) -->
 <img src="/logo.png" width="1" height="1">
 <!-- VIOLACAO (seguranca Fase B): SVG com handler inline -->

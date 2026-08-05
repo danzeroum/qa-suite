@@ -45,6 +45,21 @@ não entrou.
 | GUI-RESP-04 | CLS medido **por viewport** (hoje só no default) | S | CLS por viewport | reuso de `VITALS_JS` | A | N |
 | GUI-RESP-05 | Navegação principal utilizável em mobile (visível, ou gatilho que abre por clique **e** por teclado) | S | booleano por viewport | Playwright | A | N |
 
+> **RESP‑03/04/05 e GUI‑COMPAT‑01/02 entregues na OS‑48**, com três
+> decisões que só a execução revelou:
+>
+> * **o alvo precisou de `meta viewport`.** Sem ele, a emulação móvel do Chromium
+>   dá à página o viewport de layout de fallback de 980px, e NENHUMA media query
+>   abaixo disso chega a valer — a família inteira de checks por viewport mediria
+>   o layout de desktop achando que mediu o de celular. É a mesma lição que fez
+>   `reflow_aa` nascer sem emulação, agora aplicada ao alvo em vez do perfil;
+> * **GUI‑COMPAT‑01 compara só o eixo HORIZONTAL.** `y` e `altura` acumulam as
+>   métricas de fonte da página inteira: medido, o `body` do alvo fabricado dá
+>   1776px no Chromium e 1797px no Firefox — 21px sem nada quebrado;
+> * **GUI‑COMPAT‑02 tem dois pesos.** Exceção de JavaScript exclusiva reprova
+>   (comportamento); erro de console exclusivo abranda para `xfail` (relato — o
+>   Chromium loga falha de rede que o Firefox cala).
+
 ### 1.2 `GUI-FOCO` — foco e teclado
 
 | ID | Cenário | Nível | Métrica | Ferramenta | Sev | Freq |

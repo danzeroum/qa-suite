@@ -70,6 +70,28 @@ jobs:
         continue-on-error: true
         run: pytest -m "browser and not verification" -q
 
+      # A matriz COMPLETA de viewports, só aqui. No PR a dimensão gui roda os dois
+      # extremos (mobile+desktop, default de webqa/viewports.py) para não
+      # multiplicar o tempo do job que roda em todo push — este slot existe
+      # justamente para a matriz que lá não cabe.
+      #
+      # Laudo em diretório PRÓPRIO: o passo acima já escreveu report/summary.json,
+      # e deixar os dois na mesma pasta faria o segundo apagar o primeiro — o
+      # artefato sairia com metade da execução e ninguém veria falta nenhuma.
+      - name: Dimensão gui na matriz completa de viewports
+        continue-on-error: true
+        env:
+          WEBQA_VIEWPORTS: "mobile,tablet,desktop,ultrawide,reflow_aa"
+          WEBQA_REPORT_DIR: report/matriz-gui
+        run: pytest -m "gui and not load" -q
+
+      # A soma tem de fechar. Sem esta conferência, uma engine que não instalou
+      # some do laudo em silêncio e o artefato fica indistinguível entre "as três
+      # concordaram" e "só uma rodou" — que é o verde por ausência do D6, agora
+      # na dimensão de compatibilidade.
+      - name: A conta das engines fecha no laudo
+        run: python scripts/afere_matriz_gui.py report/matriz-gui/summary.json
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
