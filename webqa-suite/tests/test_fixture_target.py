@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from fixture_target import servir
+from fixture_target.paginas_gui import PAGINAS_GUI
 from fixture_target.servir import (
     CDN_FALSO,
     MARCA_ISCA,
@@ -202,6 +203,116 @@ def test_iscas_ficam_fora_da_identidade(monkeypatch):
     monkeypatch.setattr(servir, "ENV_ISCA", "API_KEY=outra-coisa-fake\n")
     monkeypatch.setattr(servir, "GIT_HEAD", "ref: refs/heads/outro\n")
     assert identidade() == antes
+
+
+# ---------- Violações de GUI (OS-40) ----------
+#
+# Um teste por violação, e cada um nomeia o check FUTURO que vai lê-la. Página
+# que "reprova de propósito" sem ninguém lendo é a classe de defeito "a garantia
+# existe, a ligação não" (docs/PROXIMOS-PASSOS.md §2.10) — dentro justamente do
+# PR que existe para preveni-la.
+
+@pytest.mark.parametrize(("marcador", "check"), [
+    ("min-width: 900px", "GUI-RESP-01 (reflow a 320px, WCAG 1.4.10)"),
+    ("height: 24px; overflow: hidden", "GUI-TIPO-01 (zoom 200%, WCAG 1.4.4)"),
+    (".sem-foco:focus { outline: none", "GUI-FOCO-01 (foco visível, WCAG 2.4.7)"),
+    ('tabindex="2">Comprar', "GUI-FOCO-02 (ordem de tabulação, WCAG 2.4.3)"),
+    ("position: fixed", "GUI-FOCO-03 (foco obscurecido, WCAG 2.4.11)"),
+    ("width: 16px; height: 16px", "GUI-ALVO-01 (alvo de toque, WCAG 2.5.8)"),
+    ("animation: girar 2s linear infinite", "GUI-MOV-01 (reduced-motion, WCAG 2.3.3)"),
+    ("prefers-color-scheme: dark", "GUI-CONTR-01 (contraste no tema escuro, WCAG 1.4.3)"),
+    ("carregando pedidos...", "GUI-RESIL-01 (falha de API sem tratamento)"),
+])
+def test_home_serve_a_violacao_de_gui(home, marcador, check):
+    """Cada violação de GUI está no HTML que a home realmente serve."""
+    corpo, _ = home
+    assert marcador in corpo, f"violação ausente da home — {check} não teria o que detectar"
+
+
+def test_home_consome_a_api_sem_tratar_falha(home):
+    """GUI-RESIL-01: o fetch não tem `.catch` nem checa `r.ok`.
+
+    É a violação inteira. O alvo responde 200; quem força o erro é o check, no
+    cliente (`page.route`) — e aí o parágrafo fica preso em "carregando".
+    """
+    corpo, _ = home
+    trecho = corpo.split('fetch("/gui/api/pedidos")', 1)[1].split("</script>", 1)[0]
+    assert ".catch" not in trecho, "o fetch trata a falha — não há violação a detectar"
+    assert "r.ok" not in trecho, "o fetch checa o status — não há violação a detectar"
+
+
+def test_app_js_bloqueia_a_thread_principal():
+    """GUI-PERF-01: seis blocos acima de 50ms — long tasks e TBT observáveis."""
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + "/app.js")
+    assert status == 200
+    assert "blocosRestantes = 6" in corpo and "Date.now() + 110" in corpo
+    # Reagendado, não num laço só: seis iterações síncronas seriam UMA long
+    # task de 660ms para o navegador, e a API reportaria 1, não 6.
+    assert "setTimeout(bloquearThreadPrincipal, 0)" in corpo
+
+
+@pytest.mark.parametrize(("caminho", "marcador"), [
+    ("/gui/estados", 'onblur="this.focus()"'),      # GUI-FOCO-04: armadilha de foco
+    ("/gui/estados", "falso-desabilitado"),         # GUI-ESTADO-03: sem disabled
+    ("/gui/estados", "campo-erro"),                 # GUI-ESTADO-01: erro só por cor
+    ("/gui/api/pedidos", '"total": 3'),             # resposta estável que a home consome
+])
+def test_pagina_de_gui_responde_com_a_violacao(caminho, marcador):
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + caminho)
+    assert status == 200
+    assert marcador in corpo
+
+
+def test_galeria_de_gui_e_alcancavel_por_link(home):
+    """A galeria é LINKADA na home: o crawl passivo chega nela seguindo o que a
+    aplicação oferece, e nenhum check precisa fabricar endereço para alcançá-la.
+
+    É a diferença entre esta página e as iscas da Fase C, que são deliberadamente
+    não linkadas — e o teste ao lado (`test_iscas_nao_sao_linkadas_no_home`)
+    fixa o outro lado da mesma fronteira.
+    """
+    corpo, _ = home
+    assert 'href="/gui/estados"' in corpo
+
+
+def test_paginas_de_gui_ficam_fora_da_identidade(monkeypatch):
+    """Mexer numa página de GUI NÃO reinicia a caminhada do ledger.
+
+    Mesma razão das iscas: o ledger mede o contrato passivo, e estas páginas não
+    são observadas por nenhum check dele. Incluí-las cobraria um reinício da
+    sequência sem-flake por conteúdo que ninguém mede.
+    """
+    antes = identidade()
+    monkeypatch.setitem(PAGINAS_GUI, "/gui/estados", (b"<html>outra coisa</html>", "text/html"))
+    monkeypatch.setattr(servir, "PAGINAS_GUI", dict(PAGINAS_GUI))
+    assert identidade() == antes
+
+
+def test_violacao_de_gui_na_home_muda_a_identidade(monkeypatch):
+    """O outro lado da fronteira: o que está no hash reinicia a sequência.
+
+    Sem este par, o teste acima passaria também se `identidade()` tivesse parado
+    de observar QUALQUER COISA — provaria a ausência sem provar a presença.
+    """
+    antes = identidade()
+    monkeypatch.setattr(servir, "APP_JS",
+                    servir.APP_JS.replace("blocosRestantes = 6", "blocosRestantes = 2"))
+    assert identidade() != antes
+
+
+def test_contrato_nao_ganhou_check_de_gui():
+    """`esperado.json` INTACTO: nenhum check de `gui` existe ainda.
+
+    A violação nasce antes do check de propósito (regra da casa: teste antes do
+    check, quando der). Enquanto `checks/gui/` não existir, uma entrada de `gui`
+    no contrato seria um id fantasma — e `tests/test_alvo_fixture.py` reprova
+    justamente isso.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    ids = [*contrato["devem_falhar"], *contrato["fora_do_contrato"]]
+    assert not [i for i in ids if "checks/gui/" in i]
 
 
 # ---------- Identidade do alvo (chave do ledger) ----------
