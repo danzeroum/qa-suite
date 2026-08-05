@@ -349,9 +349,7 @@ _CORPO_POLITICA = (
 POLITICA = f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <title>Politica de Privacidade — Loja Fixture</title></head><body>
-<style>@keyframes piscar {{ from {{ opacity: 1; }} to {{ opacity: .2; }} }}
-.plantada {{ animation: piscar 1s linear infinite; }}</style>
-<h1 class="plantada">Politica de Privacidade</h1>
+<h1>Politica de Privacidade</h1>
 <p>{_CORPO_POLITICA}</p>
 <p>O titular tem direito de acesso, correcao, eliminacao e portabilidade dos
 seus dados, e pode revogar o consentimento a qualquer momento.</p>
