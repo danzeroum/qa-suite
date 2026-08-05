@@ -1,0 +1,68 @@
+# Perfis da dimensão `gui` — o que NÃO é orçamento numérico.
+#
+# A partição é do código, não de estilo: `load_settings` faz `float()` em TODA
+# chave de `config.yaml::thresholds` (webqa/config.py), então só número cabe lá.
+# Viewport é um mapa, máscara é uma lista e política é booleano — nada disso
+# sobrevive a um `float()`. Aqui é o outro lado dessa fronteira.
+#
+# Contrato: docs/GUI.md §3.3. Precedente de dado versionado em data/:
+# data/caminhos-sensiveis.yaml.
+
+# Matriz de viewports. A EXECUÇÃO escolhe quais rodar por WEBQA_VIEWPORTS
+# (webqa/viewports.py) — default mobile+desktop no PR, matriz completa no
+# noturno. Fail-closed: nome desconhecido é erro, nunca filtro silencioso.
+viewports:
+  # `mobile` e `desktop` são o default: cobrem os dois extremos que mais
+  # quebram, sem dobrar o tempo do PR.
+  mobile:    {width: 390,  height: 844,  mobile: true, touch: true}
+  tablet:    {width: 820,  height: 1180, mobile: true, touch: true}
+  desktop:   {width: 1366, height: 768}
+  ultrawide: {width: 2560, height: 1080}
+  # 320 CSS px é a largura que a WCAG 1.4.10 (Reflow) exige que funcione — é o
+  # equivalente a 400% de zoom num viewport de 1280. Não é "um celular
+  # pequeno": é o teto da norma.
+  reflow_aa: {width: 320,  height: 640,  mobile: true, touch: true}
+
+# Regiões voláteis excluídas do diff visual (OS-49).
+#
+# Seletor CSS, NUNCA coordenada: coordenada envelhece a cada mudança de layout
+# e passa a mascarar a região errada — em silêncio, que é o pior jeito de uma
+# máscara falhar. Vazio hoje; cada entrada nasce com um alvo real que a exigiu.
+mascaras: []
+
+# Vocabulário do check de resiliência (GUI-RESIL-01, OS-47).
+resiliencia:
+  # Termos que uma mensagem de erro voltada ao visitante nunca deve conter.
+  termos_proibidos:
+    - "Traceback"
+    - "NullPointer"
+    - "undefined is not"
+    - "500 Internal"
+    - "SQLSTATE"
+    - "Exception in"
+  # Sinal de que existe mensagem de erro reconhecível. É HEURÍSTICA e o check
+  # a trata como tal: ausência vira alerta, nunca reprovação — vocabulário não
+  # cobre alvo internacionalizado, e reprovar com heurística fraca custa a
+  # credibilidade da bateria inteira.
+  vocabulario_de_erro:
+    - "erro"
+    - "falha"
+    - "indisponivel"
+    - "tente novamente"
+    - "error"
+    - "failed"
+    - "unavailable"
+    - "try again"
+
+# Mapa critério WCAG -> teste. É o insumo do VPAT/ACR (docs/GUI.md §6) e existe
+# para que ninguém precise deduzir cobertura a partir de nome de arquivo.
+# Preenchido conforme cada check nasce; hoje declara a INTENÇÃO das OS-42/43/44.
+wcag:
+  "1.4.3":  [GUI-CONTR-01]
+  "1.4.4":  [GUI-TIPO-01]
+  "1.4.10": [GUI-RESP-01]
+  "2.3.3":  [GUI-MOV-01]
+  "2.4.3":  [GUI-FOCO-02]
+  "2.4.7":  [GUI-FOCO-01]
+  "2.4.11": [GUI-FOCO-03]
+  "2.5.8":  [GUI-ALVO-01]

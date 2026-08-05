@@ -217,6 +217,64 @@ def test_estado_de_prefere_o_campo_estado():
     assert estado_de({}) == "skipped"
 
 
+# ---------- Dimensão `gui` (OS-41) ----------
+#
+# A dimensão só existe de verdade quando ATRAVESSA os quatro pontos: marcador,
+# DIMENSIONS, DIMENSION_NOTES e OBSERVACOES. Testar a constante provaria que o
+# texto foi escrito; o que estes testes exigem é que ele chegue à PÁGINA — é a
+# diferença entre "a garantia existe" e "a ligação existe"
+# (docs/PROXIMOS-PASSOS.md §2.10).
+
+def test_gui_e_dimensao_reconhecida_e_nao_cai_em_other():
+    """Fora de `report.py::DIMENSIONS` a dimensão agrupa como `other`: existiria
+    no pytest e não no laudo, que é o pior dos dois mundos — os checks rodam e
+    ninguém lê o resultado."""
+    from webqa.report import DIMENSIONS
+
+    assert "gui" in DIMENSIONS
+
+
+def test_card_de_gui_renderiza_com_observacao():
+    html = montar(_summary([_r("t::a", "failed", dimension="gui", detail="alvo de 16px")]))
+    assert ">gui<" in html, "a dimensão não ganhou card no panorama"
+    assert "Interface renderizada" in html, "a observação do card não foi interpolada"
+
+
+def test_nota_epistemica_de_gui_chega_ao_html():
+    """A nota é o que impede o laudo de virar selo. Ela vive em
+    `report.py::DIMENSION_NOTES`, viaja no `summary` e tem de aparecer no card —
+    quem lê o relatório não leu o contrato da dimensão.
+    """
+    from webqa.report import DIMENSION_NOTES
+
+    nota = DIMENSION_NOTES["gui"]
+    html = montar(_summary([_r("t::a", "passed", dimension="gui")],
+                           dimension_notes={"gui": nota}))
+    assert "NÃO certifica usabilidade" in html
+    assert "geometria conforme" in html
+
+
+def test_gui_nao_inventa_classe_fora_da_folha_canonica():
+    """Zero classe nova: a folha é congelada byte a byte, e inventar token é
+    regressão, não melhoria (§2.4). Mesma varredura que o painel já sofre."""
+    html = montar(_summary([_r("t::a", "failed", dimension="gui", detail="x"),
+                            _r("t::b", "xfail", dimension="gui", detail="y")]))
+    corpo = re.sub(r"<style>.*?</style>", "", html, flags=re.S)
+    usadas = {c for m in re.finditer(r'class="([^"]+)"', corpo) for c in m.group(1).split()}
+    ausentes = sorted(c for c in usadas if f".{c}" not in ESTILO_CANONICO)
+    assert ausentes == [], f"classes sem regra na folha canônica: {ausentes}"
+
+
+def test_gui_convive_com_as_outras_dimensoes():
+    """Dimensão nova não pode reordenar nem engolir as antigas — um laudo
+    anterior tem de renderizar exatamente como antes."""
+    html = montar(_summary([_r("t::a", "passed", dimension="lgpd"),
+                            _r("t::b", "failed", dimension="gui", detail="x"),
+                            _r("t::c", "passed", dimension="seguranca")]))
+    for dim in ("lgpd", "gui", "seguranca"):
+        assert f">{dim}<" in html
+
+
 # ---------- Contrato visual ----------
 
 def test_estilo_canonico_embutido_uma_vez_e_sem_requisicao_externa():

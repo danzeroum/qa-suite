@@ -91,6 +91,8 @@ OBSERVACOES = {
     "lgpd": ("Conformidade LGPD observável de fora (caixa-preta). Inclui os testes de "
              "acessibilidade, que contam também aqui — LBI, Art. 63."),
     "ux": "Acessibilidade conta aqui e em lgpd.",
+    "gui": ("Interface renderizada: geometria, CSS computado e tempo de interação. "
+            "Mede o que o navegador mostra, não se a pessoa entendeu."),
     "verification": "A suíte testando a si mesma (tests/).",
     "load": "Carga só roda com autorização explícita (WEBQA_LOAD_AUTHORIZED).",
 }
