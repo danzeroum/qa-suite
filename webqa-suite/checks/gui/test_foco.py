@@ -30,6 +30,7 @@ from webqa.foco import (
     resumo_de_inversoes,
     resumo_de_paradas,
 )
+from webqa.geometria import JS_ALVOS_DE_TOQUE
 
 pytestmark = [pytest.mark.gui, pytest.mark.browser]
 
@@ -56,22 +57,42 @@ def caminhada_de_foco(contexto_gui_modulo, settings, perfis_gui):
         pagina.keyboard.press("Tab")
         pagina.wait_for_timeout(_ESPERA_DE_TRANSICAO_MS)
 
+    def voltar_tab():
+        pagina.keyboard.press("Shift+Tab")
+        pagina.wait_for_timeout(_ESPERA_DE_TRANSICAO_MS)
+
     def ler_foco():
         bruto = pagina.evaluate(JS_FOCO_ATUAL)
         return parada_de(bruto) if bruto else None
 
-    return caminhar(pressionar_tab, ler_foco)
+    # O inventário do que a página oferece de focável. Sem ele a caminhada não
+    # consegue separar armadilha de fim de ordem — e a diferença não é teórica:
+    # o Chromium dá a volta na ordem de tabulação e o Firefox não, então lá o
+    # foco congela no último elemento e a versão anterior deste check acusava
+    # armadilha onde não havia, derrubando os três critérios com `error`.
+    focaveis = [c.get("seletor") for c in (pagina.evaluate(JS_ALVOS_DE_TOQUE) or [])]
+    return caminhar(pressionar_tab, ler_foco, focaveis=focaveis,
+                    voltar_tab=voltar_tab)
 
 
 @pytest.fixture(scope="module")
 def paradas(caminhada_de_foco):
     """Só o que é avaliável: iframe de terceiro sai dos vereditos (e vai ao laudo)."""
-    if caminhada_de_foco.armadilha:
+    if caminhada_de_foco.fim_de_ordem:
+        # Término NORMAL. A engine não devolve o foco ao documento depois do
+        # último elemento — o Tab vai para a interface do navegador. Não é
+        # defeito do alvo, e os três critérios seguem medindo as paradas reais.
+        pass
+    elif caminhada_de_foco.armadilha:
         pytest.fail(
             f"Armadilha de foco: em {TETO_DE_TABS} Tabs o foco nunca voltou ao início, "
             f"girando entre {len(caminhada_de_foco.ciclo)} elemento(s). Quem navega por "
             "teclado fica preso e não alcança o resto da página (WCAG 2.1.2).\n"
-            "Ciclo:\n" + "\n".join(f"  {s}" for s in caminhada_de_foco.ciclo))
+            "Ciclo:\n" + "\n".join(f"  {s}" for s in caminhada_de_foco.ciclo)
+            + f"\nFocáveis que a caminhada NUNCA alcançou "
+              f"({len(caminhada_de_foco.inalcancados)}) — é isto que separa "
+              "armadilha de fim de ordem:\n"
+            + "\n".join(f"  {s}" for s in caminhada_de_foco.inalcancados[:10]))
     if not caminhada_de_foco.avaliaveis:
         pytest.skip("Nenhum elemento focável fora de iframe — nada a avaliar.")
     return caminhada_de_foco.avaliaveis

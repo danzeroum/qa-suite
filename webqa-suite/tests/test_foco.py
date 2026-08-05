@@ -74,7 +74,10 @@ def test_foco_preso_num_elemento_e_armadilha_com_o_ciclo_na_mensagem():
     que é indistinguível de infraestrutura quebrada e não diz nada a ninguém.
     """
     tab, ler = _passeio(_gruda_em([_parada("button#antes")], _parada("input#preso")))
-    caminhada = caminhar(tab, ler, teto=30)
+    # O inventário é o que torna isto armadilha e não fim de ordem: havia mais
+    # coisa focável depois do campo que prende o foco (OS-56).
+    focaveis_da_pagina = ["button#antes", "input#preso", "a#depois"]
+    caminhada = caminhar(tab, ler, teto=30, focaveis=focaveis_da_pagina)
 
     assert caminhada.teto_atingido and caminhada.armadilha
     assert caminhada.ciclo == ("input#preso",), "o ciclo tem de nomear onde o foco ficou"
@@ -88,7 +91,10 @@ def test_ciclo_curto_entre_poucos_elementos_tambem_e_armadilha():
     def passo(i):
         return fora if i == 0 else dentro[(i - 1) % len(dentro)]
 
-    caminhada = caminhar(*_passeio(passo), teto=40)
+    # `a#fora` fica inalcançável depois do primeiro Tab: é ele que faz disto
+    # armadilha e não fim de ordem (OS-56).
+    caminhada = caminhar(*_passeio(passo), teto=40,
+                         focaveis=["a#fora", "input#nome", "button#ok", "button#fim"])
 
     assert caminhada.armadilha
     assert set(caminhada.ciclo) == {"input#nome", "button#ok"}
@@ -257,3 +263,129 @@ def test_parada_de_calcula_a_fracao_a_partir_das_amostras():
     assert parada.fracao_coberta == 0.5 and parada.obscurecida
     assert parada.cobridor == "div.barra-fixa", "o laudo precisa nomear QUEM cobre"
     assert parada.caixa.largura == 80 and parada.estilo_muda_com_foco
+
+
+# ---------- Fim de ordem × armadilha: o discriminador por COBERTURA (OS-56) ----------
+#
+# As duas situações produzem a MESMA assinatura — teto atingido repetindo poucos
+# elementos — e confundi-las custou três `error` no Firefox (run 31044478226).
+# A contagem não separa: a armadilha plantada do fixture também repete UM
+# elemento. O que separa é se ainda restava alguém por visitar.
+
+def test_estagnar_no_ultimo_com_tudo_visitado_e_FIM_DE_ORDEM():
+    """O caso do Firefox: percorreu todos, congelou no último.
+
+    O Chromium dá a volta na ordem de tabulação e o Firefox não — lá o Tab
+    passa o foco para a interface do navegador e `document.activeElement` não
+    muda mais. Não é defeito do alvo, e tratá-lo como armadilha derrubava os
+    três critérios de foco naquela engine com `error`.
+    """
+    visitados = [_parada("a#um"), _parada("b#dois"), _parada("c#tres")]
+    tab, ler = _passeio(_gruda_em(visitados[:-1], visitados[-1]))
+    caminhada = caminhar(tab, ler, teto=60,
+                         focaveis=["a#um", "b#dois", "c#tres"])
+    assert caminhada.teto_atingido
+    assert caminhada.fim_de_ordem
+    assert not caminhada.armadilha, "fim de ordem não é armadilha"
+    assert {p.seletor for p in caminhada.paradas} == {"a#um", "b#dois", "c#tres"}
+
+
+def test_estagnar_com_focaveis_por_visitar_e_ARMADILHA():
+    """A armadilha real: preso antes de alcançar o resto da página."""
+    tab, ler = _passeio(_gruda_em([_parada("a#um")], _parada("b#dois")))
+    caminhada = caminhar(tab, ler, teto=60,
+                         focaveis=["a#um", "b#dois", "c#tres", "d#quatro", "e#cinco"])
+    assert caminhada.armadilha
+    assert not caminhada.fim_de_ordem
+    assert caminhada.inalcancados == ("c#tres", "d#quatro", "e#cinco"), (
+        "o laudo nomeia quem ficou fora")
+
+
+def test_sem_inventario_nao_se_afirma_armadilha():
+    """Coletor que falhou é ausência de medida, e ausência não vira acusação —
+    acusar errado é exatamente o defeito que esta OS conserta."""
+    tab, ler = _passeio(_gruda_em([_parada("a#um")], _parada("b#dois")))
+    caminhada = caminhar(tab, ler, teto=60)
+    assert caminhada.teto_atingido
+    assert not caminhada.armadilha
+    assert not caminhada.fim_de_ordem
+    assert not caminhada.inventario_conhecido
+
+
+def test_inventario_vazio_tambem_nao_acusa():
+    tab, ler = _passeio(_gruda_em([_parada("a#um")], _parada("b#dois")))
+    caminhada = caminhar(tab, ler, teto=60, focaveis=[])
+    assert not caminhada.armadilha
+
+
+def test_o_teto_continua_valendo():
+    """Sem teto, uma armadilha real trava a suíte em vez de reprovar."""
+    tab, ler = _passeio(_gruda_em([_parada("a#um")], _parada("b#dois")))
+    caminhada = caminhar(tab, ler, teto=30, focaveis=["a#um", "b#dois", "c#tres"])
+    assert caminhada.teto_atingido and len(caminhada.paradas) == 30
+
+
+# ---------- A sonda Shift+Tab: o que a cobertura sozinha não separa ----------
+#
+# Quando a armadilha está no ÚLTIMO focável — o caso da plantada em
+# /gui/estados — não sobra ninguém por visitar, e cobertura descreve os dois
+# casos igualmente bem. A validação real pegou isso: o conserto por cobertura,
+# sozinho, APAGAVA a detecção da armadilha plantada. A sonda é comportamental.
+
+
+def _sonda(devolve_o_mesmo: bool):
+    """Shift+Tab que devolve o foco ao mesmo elemento (armadilha) ou ao anterior."""
+    estado = {"soltou": False}
+
+    def voltar():
+        estado["soltou"] = not devolve_o_mesmo
+    return voltar, estado
+
+
+def test_armadilha_no_ULTIMO_focavel_e_pega_pela_sonda():
+    """O caso que a cobertura não vê: nada por visitar, e mesmo assim é armadilha."""
+    tab, ler = _passeio(_gruda_em([_parada("a#um")], _parada("b#preso")))
+    caminhada = caminhar(tab, ler, teto=30, focaveis=["a#um", "b#preso"],
+                         voltar_tab=lambda: None)
+    assert caminhada.armadilha, "Shift+Tab não soltou o foco: está preso"
+    assert not caminhada.fim_de_ordem
+    assert caminhada.sonda == "armadilha"
+
+
+def test_fim_de_ordem_e_confirmado_quando_o_foco_SOLTA():
+    """O caso do Firefox: Shift+Tab traz o foco de volta ao elemento anterior."""
+    passos = [_parada("a#um"), _parada("b#dois"), _parada("c#fim")]
+    tab, ler_normal = _passeio(_gruda_em(passos[:-1], passos[-1]))
+    soltou = {"sim": False}
+
+    def ler():
+        if soltou["sim"]:
+            return _parada("b#dois")      # Shift+Tab devolveu ao anterior
+        return ler_normal()
+
+    def voltar():
+        soltou["sim"] = True
+
+    caminhada = caminhar(tab, ler, teto=30, focaveis=["a#um", "b#dois", "c#fim"],
+                         voltar_tab=voltar)
+    assert caminhada.fim_de_ordem and not caminhada.armadilha
+    assert caminhada.sonda == "fim_de_ordem"
+
+
+def test_a_sonda_tem_PRIORIDADE_sobre_a_cobertura():
+    """Evidência comportamental ganha de inferência. Sem esta ordem, a armadilha
+    no fim continuaria invisível mesmo com a sonda implementada."""
+    tab, ler = _passeio(_gruda_em([_parada("a#um")], _parada("b#preso")))
+    # Cobertura diria "fim de ordem" (nada por visitar); a sonda diz o contrário.
+    caminhada = caminhar(tab, ler, teto=30, focaveis=["a#um", "b#preso"],
+                         voltar_tab=lambda: None)
+    assert caminhada.inventario_conhecido and not caminhada.inalcancados
+    assert caminhada.armadilha
+
+
+def test_sem_sonda_a_cobertura_continua_valendo():
+    """A sonda é opcional: quem não a injetar continua com o discriminador de
+    cobertura, e não perde a armadilha no meio da página."""
+    tab, ler = _passeio(_gruda_em([_parada("a#um")], _parada("b#preso")))
+    caminhada = caminhar(tab, ler, teto=30, focaveis=["a#um", "b#preso", "c#tres"])
+    assert caminhada.armadilha and caminhada.sonda == ""

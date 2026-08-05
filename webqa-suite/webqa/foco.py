@@ -90,16 +90,73 @@ class Caminhada:
     teto_atingido: bool = False
     # Seletores que se repetem no fim da caminhada — o ciclo em que o foco ficou.
     ciclo: tuple[str, ...] = ()
+    # Focáveis que a caminhada NUNCA alcançou. É o que separa fim de ordem de
+    # armadilha — ver `armadilha`. Vazio quando não houve inventário.
+    inalcancados: tuple[str, ...] = ()
+    # Houve inventário? Sem ele não dá para afirmar cobertura, e o lado seguro
+    # é não acusar armadilha (acusar errado é o defeito que isto conserta).
+    inventario_conhecido: bool = False
+    # Veredito da sonda Shift+Tab no ponto de estagnação: "armadilha",
+    # "fim_de_ordem" ou "" (não sondado). Evidência COMPORTAMENTAL, e por isso
+    # tem prioridade sobre a cobertura — ver `armadilha`.
+    sonda: str = ""
 
     @property
     def armadilha(self) -> bool:
-        """Teto atingido girando entre poucos elementos = foco preso.
+        """Foco preso — e o discriminador é COBERTURA, não contagem.
 
-        A distinção importa: teto atingido com 200 elementos DISTINTOS é uma
-        página comprida, e reportá-la como armadilha mandaria alguém caçar um
-        defeito que não existe.
+        Duas situações produzem a mesma assinatura (o teto atingido repetindo
+        poucos elementos), e confundi-las custou três `error` no Firefox:
+
+        * **armadilha** — o foco gira entre poucos elementos E ainda havia
+          focáveis por visitar. Quem navega por teclado não alcança o resto;
+        * **fim de ordem** — o foco parou no último e não havia mais nada por
+          visitar. Não é defeito do alvo: é o Chromium que dá a volta na ordem
+          de tabulação e o Firefox que não. Medido no runner e reproduzido:
+          o Firefox percorre os 15 focáveis na mesma ordem, congela no último
+          (o foco vai para a interface do navegador) e `document.activeElement`
+          não muda mais até o teto.
+
+        Contagem sozinha não separa os dois: a armadilha plantada do fixture
+        (`onblur="this.focus()"`) também repete UM elemento.
+
+        **A cobertura sozinha não basta**, e a validação mostrou onde: quando a
+        armadilha está no ÚLTIMO focável — que é o caso da plantada em
+        `/gui/estados` —, não sobra ninguém por visitar e os dois casos ficam
+        idênticos aos olhos da cobertura. Daí a sonda `Shift+Tab`, que é
+        evidência comportamental e por isso tem prioridade:
+
+        * **fim de ordem** — o foco tinha saído do documento; Shift+Tab o traz
+          de volta ao elemento ANTERIOR (ou a lugar nenhum);
+        * **armadilha** — o `onblur` cancela qualquer saída, e Shift+Tab devolve
+          o foco ao MESMO elemento.
+
+        Cobertura pega a armadilha no meio da página; a sonda pega a do fim.
+
+        Sem sonda e sem inventário não se afirma armadilha. Coletor que falhou é
+        ausência de medida, e ausência de medida não vira acusação.
         """
-        return self.teto_atingido and 0 < len(self.ciclo) <= _CICLO_CURTO
+        if not (self.teto_atingido and 0 < len(self.ciclo) <= _CICLO_CURTO):
+            return False
+        if self.sonda:
+            return self.sonda == "armadilha"
+        if not self.inventario_conhecido:
+            return False
+        return bool(self.inalcancados)
+
+    @property
+    def fim_de_ordem(self) -> bool:
+        """Estagnou tendo visitado tudo — término NORMAL, e os checks rodam.
+
+        Existe como propriedade própria para o laudo poder dizer o que houve.
+        Tratar isto como skip trocaria um falso positivo por um falso silêncio:
+        os três critérios de foco continuariam sem medir nada naquela engine.
+        """
+        if not (self.teto_atingido and bool(self.ciclo)):
+            return False
+        if self.sonda:
+            return self.sonda == "fim_de_ordem"
+        return self.inventario_conhecido and not self.inalcancados
 
     @property
     def em_iframe(self) -> tuple[Parada, ...]:
@@ -117,11 +174,22 @@ class Caminhada:
         return tuple(p for p in self.paradas if not p.em_iframe)
 
 
-def caminhar(pressionar_tab, ler_foco, teto: int = TETO_DE_TABS) -> Caminhada:
+def caminhar(pressionar_tab, ler_foco, teto: int = TETO_DE_TABS,
+             focaveis=None, voltar_tab=None) -> Caminhada:
     """Pressiona Tab até voltar ao início, o foco sair, ou o teto estourar.
 
     `ler_foco()` devolve uma `Parada` ou `None` quando o foco deixou o documento
     (barra de endereços do navegador, fim natural). Ambos são término normal.
+
+    `voltar_tab` pressiona Shift+Tab e é usado UMA vez, só no ponto de
+    estagnação, para separar armadilha de fim de ordem por comportamento. Também
+    injetado — esta função não abre navegador.
+
+    `focaveis` é o inventário de seletores que o navegador diz serem focáveis —
+    injetado, como as ações, para que esta função siga pura e testável sem subir
+    navegador. É ele que permite responder "sobrou alguém por visitar?", que é a
+    única pergunta que separa armadilha de fim de ordem. Ausente, a caminhada
+    não afirma armadilha.
     """
     paradas: list[Parada] = []
     for _ in range(teto):
@@ -133,9 +201,40 @@ def caminhar(pressionar_tab, ler_foco, teto: int = TETO_DE_TABS) -> Caminhada:
             break                      # voltou ao primeiro: ciclo completo, normal
         paradas.append(parada)
     else:
-        return Caminhada(paradas=tuple(paradas), teto_atingido=True,
-                         ciclo=_ciclo_final(paradas))
-    return Caminhada(paradas=tuple(paradas))
+        ciclo = _ciclo_final(paradas)
+        return Caminhada(paradas=tuple(paradas), teto_atingido=True, ciclo=ciclo,
+                         sonda=_sondar_retorno(voltar_tab, ler_foco, paradas),
+                         **_cobertura(paradas, focaveis))
+    return Caminhada(paradas=tuple(paradas), **_cobertura(paradas, focaveis))
+
+
+def _sondar_retorno(voltar_tab, ler_foco, paradas: list[Parada]) -> str:
+    """Shift+Tab no ponto de estagnação. "" quando não há como sondar.
+
+    Um toque só, e só aqui: a pergunta é se o elemento SOLTA o foco. Se soltar,
+    a caminhada tinha chegado ao fim da ordem e a engine é que não dá a volta;
+    se não soltar, alguma coisa o está prendendo.
+    """
+    if voltar_tab is None or not paradas:
+        return ""
+    preso = paradas[-1].seletor
+    try:
+        voltar_tab()
+        depois = ler_foco()
+    except Exception:
+        return ""              # instrumentação não decide veredito
+    if depois is None:
+        return "fim_de_ordem"  # o foco saiu do documento: nada o prendia
+    return "armadilha" if depois.seletor == preso else "fim_de_ordem"
+
+
+def _cobertura(paradas: list[Parada], focaveis) -> dict:
+    """Quem o inventário prometia e a caminhada não alcançou."""
+    if focaveis is None:
+        return {"inventario_conhecido": False, "inalcancados": ()}
+    visitados = {p.seletor for p in paradas}
+    faltando = tuple(s for s in dict.fromkeys(focaveis) if s not in visitados)
+    return {"inventario_conhecido": True, "inalcancados": faltando}
 
 
 def _ciclo_final(paradas: list[Parada], janela: int = 20) -> tuple[str, ...]:
