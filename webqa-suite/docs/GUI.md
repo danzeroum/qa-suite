@@ -18,10 +18,21 @@ Base deste documento: `main` @ `2e15aec` (pós #80).
 
 ---
 
-## 0. Estado: PLANEJADA — nenhuma linha de código
+## 0. Estado: EM CONSTRUÇÃO — OS‑40 a OS‑50 entregues
 
-`checks/gui/` **não existe**. Este documento é contrato, não descrição: ele
-descreve o que será construído e as condições sob as quais pode ser construído.
+`checks/gui/` existe e tem dez arquivos de check. Este documento continua sendo
+**contrato**, não descrição: ele diz o que pode ser construído e sob que
+condições, e o que já foi construído está registrado na tabela `Concluído` da
+fila de OS — que é o lugar onde essa contagem envelhece bem, porque muda a cada
+entrega.
+
+> **Esta linha esteve errada por nove OSs.** Ela dizia "PLANEJADA — nenhuma linha
+> de código" e "`checks/gui/` **não existe**" enquanto catorze módulos de `webqa/`,
+> dez arquivos de check e vinte orçamentos já estavam em `main`. Corrigida na
+> OS‑50, como carona declarada. Não é detalhe de forma: o §2.10 da casa manda
+> desconfiar do código quando prosa e código discordam, e uma prosa que nega a
+> existência do código treina quem lê a ignorar a prosa — que é o jeito mais
+> barato de um contrato deixar de valer.
 
 O catálogo priorizado e a especificação dos dez primeiros testes estão em
 [`GUI-CATALOGO.md`](GUI-CATALOGO.md). A fila executável está em
@@ -153,7 +164,7 @@ Cada uma é imposta por um teste, não por combinação. A coluna da direita é 
 | 5 | Nenhum check consome `require_active_probes` hoje | `tests/test_fase_c_travada.py:314-326` | o primeiro check que o consumir **altera esse teste**, num PR que diga isso — e o arquivo é protegido por CODEOWNERS |
 | 6 | `report/` nunca é versionado | `.gitignore:1-4,19`; R8 | guardar linha de base visual de alvo real em `report/` **ou** em qualquer lugar versionado (§3.4) |
 | 7 | `sanitize_text` é a borda de escrita **de texto** | `webqa/sanitize.py:156`; `webqa/report.py:236-238` varre a string já serializada | supor que uma captura de tela está sanitizada. Ela não está — não existe mascarador de pixel. É o R19 |
-| 8 | `browser_page` é de sessão e compartilhada | `conftest.py:200-205`; preço registrado em `ARQUITETURA.md:55` | mudar viewport, tema ou movimento nela. Toda variação abre contexto próprio, no molde de `network_log` (`conftest.py:326`) |
+| 8 | `browser_page` é de sessão e compartilhada | `conftest.py:200-205`; preço registrado em `ARQUITETURA.md:55` | mudar viewport, tema ou movimento nela. Toda variação abre contexto próprio, no molde de `network_log` (`conftest.py:338-349`) |
 | 9 | Ausência nunca vira zero | `PROXIMOS-PASSOS.md §2.1`; `webqa/metricas.py:26-45` recusa `None` | tratar elemento não renderizado como `0 px`, ou linha de base ausente como aprovação |
 | 10 | `error` ≠ `failed` | `PROXIMOS-PASSOS.md §2.2`; `webqa/report.py:157-162` | contar contexto que não abriu como achado. É o teste **não tendo acontecido** |
 | 11 | Cor nunca é o único portador de significado | `PROXIMOS-PASSOS.md §2.5`; `report_html.py:380-383` (severidade é **inline e tipográfica**, porque a folha não tem classe para ela) | inventar semáforo para diff visual. E note a simetria: isto é, ao mesmo tempo, **critério que a camada testa no alvo** (WCAG 1.4.1) |
@@ -566,9 +577,37 @@ incompatibilidade de layout mais aparece (`webqa/viewports.py`, OS‑48).
 envelhece em silêncio e passaria a mentir no dia em que o Firefox implementar
 (`webqa/vitals_interacao.py`, OS‑46).
 
-**A regra que os três compartilham:** capacidade se **pergunta ao navegador**, e
+**4. Emulação de rede e de CPU é do CDP, logo Chromium apenas.** O Playwright não
+expõe estrangulamento neutro entre engines: `set_offline` liga e desliga, e não há
+meio‑termo. Estrangular no cliente (`route` com espera) atrasaria o corpo da
+resposta mas não o *handshake*, e portanto não mediria latência — o número sairia
+otimista sem nada avisar. A sessão CDP que não abre vira **skip nomeando a
+incapacidade**, jamais uma lista de engines escrita à mão
+(`webqa/rede_simulada.py`, OS‑50).
+
+**A regra que os quatro compartilham:** capacidade se **pergunta ao navegador**, e
 diferença de engine vira skip nomeado ou nota no laudo — nunca um veredito sobre
 o alvo.
+
+### Régua sob condição degradada — o que não se compara com o quê
+
+Orçamento de fibra e orçamento de rede lenta são **grandezas diferentes com o
+mesmo nome**, e trocá‑los é o erro barato desta camada: cobrar `lcp_ms` (2500 ms)
+de uma medida sob 3G reprovaria toda página do mundo, e cobrar
+`gui_lcp_ms_rede_lenta` de uma medida de fibra aprovaria qualquer coisa. As
+chaves são separadas **mesmo quando o número coincide**, porque o que precisa
+poder divergir é o regime, não o valor de hoje — e porque reusar a chave faria
+uma edição mover os dois regimes de uma vez, em silêncio.
+
+Isso diverge do precedente do GUI‑RESP‑04, que **reusa** `cls` de propósito, e a
+divergência tem critério: CLS é adimensional e independe da condição — o layout
+salta ou não salta em qualquer largura. FCP, LCP e TBT são **tempo**, e tempo sob
+3G não é a mesma grandeza que tempo sob fibra.
+
+O estrangulamento vive na sessão CDP do par (contexto, página) e **morre com o
+contexto** — é o R20 em versão rede. Aplicado à página de sessão, faria
+`checks/frontend/test_rendering.py` medir LCP sob 3G sem declarar: o LCP sairia
+péssimo, o alvo estaria intacto, e nada ficaria vermelho.
 
 **Sanitização.** Texto passa pela borda de escrita. **Imagem não passa** — e o
 documento diz isso em voz alta, porque a alternativa é uma falsa sensação de

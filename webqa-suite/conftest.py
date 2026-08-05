@@ -26,6 +26,7 @@ from webqa.http_utils import Timing, make_client, timed_get
 from webqa.navegacao import percorrer
 from webqa.navegador import engines_configurados
 from webqa.trackers import LoggedRequest, NetworkLog
+from webqa.rede_simulada import carregar_perfis_de_rede
 from webqa.viewports import carregar_perfis, opcoes_de_contexto
 
 
@@ -213,6 +214,17 @@ def perfis_gui():
     execução — reler por teste seria I/O sem pergunta correspondente.
     """
     return carregar_perfis()
+
+
+@pytest.fixture(scope="session")
+def perfis_de_rede():
+    """Perfis de rede e CPU de `data/gui-perfis.yaml` (OS-50).
+
+    Fixture pelo mesmo motivo que `perfis_gui`: o alvo do check é o que MEDIR,
+    não de onde a configuração vem. Sessão porque o YAML não muda no meio da
+    execução.
+    """
+    return carregar_perfis_de_rede()
 
 
 def _contextos_de_gui(browser, settings, credenciais_navegador):

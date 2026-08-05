@@ -30,6 +30,29 @@ viewports:
   # px de viewport, não de um dispositivo.
   reflow_aa: {width: 320,  height: 640}
 
+# Condições de rede e CPU emuladas por CDP (GUI-PERF-02/03, OS-50).
+#
+# A EXECUÇÃO escolhe o perfil por WEBQA_GUI_PERFIL_REDE; default `3g_rapido`.
+# Fail-closed: nome desconhecido é erro nomeando os válidos, nunca "rodou sem
+# estrangular e passou" — que é o pior verde possível aqui, porque o check
+# anuncia ter medido 3G e mediu fibra.
+#
+# Banda em kbps (é assim que rede se fala); a conversão para bytes/s que o CDP
+# exige mora em `webqa/rede_simulada.py`, num lugar só. Passar kbps direto ao
+# comando emularia uma rede OITO vezes mais rápida do que a declarada, sem nada
+# ficar vermelho — por isso a conversão tem teste nas duas pontas.
+rede:
+  # Não são números da casa: é o preset móvel PADRÃO do Lighthouse (`slow 4G`
+  # simulado — 1638.4 kbps, 150ms RTT, CPU ×4). Herdar a régua de uma ferramenta
+  # de referência é o que torna o número comparável com o que qualquer pessoa
+  # mede fora daqui; inventar um perfil próximo deste produziria medidas que só
+  # conversam consigo mesmas.
+  3g_rapido:
+    download_kbps: 1638.4
+    upload_kbps: 750
+    latencia_ms: 150
+    cpu_fator: 4
+
 # Regiões voláteis excluídas do diff visual (OS-49).
 #
 # Seletor CSS, NUNCA coordenada: coordenada envelhece a cada mudança de layout

@@ -25,7 +25,8 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 | OS‑47 | #91 | `906a6ac` | `webqa/degradacao.py`: 500, sem resposta, JSON truncado e perda de conexão |
 | OS‑48 | #92 | `15d67ce` | `webqa/compatibilidade.py` + `webqa/menu.py`: matriz viewport × engine no noturno |
 | OS‑56 | #92 | `15d67ce` | `webqa/foco.py`: fim de ordem ≠ armadilha — o falso positivo de foco no Firefox |
-| OS‑49 | — | — | `webqa/imagem.py` + `evidencias.py` + `referencia_visual.py`: contrato visual |
+| OS‑49 | #93 | `cd16e9f` | `webqa/imagem.py` + `evidencias.py` + `referencia_visual.py`: contrato visual |
+| OS‑50 | — | — | `webqa/rede_simulada.py`: pintura sob 3G e bloqueio sob CPU ×4, por CDP |
 
 **Por que a OS‑56 aparece aqui e não na fila abaixo.** Ela não foi planejada: nasceu
 do run real da matriz da OS‑48, que acusou três `error` do Firefox em `test_foco.py`.
@@ -254,7 +255,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 
 | OS | Entrega | Aceite resumido | Est. | Depende de |
 |---|---|---|---|---|
-| **OS‑50** | `webqa/rede_simulada.py`: CWV sob 3G e CPU 4× (GUI‑PERF‑02/03) | chromium‑only com skip instruído; **orçamento próprio** (`gui_lcp_ms_rede_lenta`), nunca o `lcp_ms` de fibra | 5 | OS‑46 |
+| ~~**OS‑50**~~ | ~~`webqa/rede_simulada.py`: CWV sob 3G e CPU 4× (GUI‑PERF‑02/03)~~ | **entregue.** Perfil `3g_rapido` = preset móvel padrão do Lighthouse, herdado e não inventado; fail‑closed no nome; skip nomeando a incapacidade de CDP, nunca lista de engines. Ambos os nodeids ficam **fora do contrato** por dois motivos independentes (desfecho por `WEBQA_ORIGEM` e por engine com CDP), então `devem_falhar` segue em 23. Uma descoberta que mudou o desenho: **o bloqueio da home é `while (Date.now() < fim)` — prazo de RELÓGIO, imune a throttling de CPU** (medido: 363ms sob ×4 contra 357ms livre), então a violação de referência teve de nascer COMPUTACIONAL em `/gui/pesado`, invisível sem throttle e severa com ele. GUI‑PERF‑02 virou dois itens no catálogo, e jank/heap deslocaram para ‑04/‑05 | 5 | OS‑46 |
 | **OS‑51** | `webqa/jornada.py` + GUI‑JORN‑01/02 + `features/jornada_usabilidade.feature` | TSR/ToT/cliques nos **mesmos** cenários BDD que o protocolo humano usa — é o que torna as réguas comparáveis; becos sem saída lidos do grafo que `percorrer()` já produz | 8 | OS‑48 |
 | **OS‑52** | GUI‑TIPO‑02/03, GUI‑RESP i18n/RTL, GUI‑CONTR‑03 (`forced-colors`) | página RTL fabricada reprova quando o layout quebra; zoom 400 % sob demanda | 5 | OS‑48 |
 | **OS‑53** | Evidência de conformidade: exportador SARIF de GUI, PDF executivo, VPAT parcial | exportador é função **pura** lendo `summary.json` (a dimensão `gui` não constrói `Finding` — `dominio.py:76-79`); PDF por `page.pdf()` do Chromium, zero dep; mapa critério→teste vem de `data/gui-perfis.yaml`, nunca digitado no template | 5 | OS‑45..49 |

@@ -75,3 +75,26 @@ thresholds:
   # absorver mudanca de forma — a pagina do contrato e sem texto justamente para
   # que esse numero possa ser baixo.
   gui_visual_tolerancia_canal: 8
+  # GUI-PERF-02/03 (OS-50). Orcamentos PROPRIOS da condicao degradada, NUNCA os
+  # de fibra — e as chaves sao separadas mesmo quando o numero coincide, porque
+  # o que precisa poder divergir e o REGIME, nao o valor de hoje. Reusar
+  # `lcp_ms` faria uma edicao mover os dois regimes de uma vez, em silencio.
+  #
+  # Divergem de proposito do precedente do GUI-RESP-04, que REUSA `cls`: CLS e
+  # adimensional e independe da condicao (o layout salta ou nao salta em
+  # qualquer largura). Estes tres sao TEMPO, e tempo sob 3G nao e a mesma
+  # grandeza que tempo sob fibra — uma regua so seria absurdamente frouxa num
+  # regime ou absurdamente dura no outro.
+  #
+  # Os numeros sao os limiares "bom" das Core Web Vitals, aplicados no regime
+  # para o qual foram DEFINIDOS: eles vieram de dados de campo (gente real, rede
+  # real, majoritariamente celular), e o Lighthouse os pontua sob exatamente
+  # este perfil movel. Cobra-los de uma medida de fibra e que e o uso frouxo.
+  #
+  # MEDIDOS antes de escolhidos (3 execucoes, PR da OS-50):
+  #   conforme  /gui/resiliente  sob 3g_rapido: FCP/LCP 208-212ms, TBT 0
+  #   ofensora  /gui/pesado      sob 3g_rapido: FCP/LCP 3376-3388ms, TBT 1242-1332
+  #   ofensora  /gui/pesado      SEM throttle:  FCP/LCP 68-76ms,     TBT 0
+  gui_fcp_ms_rede_lenta: 1800
+  gui_lcp_ms_rede_lenta: 2500
+  gui_tbt_ms_cpu_lento: 200

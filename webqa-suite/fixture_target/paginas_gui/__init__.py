@@ -140,6 +140,86 @@ RESILIENTE_HTML = f"""<!doctype html>
 </body></html>
 """
 
+# VIOLAÇÕES de desempenho SOB CONDIÇÃO DEGRADADA (gui, GUI-PERF-02/03, OS-50).
+#
+# Esta página existe porque a home NÃO serve para o que a OS-50 mede, e a
+# medição é que mostrou isso — não o projeto.
+#
+# **O bloqueio da home é imune a throttling de CPU, por construção.** Ele é
+# `while (Date.now() < fim)`: um laço com prazo de RELÓGIO. Estrangular a CPU em
+# ×4 reduz instruções por segundo, e não o relógio — então o laço sai no mesmo
+# instante e a tarefa dura os mesmos 110ms. Medido: TBT 363ms sob ×4 contra
+# 357ms sem throttle, uma diferença de 2%. Um check de CPU lenta apontado para a
+# home relataria "a degradação não mudou nada" e estaria certo pelo motivo
+# errado — mediria um alvo que não pode reagir ao que ele emula.
+#
+# A violação daqui é COMPUTACIONAL: trabalho de quantidade fixa, cujo tempo
+# escala com a velocidade da máquina. É o que a torna interessante — ela é
+# **invisível no desktop e severa no aparelho modesto**:
+#
+#   sem throttle  ~39ms por bloco → nenhuma tarefa longa, TBT 0
+#   sob CPU ×4   ~156ms por bloco → dez tarefas longas, TBT ~1000ms
+#
+# Um alvo assim passa em toda medição de laboratório e falha na mão de quem usa.
+# É exatamente a classe de defeito que só um perfil degradado encontra, e a razão
+# de esta OS existir.
+#
+# **O dimensionamento é apertado dos dois lados, e o número saiu de medição.** A
+# janela é estreita por aritmética, não por gosto: o bloco precisa ficar ABAIXO
+# de 50ms sem throttle (senão a violação aparece no desktop e deixa de ser o que
+# esta página existe para ser) e BEM ACIMA de 50ms sob ×4 (senão não há tarefa
+# longa e o TBT é zero). Como o fator é fixo em 4, isso confina a duração do
+# bloco à faixa 21ms–50ms na máquina de referência. `n` foi escolhido para cair
+# no meio dela (~39ms), e o número de blocos subiu de 6 para 10 porque é o outro
+# grau de liberdade: o TBT cresce com a CONTAGEM sem empurrar o bloco individual
+# para perto do teto de 50ms. Máquina muito mais rápida encolhe o bloco e pode
+# apagar o sinal — é limite conhecido, e por isso o veredito duro desta família
+# só existe sob `WEBQA_ORIGEM=vps`, onde a máquina é uma só e conhecida.
+#
+# Blocos REAGENDADOS por `setTimeout`, e não um laço só, pela lição da OS-40 já
+# registrada em `webqa/vitals_interacao.py`: dez blocos síncronos no mesmo
+# retorno ao laço de eventos são UMA tarefa para o navegador, e a API reporta 1
+# em vez de 10.
+_PESADO_JS = """
+var blocosRestantes = 10;
+function trabalhoComputacional() {
+  var soma = 0;
+  for (var i = 0; i < 3000000; i++) { soma += Math.sqrt(i) * Math.sin(i); }
+  window.__soma = soma;   // impede que a engine descarte o laco como morto
+  if (--blocosRestantes > 0) { setTimeout(trabalhoComputacional, 0); }
+}
+trabalhoComputacional();
+"""
+
+# VIOLAÇÃO (gui, GUI-PERF-02): folha de estilo que BLOQUEIA a renderização e pesa
+# o suficiente para a banda importar. Em fibra ela chega em ~50ms e não custa
+# nada; a 1638 kbps são ~3,4s em que a tela fica em branco — o defeito real de
+# quem publica uma folha única, não dividida e não minificada.
+#
+# Gerada em memória por repetição, e não guardada como arquivo: 700KB de blob no
+# repositório seriam opacos no diff, e o que a violação É precisa se ler no
+# código. O conteúdo é CSS válido e inerte de propósito — o peso é o defeito, e
+# misturar uma segunda violação aqui tornaria ambíguo o que o check acusa.
+_REGRA_DE_ENCHIMENTO = (
+    "/* peso deliberado: esta folha existe para custar banda, nao para estilizar */\n"
+    ".enchimento-%d { margin: 0; padding: 0; border: 0; outline: 0; }\n"
+)
+PESADO_CSS = "".join(_REGRA_DE_ENCHIMENTO % i for i in range(4200))
+
+PESADO_HTML = f"""<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catalogo — Loja Fixture</title>
+<link rel="stylesheet" href="/gui/pesado.css">
+</head><body>
+<main>
+  <h1>Catalogo de produtos</h1>
+  <p>Conteudo principal da pagina, que so aparece depois da folha de estilo.</p>
+</main>
+<script>{_PESADO_JS}</script>
+</body></html>
+"""
+
 # Caminhos servidos por `servir.py`. Mapa, e não uma cadeia de `elif`, porque o
 # teste que prova a ausência destas páginas no hash itera sobre ele — a lista
 # de páginas e a lista conferida são a mesma coisa, e não podem divergir.
@@ -147,6 +227,8 @@ PAGINAS_GUI: dict[str, tuple[bytes, str]] = {
     "/gui/estados": (ESTADOS_HTML.encode("utf-8"), "text/html; charset=utf-8"),
     "/gui/resiliente": (RESILIENTE_HTML.encode("utf-8"), "text/html; charset=utf-8"),
     "/gui/api/pedidos": (API_PEDIDOS.encode("utf-8"), "application/json"),
+    "/gui/pesado": (PESADO_HTML.encode("utf-8"), "text/html; charset=utf-8"),
+    "/gui/pesado.css": (PESADO_CSS.encode("utf-8"), "text/css; charset=utf-8"),
 }
 
 
