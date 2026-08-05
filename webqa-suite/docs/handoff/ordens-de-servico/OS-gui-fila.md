@@ -21,10 +21,18 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 | OS‑43 | #87 | `ae71d21` | `webqa/foco.py`: a caminhada de foco e os três critérios que ela sustenta |
 | OS‑44 | #88 | `29c1814` | `webqa/movimento.py` + smoke de GUI no `quality-gate` com aferição própria |
 | OS‑45 | #89 | `dee1199` | `webqa/tema.py` + `webqa/axe.py`: contraste em tema escuro, com pré‑checagem |
-| OS‑46 | — | — | `webqa/vitals_interacao.py`: TBT, long tasks e INP aproximado |
-| OS‑47 | — | — | `webqa/degradacao.py`: 500, sem resposta, JSON truncado e perda de conexão |
-| OS‑48 | — | — | `webqa/compatibilidade.py` + `webqa/menu.py`: matriz viewport × engine no noturno |
+| OS‑46 | #90 | `7c6b357` | `webqa/vitals_interacao.py`: TBT, long tasks e INP aproximado |
+| OS‑47 | #91 | `906a6ac` | `webqa/degradacao.py`: 500, sem resposta, JSON truncado e perda de conexão |
+| OS‑48 | #92 | `15d67ce` | `webqa/compatibilidade.py` + `webqa/menu.py`: matriz viewport × engine no noturno |
+| OS‑56 | #92 | `15d67ce` | `webqa/foco.py`: fim de ordem ≠ armadilha — o falso positivo de foco no Firefox |
 | OS‑49 | — | — | `webqa/imagem.py` + `evidencias.py` + `referencia_visual.py`: contrato visual |
+
+**Por que a OS‑56 aparece aqui e não na fila abaixo.** Ela não foi planejada: nasceu
+do run real da matriz da OS‑48, que acusou três `error` do Firefox em `test_foco.py`.
+Conserto de defeito achado por execução entra no PR que o expôs — separar em PR
+próprio faria a OS‑48 mergear sabidamente quebrada numa engine. A numeração pulou
+para 56 porque 50‑55 já estão reservadas na fila abaixo, e recontar OS já custou
+caro duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`).
 
 ---
 
