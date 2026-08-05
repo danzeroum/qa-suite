@@ -21,7 +21,14 @@ viewports:
   # 320 CSS px é a largura que a WCAG 1.4.10 (Reflow) exige que funcione — é o
   # equivalente a 400% de zoom num viewport de 1280. Não é "um celular
   # pequeno": é o teto da norma.
-  reflow_aa: {width: 320,  height: 640,  mobile: true, touch: true}
+  #
+  # E por isso NÃO é `mobile: true`. Com emulação móvel, uma página sem
+  # `<meta viewport>` recebe do Chromium o viewport de layout de fallback
+  # (980px) e é reduzida por escala: `scrollWidth` passa a ser igual a
+  # `clientWidth` e a rolagem horizontal DESAPARECE da medição — some
+  # exatamente o que este perfil existe para medir. A norma fala de 320 CSS
+  # px de viewport, não de um dispositivo.
+  reflow_aa: {width: 320,  height: 640}
 
 # Regiões voláteis excluídas do diff visual (OS-49).
 #

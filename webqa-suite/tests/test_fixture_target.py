@@ -219,6 +219,12 @@ def test_iscas_ficam_fora_da_identidade(monkeypatch):
     ('tabindex="2">Comprar', "GUI-FOCO-02 (ordem de tabulação, WCAG 2.4.3)"),
     ("position: fixed", "GUI-FOCO-03 (foco obscurecido, WCAG 2.4.11)"),
     ("width: 16px; height: 16px", "GUI-ALVO-01 (alvo de toque, WCAG 2.5.8)"),
+    # Dois alvos colados, e não um: um alvo pequeno SOZINHO é conforme pela
+    # exceção de espaçamento da própria norma. Foi o check que mostrou isso.
+    (".alvo-pequeno + .alvo-pequeno { margin-left: 2px; }",
+     "GUI-ALVO-01 (a exceção de espaçamento precisa cair)"),
+    ("passa a ocupar duas quando o usuario amplia",
+     "GUI-TIPO-01 (o texto precisa CABER a 100% para poder sumir a 200%)"),
     ("animation: girar 2s linear infinite", "GUI-MOV-01 (reduced-motion, WCAG 2.3.3)"),
     ("prefers-color-scheme: dark", "GUI-CONTR-01 (contraste no tema escuro, WCAG 1.4.3)"),
     ("carregando pedidos...", "GUI-RESIL-01 (falha de API sem tratamento)"),
@@ -302,17 +308,37 @@ def test_violacao_de_gui_na_home_muda_a_identidade(monkeypatch):
     assert identidade() != antes
 
 
-def test_contrato_nao_ganhou_check_de_gui():
-    """`esperado.json` INTACTO: nenhum check de `gui` existe ainda.
+def test_contrato_cobra_os_checks_de_gui_existentes():
+    """O contrato lista os checks de `gui` que JÁ existem — nem mais, nem menos.
 
-    A violação nasce antes do check de propósito (regra da casa: teste antes do
-    check, quando der). Enquanto `checks/gui/` não existir, uma entrada de `gui`
-    no contrato seria um id fantasma — e `tests/test_alvo_fixture.py` reprova
-    justamente isso.
+    Este teste nasceu na OS-40 exigindo o contrário: `esperado.json` INTACTO,
+    porque nenhum check de `gui` existia e uma entrada para teste inexistente
+    seria o id fantasma que `tests/test_alvo_fixture.py` reprova. Ele cumpriu o
+    papel e agora afirma o outro lado da mesma regra: check que nasce entra no
+    contrato no MESMO PR, senão o alvo passa a reprovar sem ninguém ter
+    declarado que devia.
+
+    A lista é explícita de propósito. Derivá-la de um glob sobre `checks/gui/`
+    faria a cobertura encolher junto com o código removido, fechando o furo no
+    papel e deixando-o aberto no contrato.
     """
     contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
-    ids = [*contrato["devem_falhar"], *contrato["fora_do_contrato"]]
-    assert not [i for i in ids if "checks/gui/" in i]
+    esperados = {
+        "checks/gui/test_alvos.py::test_area_minima_de_toque",
+        "checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px",
+        "checks/gui/test_reflow.py::test_zoom_200_nao_perde_conteudo",
+    }
+    declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
+    assert declarados == esperados
+
+
+def test_escopo_do_contrato_inclui_a_dimensao_gui():
+    """Sem `gui` na seleção, os três checks nem rodariam na execução interna — e
+    o contrato os cobraria como "a menos" a cada run. A seleção é lida do próprio
+    contrato por `tests/test_alvo_fixture.py`, então este é o único lugar em que
+    ela é afirmada."""
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    assert "gui" in contrato["escopo"]
 
 
 # ---------- Identidade do alvo (chave do ledger) ----------
