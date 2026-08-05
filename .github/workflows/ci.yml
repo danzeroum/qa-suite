@@ -75,6 +75,40 @@ jobs:
         run: pytest tests -m verification --cov=webqa --cov-report=term
              --cov-report=json:report/coverage.json --cov-fail-under=78
 
+      # ---------- Smoke de GUI ----------
+      #
+      # A dimensao `gui` ja e exercida na direcao "reprova o que deve": o
+      # contrato 1:1 (tests/test_alvo_fixture.py, dentro do passo acima) roda os
+      # checks contra o alvo fabricado e exige os 18 FAILs exatos.
+      #
+      # O que FALTA, e e o que este smoke acrescenta, e a direcao oposta: um
+      # check de GUI nao pode reprovar uma pagina CONFORME. O alvo fabricado tem
+      # uma - a politica de privacidade - e ela e o unico lugar deste job em que
+      # os checks rodam esperando verde. Falso positivo em bateria de
+      # acessibilidade custa a credibilidade da bateria inteira, e esta e a
+      # barreira que o pega antes de chegar num alvo real.
+      #
+      # Contra o alvo FABRICADO, em loopback: nenhum alvo externo, nenhuma carga
+      # (-m "gui and not load", e WEBQA_LOAD_AUTHORIZED segue ausente).
+      - name: Subir o alvo fabricado e apontar o smoke para a pagina conforme
+        run: |
+          python fixture_target/servir.py --url-file /tmp/alvo-gui.txt &
+          for _ in $(seq 1 40); do [ -s /tmp/alvo-gui.txt ] && break; sleep 0.5; done
+          test -s /tmp/alvo-gui.txt
+          echo "WEBQA_TARGET_URL=$(cat /tmp/alvo-gui.txt)/privacidade" >> "$GITHUB_ENV"
+          echo "NO_PROXY=*" >> "$GITHUB_ENV"
+          echo "no_proxy=*" >> "$GITHUB_ENV"
+          echo "WEBQA_REPORT_DIR=report/smoke-gui" >> "$GITHUB_ENV"
+
+      - name: Smoke de GUI contra a pagina conforme
+        run: pytest -m "gui and not load" -q
+
+      # A licao do D6: sem Chromium os checks de `gui` PULAM, o pytest sai 0 e o
+      # job ficaria verde sem ter exercido nada. Script proprio, e nao trecho
+      # embutido, para a guarda tambem ter teste (tests/test_afere_smoke_gui.py).
+      - name: O smoke exercitou os checks de GUI
+        run: python scripts/afere_smoke_gui.py report/smoke-gui/summary.json
+
       # Liga o "motor" do cockpit (D5k): medicoes.json a partir da cobertura recém
       # medida + ruff C901; depois o cockpit veste tudo. Ambiente limpo (sem gate
       # de rede) — a espinha do cockpit fica serena, como deve. Não bloqueia o PR.

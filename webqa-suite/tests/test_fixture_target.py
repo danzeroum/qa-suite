@@ -333,6 +333,7 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
         "checks/gui/test_foco.py::test_indicador_de_foco_visivel",
         "checks/gui/test_foco.py::test_ordem_de_tabulacao_segue_a_ordem_visual",
         "checks/gui/test_foco.py::test_foco_nao_obscurecido",
+        "checks/gui/test_preferencias.py::test_reduced_motion_respeitado",
     }
     declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
     assert declarados == esperados

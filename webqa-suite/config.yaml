@@ -49,3 +49,4 @@ thresholds:
   # produz salto legitimo; limiar zero reprovaria layout conforme.
   gui_foco_inversoes_max: 2
   gui_foco_obscurecido_max: 0 # WCAG 2.4.11 (nova na 2.2)
+  gui_animacoes_sob_rm_max: 0 # WCAG 2.3.3 — sob reduced-motion, nada se mexe
