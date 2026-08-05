@@ -9,37 +9,24 @@ obrigação legal — Lei Brasileira de Inclusão (13.146/2015), Art. 63: sítio
 devem ser acessíveis ao uso da pessoa com deficiência. Por isso estes testes
 contam nas duas dimensões do relatório; o agrupamento fica em `ux` (primeiro
 marker declarado), a contagem aparece também em `lgpd`.
+
+A obtenção verificada do axe-core mora em `webqa/axe.py` desde a OS-45: o
+contraste do tema escuro (`checks/gui/test_preferencias.py`) usa o MESMO par
+versão+hash, e duas cópias divergiriam no primeiro dia em que alguém atualizasse
+uma delas.
 """
 import json
 
 import pytest
 
+from webqa.axe import baixar_axe_verificado, violacoes_por_impacto
+
 pytestmark = [pytest.mark.ux, pytest.mark.lgpd, pytest.mark.browser]
-
-# Versão FIXADA + hash SHA-384 verificado antes de injetar (SRI manual):
-# CDN comprometido não roda script arbitrário no DOM da página sob teste.
-AXE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js"
-AXE_SHA384 = ("b91444cffa692592290e122db68c9b6953d29714"
-              "bb3457b5b423a41f741597e1f778cd9a2fdd1ad78d32cd829887c4c0")
-
-
-def _fetch_axe_verified(client) -> str:
-    """Baixa o axe-core e valida integridade; falha de hash é ERRO, não skip."""
-    import hashlib
-    resp = client.get(AXE_CDN)
-    resp.raise_for_status()
-    digest = hashlib.sha384(resp.content).hexdigest()
-    assert digest == AXE_SHA384, (
-        f"Integridade do axe-core FALHOU (sha384 {digest[:16]}… != esperado) — "
-        "possível comprometimento do CDN; script NÃO foi injetado."
-    )
-    return resp.text
-
 
 @pytest.fixture(scope="module")
 def axe_results(browser_page, settings, client):
     try:
-        axe_js = _fetch_axe_verified(client)
+        axe_js = baixar_axe_verificado(client)
     except AssertionError:
         raise
     except Exception as exc:
@@ -49,12 +36,8 @@ def axe_results(browser_page, settings, client):
     return browser_page.evaluate("async () => await axe.run()")
 
 
-def _by_impact(results, impact):
-    return [v for v in results["violations"] if v.get("impact") == impact]
-
-
 def test_sem_violacoes_criticas(axe_results, settings):
-    critical = _by_impact(axe_results, "critical")
+    critical = violacoes_por_impacto(axe_results, "critical")
     resumo = [{"id": v["id"], "help": v["help"], "nodes": len(v["nodes"])} for v in critical]
     assert len(critical) <= settings.threshold("a11y_critical_max"), (
         "Violações WCAG críticas:\n" + json.dumps(resumo, indent=2, ensure_ascii=False)
@@ -62,7 +45,7 @@ def test_sem_violacoes_criticas(axe_results, settings):
 
 
 def test_sem_violacoes_serias(axe_results, settings):
-    serious = _by_impact(axe_results, "serious")
+    serious = violacoes_por_impacto(axe_results, "serious")
     resumo = [{"id": v["id"], "help": v["help"], "nodes": len(v["nodes"])} for v in serious]
     assert len(serious) <= settings.threshold("a11y_serious_max"), (
         "Violações WCAG sérias:\n" + json.dumps(resumo, indent=2, ensure_ascii=False)
