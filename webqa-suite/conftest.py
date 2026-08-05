@@ -26,6 +26,7 @@ from webqa.http_utils import Timing, make_client, timed_get
 from webqa.navegacao import percorrer
 from webqa.navegador import engines_configurados
 from webqa.trackers import LoggedRequest, NetworkLog
+from webqa.viewports import opcoes_de_contexto
 
 
 @pytest.fixture(scope="session")
@@ -153,6 +154,42 @@ def browser_page(browser, credenciais_navegador, alvo_alcancavel):
     page = browser.new_page(**credenciais_navegador)
     yield page
     page.close()
+
+
+@pytest.fixture()
+def contexto_gui(browser, settings, credenciais_navegador, alvo_alcancavel):
+    """Fábrica de páginas em contexto NOVO — uma por variação de GUI.
+
+    Devolve `abrir(viewport=..., **opcoes)`, que abre um `browser.new_context`
+    próprio e o fecha no fim do teste. Todo check de `gui` passa por aqui, e
+    **nenhum deles toca `browser_page`**.
+
+    A regra não é higiene: `browser_page` é de SESSÃO e é a mesma página que
+    `checks/frontend/test_rendering.py` usa para medir FCP, LCP e CLS. Um check
+    de GUI que mudasse o viewport ou o tema nela deixaria as Web Vitals das
+    outras dimensões medidas num viewport que ninguém declarou — e o número
+    sairia errado sem nada ficar vermelho (R20). É a mesma lição que já fez o
+    `network_log` nascer com contexto virgem: estado herdado de um teste
+    anterior é o pior falso resultado possível, porque é silencioso.
+
+    As opções vêm de `webqa/viewports.py::opcoes_de_contexto`, que é pura — o
+    detalhe vive na biblioteca, os checks só conhecem esta fixture.
+    """
+    contextos = []
+
+    def abrir(viewport=None, **opcoes):
+        base = {"user_agent": settings.user_agent, **credenciais_navegador}
+        contexto = browser.new_context(**opcoes_de_contexto(viewport, **base, **opcoes))
+        contextos.append(contexto)
+        return contexto.new_page()
+
+    try:
+        yield abrir
+    finally:
+        # `finally`, e não depois do yield: teste que estoura no meio não pode
+        # deixar contexto de navegador vazando para o resto da sessão.
+        for contexto in contextos:
+            contexto.close()
 
 
 @pytest.fixture(scope="session")

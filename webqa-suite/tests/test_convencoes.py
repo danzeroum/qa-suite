@@ -235,3 +235,51 @@ def test_find_secrets_sempre_com_fase_explicita():
         "chamada a find_secrets sem `fase=` explícito:\n  " + "\n  ".join(ofensores)
         + "\nPasse fase= no ponto de chamada (A/B/C). Terceiro posicional é fácil "
           "de deslocar e etiqueta o achado com a fase errada em silêncio.")
+
+
+# ---- toda dimensão do laudo tem marcador registrado ----
+#
+# A regra que isto mecaniza: uma dimensão só existe de ponta a ponta quando
+# atravessa os pontos de integração. Registrar em `report.py::DIMENSIONS` sem
+# registrar o marcador em `pytest.ini` produz o pior par possível — os checks
+# nem coletam (`--strict-markers`), e quem só olhou o laudo acha que a dimensão
+# está lá. O inverso também engana: marcador registrado sem entrada em
+# DIMENSIONS faz os resultados caírem em `other`, e a dimensão some do relatório
+# rodando o tempo todo.
+#
+# Vale para a PRÓXIMA dimensão, que é o ponto: esta guarda foi escrita junto com
+# a `gui` (OS-41) para que ninguém precise lembrar da lição depois.
+
+def test_toda_dimensao_do_laudo_tem_marcador_registrado():
+    from webqa.report import DIMENSIONS
+
+    ini = (RAIZ / "pytest.ini").read_text(encoding="utf-8")
+    bloco = ini.split("markers =", 1)[1]
+    registrados = {linha.strip().split(":", 1)[0]
+                   for linha in bloco.splitlines() if ":" in linha}
+
+    faltando = sorted(d for d in DIMENSIONS if d not in registrados)
+    assert not faltando, (
+        f"dimensão em report.py::DIMENSIONS sem marcador em pytest.ini: {faltando}. "
+        "Com --strict-markers o check nem coleta, mas a dimensão aparece no laudo "
+        "como se estivesse coberta.")
+
+
+def test_marcador_de_dimensao_nao_fica_orfao_do_laudo():
+    """O outro sentido: marcador de dimensão sem entrada em DIMENSIONS faz o
+    resultado cair em `other` — a dimensão roda e some do relatório."""
+    from webqa.report import DIMENSIONS
+
+    # `browser` é ATRIBUTO de execução (exige navegador), não dimensão de
+    # qualidade: ele qualifica um teste de qualquer dimensão. Fica de fora por
+    # natureza, não por esquecimento.
+    atributos = {"browser"}
+    ini = (RAIZ / "pytest.ini").read_text(encoding="utf-8")
+    bloco = ini.split("markers =", 1)[1]
+    registrados = {linha.strip().split(":", 1)[0]
+                   for linha in bloco.splitlines() if ":" in linha} - atributos
+
+    orfaos = sorted(m for m in registrados if m not in DIMENSIONS)
+    assert not orfaos, (
+        f"marcador registrado que o laudo não conhece: {orfaos}. Resultado assim "
+        "agrupa como 'other' e a dimensão desaparece do relatório.")

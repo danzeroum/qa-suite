@@ -26,7 +26,7 @@ from webqa.sanitize import mascarar_valores_registrados, safe_url, sanitize_text
 
 DIMENSIONS = (
     "backend", "frontend", "ux", "functional", "acceptance", "load", "lgpd",
-    "seguranca", "verification",
+    "seguranca", "gui", "verification",
 )
 
 # Honestidade epistêmica no CÓDIGO, não só na documentação: quem lê o relatório
@@ -37,6 +37,13 @@ DIMENSION_NOTES = {
         "Falha PROVA não conformidade; passar NÃO certifica conformidade — "
         "base legal, contrato com operador, ROPA e governança interna não são "
         "observáveis por HTTP."
+    ),
+    "gui": (
+        "Medição da interface renderizada — geometria, CSS computado e tempo de "
+        "interação. Falha PROVA um defeito de interface: um alvo de toque de 16px "
+        "é pequeno demais em qualquer contexto. Passar NÃO certifica usabilidade — "
+        "satisfação, clareza de rótulo, carga cognitiva e uso real com tecnologia "
+        "assistiva não se deduzem de geometria conforme."
     ),
 }
 
