@@ -27,7 +27,18 @@ campanha: ; python scripts/campanha.py   # nivel sistema: alvos reais x N, conso
 # FCP/LCP/CLS preenchidos. Sem segredos e sem WEBQA_ORIGEM — nao toca o ledger.
 # Rodar FORA da janela do noturno; ver docs/VPS.md §campanha.
 campanha-vps: ; docker compose -f ../docker/compose.yml run --rm campanha
-verify: ; pytest -m verification tests
+# Residuo de `report/` muda a contagem do dogfooding: tests/test_report_dogfooding.py
+# le report/campanha/*/run*/summary.json e PULA quando nao ha execucao real, entao
+# "N passed, 3 skipped" deixa de ser reproduzivel entre maquinas — e quem compara com
+# o CI (que comeca limpo) persegue uma diferenca que nao existe no codigo.
+#
+# O aviso IGNORA summary.json/summary.html: toda execucao de pytest os reescreve,
+# entao avisar por causa deles dispararia sempre — e aviso que dispara sempre e
+# aviso que ninguem le. So o que a verificacao NAO produz sozinha e residuo.
+# AVISA e nao apaga: o artefato pode ser exatamente o que a pessoa esta investigando.
+verify:
+	@ls report 2>/dev/null | grep -qvE '^summary\.(json|html)$$' && echo "AVISO: report/ tem residuo alem do summary da ultima execucao (campanha/, smoke-gui/, medicoes...). A contagem de skips do dogfooding pode divergir do CI, que comeca limpo. Apague com 'rm -rf report' antes de comparar." || true
+	pytest -m verification tests
 # Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
 # Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
 cockpit: ; python scripts/cockpit.py --html
