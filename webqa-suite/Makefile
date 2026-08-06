@@ -49,6 +49,9 @@ verify:
 	@# engole print. Cobertura parcial silenciosa induz mais confianca que
 	@# cobertura nenhuma. A reprovacao em si e do tests/test_ancoras.py.
 	python scripts/afere_ancoras.py
+	@# Placar dos coletores JS_ sem check que os execute (OS-52), mesmo motivo:
+	@# o numero precisa aparecer, e pytest engole print.
+	python scripts/afere_simbolos.py
 # Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
 # Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
 cockpit: ; python scripts/cockpit.py --html

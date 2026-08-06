@@ -27,7 +27,9 @@
     "checks/ux/test_acessibilidade.py::test_imagens_com_alt",
     "checks/gui/test_jornada.py::test_o_visitante_procura_como_falar_com_a_loja",
     "checks/gui/test_jornada.py::test_nenhuma_página_deixa_o_visitante_sem_saída",
-    "checks/gui/test_preferencias.py::test_forced_colors_nao_apaga_informacao"
+    "checks/gui/test_preferencias.py::test_forced_colors_nao_apaga_informacao",
+    "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_ao_espelhamento_rtl",
+    "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_a_expansao_de_texto"
   ],
   "fora_do_contrato": {
     "checks/ux/test_acessibilidade.py::test_sem_violacoes_criticas": "baixa o axe-core de CDN com verificação de hash — resultado depende de rede externa, não é determinístico offline",
