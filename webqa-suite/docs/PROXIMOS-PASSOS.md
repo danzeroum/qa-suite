@@ -4,10 +4,10 @@ Documento de passagem para quem assume o projeto. Não repete o que os outros
 docs já explicam: aponta para eles, diz **onde o trabalho parou** e registra as
 decisões que um leitor do código sozinho não teria como deduzir.
 
-Base deste documento: `main` em `3272077` (pós OS-23 e OS-27).
+Base deste documento: `main` em `55ad6b6` (pós docs da camada GUI).
 
-A verificação da própria suíte tem hoje **638 testes coletados**; num ambiente
-limpo o resultado é **635 passed / 3 skipped**. Os 3 skips são de
+A verificação da própria suíte tem hoje **965 testes coletados**; num ambiente
+limpo o resultado é **962 passed / 3 skipped**. Os 3 skips são de
 `tests/test_report_dogfooding.py`, que exige uma execução real de `make campanha`
 para ter o que auditar — o número de coleta e o de aprovação só coincidem depois
 dela. Confundir os dois faz ambiente saudável parecer defeituoso.
@@ -49,6 +49,8 @@ Consulta, não leitura de entrada:
 | Doc | Quando abrir |
 |---|---|
 | [`LLM.md`](LLM.md) | contrato da camada de sumário por LLM local — leia antes de tocar em `webqa/llm.py` |
+| [`GUI.md`](GUI.md) | contrato da camada não funcional de GUI/usabilidade — leia antes de escrever qualquer coisa em `checks/gui/` |
+| [`GUI-CATALOGO.md`](GUI-CATALOGO.md) | catálogo priorizado dos testes de GUI e a especificação dos dez primeiros |
 | [`PLANO-TESTE-alvo-autenticado.md`](PLANO-TESTE-alvo-autenticado.md) | roteiro de campanha contra alvo com Basic Auth, na VPS — 6 fases, com a verificação de vazamento como gate |
 | [`TELEMETRIA.md`](TELEMETRIA.md) | o que a telemetria coleta, sobre quê, e as duas linhas que ela não cruza |
 | [`RECOMENDACOES.md`](RECOMENDACOES.md) | rastrear uma prática de engenharia até onde ela é coberta |
@@ -510,6 +512,42 @@ consecutivas** sem flake de infraestrutura. Hoje: 0/10.
 
 Global Privacy Control (`Sec-GPC: 1`) e heurísticas de fingerprinting.
 
+### 4.6 Camada GUI não funcional — EM EXECUÇÃO (Fase 2)
+
+Contrato em [`GUI.md`](GUI.md); catálogo e especificação dos dez primeiros em
+[`GUI-CATALOGO.md`](GUI-CATALOGO.md); fila executável em
+[`handoff/ordens-de-servico/OS-gui-fila.md`](handoff/ordens-de-servico/OS-gui-fila.md),
+que é onde o estado por OS fica atualizado — não aqui.
+
+A lacuna que ela fecha: os testes de `checks/ux/` são inspeção estática do DOM, e
+`checks/frontend/test_rendering.py` registra `PerformanceObserver` só para LCP e
+`layout-shift` — mede pintura e estabilidade, nunca **bloqueio**. Uma página pode
+aprovar em todas as vitals de carga e ficar surda ao teclado por mais um segundo.
+
+**Quatro coisas precisam sair no MESMO PR de cada check novo**, e nenhuma é
+opcional:
+
+1. o marcador `gui` em `pytest.ini` — `--strict-markers` transforma marcador não
+   registrado em erro de coleta, e as descrições ali são ASCII sem acento;
+2. a dimensão em `webqa/report.py::DIMENSIONS` — sem ela os resultados agrupam
+   como `other` e a dimensão existe no pytest sem existir no laudo;
+3. a nota epistêmica em `webqa/report.py::DIMENSION_NOTES` — geometria conforme
+   não é pessoa atendida, e quem lê o laudo não leu o contrato;
+4. os FAILs novos contra o alvo fixture em `fixture_target/esperado.json` (§2.8),
+   pelo nodeid exato — **ou a exclusão com motivo escrito**, quando o desfecho do
+   check não depender só do que o fixture serve. Dois casos já existem, e o
+   critério é um só: rede externa (o axe do contraste em tema escuro, OS‑45) e
+   ambiente declarado (o veredito de interatividade, que só reprova sob
+   `WEBQA_ORIGEM=vps`, OS‑46). Nos dois, entrar em `devem_falhar` faria o contrato
+   reprovar por ambiente em vez de por regressão — destruindo a única propriedade
+   que ele existe para ter.
+
+**E uma ordem que tem prazo.** A OS‑40 (acrescentar as violações de GUI ao alvo
+fixture) é a primeira da fila porque `identidade()` muda quando `HOME`/`APP_JS`/
+cookies mudam, e isso zera a caminhada do ledger. A sequência está em **0/10**
+hoje: zerar zero custa nada, zerar 8/10 custa oito noites. Adiar essa OS para a
+Fase 2 é pagar caro por comodidade.
+
 ---
 
 ## 5. Como trabalhar aqui
@@ -576,4 +614,14 @@ make telemetria        # agrega campanhas já executadas (não faz requisição)
 make vps-smoke         # valida a VPS antes de agendar o cron
 
 python scripts/estabilidade.py --recompute   # auditoria do ledger, sem gravar
+
+rm -rf report          # ANTES de comparar a contagem do dogfooding com o CI
 ```
+
+> **Resíduo em `report/` muda a contagem de skips.**
+> `tests/test_report_dogfooding.py` lê `report/campanha/*/run*/summary.json` e pula
+> quando não há execução real; com resíduo local ele deixa de pular, e o total de
+> skips do `make verify` não bate com o do CI, que começa limpo. Perseguir essa
+> diferença é procurar no código um defeito que está no disco. `make verify` avisa
+> quando o diretório existe — o aviso não apaga nada, porque o artefato pode ser
+> justamente o que se está investigando.

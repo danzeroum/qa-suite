@@ -11,6 +11,9 @@ que permanece necessariamente humano.
 - **TDD/BDD**: aceitação escrita em Given/When/Then executável (pytest-bdd).
 - **Análise estática/SAST**: ruff + bandit no CI para a suíte; headers OWASP
   verificados dinamicamente no alvo.
+- **Requisitos não funcionais (ISO 25010)**: performance, segurança e
+  confiabilidade já têm dimensão própria; usabilidade e compatibilidade ganham a
+  sua em `GUI.md` (planejada).
 
 ## UX
 - **Heurísticas de Nielsen**: automatizamos os proxies objetivos (título, feedback,
@@ -20,6 +23,12 @@ que permanece necessariamente humano.
   rotulação (textos de link/label) e hierarquia (headings).
 - **Design centrado no usuário**: Web Vitals + WCAG medem a experiência real;
   recomenda-se complementar com prototipação e testes moderados.
+- **Usabilidade não funcional**: reflow a 320 px, foco visível, ordem de
+  tabulação, contraste em tema claro e escuro, `prefers-reduced-motion` e tamanho
+  de alvo são medíveis por geometria e CSS computado, sem ferramenta nova —
+  contrato em `GUI.md`. **Limite**: leitor de tela real, clareza de rótulo e
+  satisfação continuam humanos, e nenhuma medida de geometria responde à única
+  pergunta que importa — "a pessoa conseguiu?".
 
 ## Arquitetura
 - **Atributos de qualidade**: cada dimensão da suíte mapeia um -ility (performance,

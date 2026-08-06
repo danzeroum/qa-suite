@@ -1,0 +1,9 @@
+{
+  "sha256": "b216d3192c03ef396ecaf0c9d3efb0c18b012f17cb7425eb5edef9acb070b740",
+  "engine": "chromium",
+  "viewport": "desktop",
+  "tema": "light",
+  "pagina": "/gui/visual#.c",
+  "gravado_em": "2026-08-05 19:50:45 UTC",
+  "motivo": "linha de base do alvo fabricado, regravada por `make referencia-visual` contra a página sem texto do contrato visual — recorte do componente .c"
+}

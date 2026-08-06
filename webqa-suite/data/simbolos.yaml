@@ -1,0 +1,11 @@
+# Coletores `JS_*` de `webqa/` que NENHUM check executa, e por quê.
+#
+# Conferido por `scripts/afere_simbolos.py`. Entrada sem motivo reprova como se
+# não existisse: dispensa que ninguém consegue revisar depois é dispensa que não
+# vale. Entrada para símbolo que já não existe também reprova — dispensa órfã
+# esconde a próxima de verdade.
+#
+# Vazia é o estado saudável. Ela existe para o caso legítimo (coletor entregue
+# numa OS e consumido na seguinte, com a espera declarada), não para acomodar
+# instrumento esquecido.
+sem_consumidor: {}

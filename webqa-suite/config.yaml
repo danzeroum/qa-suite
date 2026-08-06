@@ -37,3 +37,73 @@ thresholds:
   max_console_errors: 0
   a11y_critical_max: 0
   a11y_serious_max: 0
+  # Dimensao gui (OS-42). So NUMERO cabe aqui: load_settings faz float() em
+  # toda chave. Viewport, mascara e politica vao para data/gui-perfis.yaml.
+  gui_overflow_x_px: 0        # WCAG 1.4.10 — rolagem horizontal a 320 CSS px
+  gui_zoom_perdidos_max: 0    # WCAG 1.4.4 — conteudo que some a 200%
+  gui_alvo_toque_px: 24       # WCAG 2.5.8 AA
+  gui_alvo_toque_meta_px: 44  # meta de plataforma: abaixo disso e ALERTA, nao achado
+  gui_foco_invisivel_max: 0   # WCAG 2.4.7 — um controle sem indicador ja quebra a cadeia
+  # WCAG 2.4.3. FOLGADO de proposito na Fase 1: a inversao e medida por
+  # geometria, e a geometria nao conhece a intencao do layout. Grade densa
+  # produz salto legitimo; limiar zero reprovaria layout conforme.
+  gui_foco_inversoes_max: 2
+  gui_foco_obscurecido_max: 0 # WCAG 2.4.11 (nova na 2.2)
+  gui_animacoes_sob_rm_max: 0 # WCAG 2.3.3 — sob reduced-motion, nada se mexe
+  # GUI-PERF-01 (OS-46). Orcamento de interatividade: so reprova sob
+  # WEBQA_ORIGEM=vps; fora do ambiente oficial o estouro vira xfail com motivo.
+  # Afrouxar estes numeros para caber na maquina mais barulhenta seria o R5.
+  gui_tbt_ms: 200             # Total Blocking Time — faixa "bom" do Lighthouse
+  gui_inp_ms: 200             # INP aproximado; "bom" do Core Web Vitals
+  gui_long_tasks_max: 5       # tarefas acima de 50ms; TBT e contagem NAO se reduzem
+  # GUI-RESIL (OS-47). Erros de console contados em relacao a carga SAUDAVEL: o
+  # alvo que ja erra antes da falha nao pode ser cobrado aqui pelo defeito de
+  # outro check. Tentativas com comparador `>`: recuo exponencial e legitimo.
+  gui_console_erros_pos_falha_max: 3
+  gui_resil_tentativas_max: 5
+  # GUI-RESP-03/05 e GUI-COMPAT-01 (OS-48).
+  # Fracao da MENOR caixa: um botao pequeno coberto por um painel grande esta
+  # 100% inacessivel, e dividir pela area do painel diria "quase nada".
+  gui_sobreposicao_fracao: 0.30
+  gui_sobreposicao_max: 0
+  # Antialiasing, sub-pixel e metricas de fonte diferem por engine. Abaixo de 4px
+  # o desvio e da engine, nao do layout — e reprovar por isso enterraria o sinal
+  # verdadeiro numa lista de diferencas de 1px.
+  gui_compat_tolerancia_px: 4
+  # GUI-VIS-01/02 (OS-49). Tolerancia POR CANAL, com comparador `>`: no desvio
+  # exatamente igual o bloco ainda esta dentro. Absorve antialiasing de borda sem
+  # absorver mudanca de forma — a pagina do contrato e sem texto justamente para
+  # que esse numero possa ser baixo.
+  gui_visual_tolerancia_canal: 8
+  # GUI-PERF-02/03 (OS-50). Orcamentos PROPRIOS da condicao degradada, NUNCA os
+  # de fibra — e as chaves sao separadas mesmo quando o numero coincide, porque
+  # o que precisa poder divergir e o REGIME, nao o valor de hoje. Reusar
+  # `lcp_ms` faria uma edicao mover os dois regimes de uma vez, em silencio.
+  #
+  # Divergem de proposito do precedente do GUI-RESP-04, que REUSA `cls`: CLS e
+  # adimensional e independe da condicao (o layout salta ou nao salta em
+  # qualquer largura). Estes tres sao TEMPO, e tempo sob 3G nao e a mesma
+  # grandeza que tempo sob fibra — uma regua so seria absurdamente frouxa num
+  # regime ou absurdamente dura no outro.
+  #
+  # Os numeros sao os limiares "bom" das Core Web Vitals, aplicados no regime
+  # para o qual foram DEFINIDOS: eles vieram de dados de campo (gente real, rede
+  # real, majoritariamente celular), e o Lighthouse os pontua sob exatamente
+  # este perfil movel. Cobra-los de uma medida de fibra e que e o uso frouxo.
+  #
+  # MEDIDOS antes de escolhidos (3 execucoes, PR da OS-50):
+  #   conforme  /gui/resiliente  sob 3g_rapido: FCP/LCP 208-212ms, TBT 0
+  #   ofensora  /gui/pesado      sob 3g_rapido: FCP/LCP 3376-3388ms, TBT 1242-1332
+  #   ofensora  /gui/pesado      SEM throttle:  FCP/LCP 68-76ms,     TBT 0
+  # GUI-CONTR-03 (OS-52). Informacao que era so cor e some sob forced-colors.
+  # Zero: se a cor era o UNICO portador, perde-la e perder a informacao — e a
+  # 1.4.1 ja proibe cor como portador unico, entao um alvo conforme tem zero.
+  # GUI-RESP i18n/RTL (OS-52). Zero nos dois: extravasar a tela ou cortar texto
+  # nao tem versao aceitavel. A tolerancia de RUIDO (2px) mora no check, nao
+  # aqui — ela e propriedade da medicao, e o orcamento e do alvo.
+  gui_rtl_quebrados_max: 0
+  gui_expansao_perdidos_max: 0
+  gui_fc_informacao_perdida_max: 0
+  gui_fcp_ms_rede_lenta: 1800
+  gui_lcp_ms_rede_lenta: 2500
+  gui_tbt_ms_cpu_lento: 200

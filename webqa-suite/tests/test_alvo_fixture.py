@@ -1,4 +1,4 @@
-"""VERIFICAÇÃO (nível sistema): as dimensões lgpd e seguranca detectam o que prometem detectar.
+"""VERIFICAÇÃO (nível sistema): as dimensões lgpd, seguranca e gui detectam o que prometem.
 
 Este é o teste mais valioso da suíte e o mais desconfortável de escrever: sobe um
 alvo com violações conhecidas, roda a dimensão inteira contra ele e exige que os
@@ -41,9 +41,17 @@ def contrato() -> dict:
 
 @pytest.fixture(scope="module")
 def execucao(tmp_path_factory) -> dict:
-    """Sobe o alvo fixture, roda `pytest -m "lgpd or seguranca"` contra ele e devolve o summary."""
+    """Sobe o alvo fixture, roda a seleção do contrato contra ele e devolve o summary.
+
+    O escopo está declarado em `esperado.json::escopo` e é lido DAQUI, não
+    digitado duas vezes: contrato e execução divergindo é a forma mais silenciosa
+    de o teste conferir outra coisa que não o que promete conferir.
+    """
     pytest.importorskip("playwright", reason="Playwright ausente: teste de sistema exige navegador.")
     saida = tmp_path_factory.mktemp("alvo-fixture")
+    # `pytest -m "..."` do contrato, sem o prefixo: uma fonte só para a seleção.
+    selecao = json.loads(CONTRATO.read_text(encoding="utf-8"))["escopo"]
+    selecao = selecao.split("-m", 1)[1].strip().strip('"')
 
     with AlvoFixture() as alvo:
         env = {
@@ -55,7 +63,7 @@ def execucao(tmp_path_factory) -> dict:
             "no_proxy": "*",
         }
         proc = subprocess.run(
-            [sys.executable, "-m", "pytest", "-m", "lgpd or seguranca", "-p", "no:cacheprovider", "-q"],
+            [sys.executable, "-m", "pytest", "-m", selecao, "-p", "no:cacheprovider", "-q"],
             cwd=RAIZ, env=env, capture_output=True, text=True, timeout=900,
         )
 

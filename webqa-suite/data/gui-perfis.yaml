@@ -1,0 +1,276 @@
+# Perfis da dimensão `gui` — o que NÃO é orçamento numérico.
+#
+# A partição é do código, não de estilo: `load_settings` faz `float()` em TODA
+# chave de `config.yaml::thresholds` (webqa/config.py), então só número cabe lá.
+# Viewport é um mapa, máscara é uma lista e política é booleano — nada disso
+# sobrevive a um `float()`. Aqui é o outro lado dessa fronteira.
+#
+# Contrato: docs/GUI.md §3.3. Precedente de dado versionado em data/:
+# data/caminhos-sensiveis.yaml.
+
+# Matriz de viewports. A EXECUÇÃO escolhe quais rodar por WEBQA_VIEWPORTS
+# (webqa/viewports.py) — default mobile+desktop no PR, matriz completa no
+# noturno. Fail-closed: nome desconhecido é erro, nunca filtro silencioso.
+viewports:
+  # `mobile` e `desktop` são o default: cobrem os dois extremos que mais
+  # quebram, sem dobrar o tempo do PR.
+  mobile:    {width: 390,  height: 844,  mobile: true, touch: true}
+  tablet:    {width: 820,  height: 1180, mobile: true, touch: true}
+  desktop:   {width: 1366, height: 768}
+  ultrawide: {width: 2560, height: 1080}
+  # 320 CSS px é a largura que a WCAG 1.4.10 (Reflow) exige que funcione — é o
+  # equivalente a 400% de zoom num viewport de 1280. Não é "um celular
+  # pequeno": é o teto da norma.
+  #
+  # E por isso NÃO é `mobile: true`. Com emulação móvel, uma página sem
+  # `<meta viewport>` recebe do Chromium o viewport de layout de fallback
+  # (980px) e é reduzida por escala: `scrollWidth` passa a ser igual a
+  # `clientWidth` e a rolagem horizontal DESAPARECE da medição — some
+  # exatamente o que este perfil existe para medir. A norma fala de 320 CSS
+  # px de viewport, não de um dispositivo.
+  reflow_aa: {width: 320,  height: 640}
+
+# Condições de rede e CPU emuladas por CDP (GUI-PERF-02/03, OS-50).
+#
+# A EXECUÇÃO escolhe o perfil por WEBQA_GUI_PERFIL_REDE; default `3g_rapido`.
+# Fail-closed: nome desconhecido é erro nomeando os válidos, nunca "rodou sem
+# estrangular e passou" — que é o pior verde possível aqui, porque o check
+# anuncia ter medido 3G e mediu fibra.
+#
+# Banda em kbps (é assim que rede se fala); a conversão para bytes/s que o CDP
+# exige mora em `webqa/rede_simulada.py`, num lugar só. Passar kbps direto ao
+# comando emularia uma rede OITO vezes mais rápida do que a declarada, sem nada
+# ficar vermelho — por isso a conversão tem teste nas duas pontas.
+rede:
+  # Não são números da casa: é o preset móvel PADRÃO do Lighthouse (`slow 4G`
+  # simulado — 1638.4 kbps, 150ms RTT, CPU ×4). Herdar a régua de uma ferramenta
+  # de referência é o que torna o número comparável com o que qualquer pessoa
+  # mede fora daqui; inventar um perfil próximo deste produziria medidas que só
+  # conversam consigo mesmas.
+  3g_rapido:
+    download_kbps: 1638.4
+    upload_kbps: 750
+    latencia_ms: 150
+    cpu_fator: 4
+
+# Regiões voláteis excluídas do diff visual (OS-49).
+#
+# Seletor CSS, NUNCA coordenada: coordenada envelhece a cada mudança de layout
+# e passa a mascarar a região errada — em silêncio, que é o pior jeito de uma
+# máscara falhar. Vazio hoje; cada entrada nasce com um alvo real que a exigiu.
+mascaras: []
+
+# Vocabulário do check de resiliência (GUI-RESIL-01, OS-47).
+resiliencia:
+  # Termos que uma mensagem de erro voltada ao visitante nunca deve conter.
+  # A comparação é sem acento e sem caixa (webqa/degradacao.py), e roda só sobre
+  # TEXTO VISÍVEL — o mesmo termo em comentário, atributo ou <script> não conta.
+  # Sem esse recorte a lista reprovaria meia internet pelo fonte de uma
+  # biblioteca, e falso positivo é o defeito mais caro que uma bateria tem.
+  termos_proibidos:
+    - "Traceback"
+    - "NullPointer"
+    - "undefined is not"
+    - "500 Internal"
+    - "SQLSTATE"
+    - "Exception in"
+    # Os três abaixo entraram na OS-47 com caso real medido: são o que o
+    # navegador produz quando a resposta da API não é o que o código esperava, e
+    # o que uma página despeja na tela quando trata a falha com
+    # `catch(e => elemento.textContent = e)`. Medidos contra o alvo fabricado:
+    # "SyntaxError: Unexpected token '<'" sob 500 com corpo HTML e
+    # "SyntaxError: Unterminated string in JSON" sob resposta truncada.
+    - "SyntaxError"
+    - "TypeError"
+    - "Failed to fetch"
+  # Sinal de que existe mensagem de erro reconhecível. É HEURÍSTICA e o check
+  # a trata como tal: ausência vira alerta, nunca reprovação — vocabulário não
+  # cobre alvo internacionalizado, e reprovar com heurística fraca custa a
+  # credibilidade da bateria inteira.
+  vocabulario_de_erro:
+    - "erro"
+    - "falha"
+    - "indisponivel"
+    - "tente novamente"
+    - "error"
+    - "failed"
+    - "unavailable"
+    - "try again"
+
+# Contrato visual (GUI-VIS-01/02, OS-49). Só páginas FABRICADAS: `report/` nunca
+# é versionado e captura de alvo real não é versionável por causa do R19 —
+# pixel não passa pela borda de sanitização.
+visual:
+  paginas:
+    # `regravar: false` na página deslocada é o que mantém a direção `failed`
+    # viva: `make referencia-visual` a pularia, senão o defeito se
+    # autocorrigiria no primeiro regravamento e o check nunca mais reprovaria.
+    - caminho: "/gui/visual"
+      viewport: "desktop"
+      regravar: true
+      componentes: [".a", ".c"]
+    - caminho: "/gui/visual-mudado"
+      viewport: "desktop"
+      regravar: false
+      componentes: []
+
+# Tarefas de jornada (GUI-JORN-01/02, OS-51).
+#
+# São as MESMAS tarefas que o protocolo humano (OS-54) leva para a sessão
+# moderada — é o que torna TSR e ToT sintético e humano comparáveis na mesma
+# régua. Quem conhece o alvo declara aqui; o check não adivinha tarefa, do mesmo
+# jeito que não adivinha rota.
+#
+# `procura` são as palavras que a PESSOA levaria na cabeça — é o que o rótulo do
+# link precisa evocar para ser encontrável. `marco` é como se reconhece que
+# chegou: o texto que ela leria na página de destino para ter certeza. A
+# comparação é sem acento e sem caixa.
+#
+# Fail-closed: cenário que cite tarefa inexistente é ERRO nomeando as válidas,
+# nunca "não mediu e passou".
+jornadas:
+  # Direção CONFORME contra o alvo fabricado: a home rotula o link como
+  # "Politica de Privacidade", que é exatamente o que se procura — um clique,
+  # zero excedente. É o lado que prova que o check não reprova tudo.
+  - nome: "encontrar a política de privacidade"
+    procura: ["politica", "privacidade"]
+    marco: "Politica de Privacidade"
+    # 1, e não 0: a home oferece DOIS links para o mesmo destino ("Privacidade" e
+    # "Politica de Privacidade"), e um alvo real costuma ter o mesmo conteúdo
+    # atrás de rodapé e de menu. Teto zero transformaria redundância legítima de
+    # navegação em achado.
+    cliques_extras_max: 1
+    # Orçamento de tarefa, não de página: inclui a leitura dos rótulos e as
+    # navegações. Folgado de propósito — o que ele pega é a rota que demora, não
+    # a página que demora (isso é GUI-PERF).
+    tot_ms: 8000
+  # Direção FAILED: nenhum rótulo do alvo fabricado evoca atendimento, e não há
+  # página de contato alcançável. A pessoa desiste na home, e desistir é
+  # resultado (TSR=0), não erro do medidor. Loja sem rota para falar com alguém é
+  # defeito de usabilidade de verdade — não foi preciso plantar nada.
+  - nome: "encontrar como falar com a loja"
+    procura: ["contato", "atendimento", "falar", "suporte"]
+    marco: "Fale conosco"
+    cliques_extras_max: 1
+    tot_ms: 8000
+
+# Marcos comparados entre engines (GUI-COMPAT-01, OS-48).
+#
+# Lista CURTA e declarada, e não "todo elemento": antialiasing de fonte,
+# arredondamento de sub-pixel e métricas de fonte diferem por engine, então
+# comparar tudo produziria dezenas de divergências de 1px que não são defeito —
+# e o sinal verdadeiro (o cabeçalho que só no WebKit cobre o conteúdo) morreria
+# no ruído. Quem conhece o alvo decide o que é estrutural nele.
+#
+# Marco ausente numa engine é achado à parte (`ausentes_de`), e o mais grave:
+# não produz desvio de pixel nenhum porque não há caixa para medir.
+compatibilidade:
+  marcos:
+    - "body"
+    - "h1"
+    - "main, #gui"
+    - "form"
+    - "nav, [role=navigation]"
+
+# Conformidade: mapa critério WCAG -> NODEID, e os três estados do VPAT (OS-53).
+#
+# **Populado lendo cada CHECK, não cada critério.** A tentação é partir da lista
+# da WCAG e "achar" um teste para cada linha — é assim que nasce VPAT que
+# promete. Partindo dos checks, o que sobra sem critério é DECLARADO, e o que
+# sobra sem teste vira `exige_humano` ou `nao_coberto`, que são as duas linhas
+# honestas.
+#
+# Guarda bidirecional (`webqa/conformidade.py`): nodeid citado aqui que não
+# existe na coleta reprova, e check de `gui` que não esteja nem mapeado nem em
+# `sem_criterio` reprova. Sem os dois lados, o mapa envelhece mentindo.
+conformidade:
+  # Critérios que UM TESTE cobre. O nodeid é a prova; o ID de catálogo não serve
+  # aqui porque não é o que a coleta produz.
+  criterios:
+    "1.4.1":
+      nome: "Uso de cor"
+      nodeids: ["checks/gui/test_preferencias.py::test_forced_colors_nao_apaga_informacao"]
+    "1.4.3":
+      nome: "Contraste (mínimo)"
+      nodeids: ["checks/gui/test_preferencias.py::test_contraste_em_tema_escuro"]
+    "1.4.4":
+      nome: "Redimensionar texto"
+      nodeids: ["checks/gui/test_reflow.py::test_zoom_200_nao_perde_conteudo"]
+    "1.4.10":
+      nome: "Reflow"
+      nodeids: ["checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px"]
+    "2.1.1":
+      nome: "Teclado"
+      nodeids: ["checks/gui/test_responsividade.py::test_navegacao_principal_utilizavel_em_mobile"]
+    "2.3.3":
+      nome: "Animação por interação"
+      nodeids: ["checks/gui/test_preferencias.py::test_reduced_motion_respeitado"]
+    "2.4.3":
+      nome: "Ordem de foco"
+      nodeids: ["checks/gui/test_foco.py::test_ordem_de_tabulacao_segue_a_ordem_visual"]
+    "2.4.7":
+      nome: "Foco visível"
+      nodeids: ["checks/gui/test_foco.py::test_indicador_de_foco_visivel"]
+    "2.4.11":
+      nome: "Foco não obscurecido (mínimo)"
+      nodeids: ["checks/gui/test_foco.py::test_foco_nao_obscurecido"]
+    "2.5.8":
+      nome: "Tamanho de alvo (mínimo)"
+      nodeids: ["checks/gui/test_alvos.py::test_area_minima_de_toque"]
+
+  # Critérios que a suíte NÃO consegue julgar sozinha, e que aparecem no VPAT de
+  # propósito: omiti-los fingiria completude. Cada um com o que falta.
+  exige_humano:
+    "1.1.1":
+      nome: "Conteúdo não textual"
+      motivo: "presença de `alt` é automatizável e já é medida; se o texto DESCREVE a imagem é julgamento humano"
+    "1.3.1":
+      nome: "Informação e relações"
+      motivo: "a árvore de acessibilidade é proxy; se a estrutura corresponde ao sentido exige leitor de tela real"
+    "2.4.6":
+      nome: "Cabeçalhos e rótulos"
+      motivo: "se o rótulo DESCREVE o propósito não é decidível por máquina"
+    "3.3.2":
+      nome: "Rótulos ou instruções"
+      motivo: "suficiência da instrução é compreensão, não estrutura"
+    "4.1.2":
+      nome: "Nome, função, valor"
+      motivo: "NVDA/JAWS/VoiceOver não rodam em CI Linux headless; o que se automatiza é proxy"
+
+  # Checks de `gui` que NÃO correspondem a critério WCAG, declarados um a um. Sem
+  # esta lista a guarda não teria como distinguir "esqueceram de mapear" de "não
+  # há critério" — e a primeira é defeito, a segunda é fato.
+  sem_criterio:
+    "checks/gui/test_compatibilidade.py::test_geometria_dos_marcos_nao_diverge_entre_engines": "paridade entre engines; a WCAG não fala de engines"
+    "checks/gui/test_compatibilidade.py::test_sem_erro_de_console_exclusivo_de_uma_engine": "idem"
+    "checks/gui/test_interatividade.py::test_tbt_long_tasks_e_inp": "Core Web Vitals / ISO 25010, não WCAG"
+    "checks/gui/test_perf_condicoes.py::test_pintura_sob_rede_lenta": "idem, sob condição degradada"
+    "checks/gui/test_perf_condicoes.py::test_bloqueio_sob_cpu_lenta": "idem"
+    "checks/gui/test_responsividade.py::test_cls_por_viewport": "estabilidade visual (CWV), não WCAG"
+    "checks/gui/test_responsividade.py::test_sem_sobreposicao_de_interativos": "geometria de interativos; a 2.5.8 fala de TAMANHO e espaçamento, não de sobreposição — mapear aqui seria forçar"
+    "checks/gui/test_resiliencia.py::test_erro_500_na_api_nao_vaza_detalhe_tecnico": "Nielsen H9 (recuperação de erro), não WCAG"
+    "checks/gui/test_resiliencia.py::test_api_que_nao_responde_avisa_o_visitante": "idem"
+    "checks/gui/test_resiliencia.py::test_json_truncado_nao_vaza_detalhe_tecnico": "idem"
+    "checks/gui/test_resiliencia.py::test_perda_de_conexao_e_comunicada": "idem"
+    "checks/gui/test_jornada.py::test_o_visitante_encontra_a_política_de_privacidade": "usabilidade quantitativa (TSR), não WCAG"
+    "checks/gui/test_jornada.py::test_o_visitante_procura_como_falar_com_a_loja": "idem"
+    "checks/gui/test_jornada.py::test_nenhuma_página_deixa_o_visitante_sem_saída": "idem"
+    "checks/gui/test_jornada.py::test_o_visitante_conclui_a_tarefa_no_tempo_previsto": "idem (ToT)"
+    "checks/gui/test_visual.py::test_paginas_estaveis_contra_a_linha_de_base": "regressão visual; a WCAG não fala de mudança não intencional"
+    "checks/gui/test_visual.py::test_componentes_estaveis_contra_a_linha_de_base": "idem"
+    "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_ao_espelhamento_rtl": "qualidade de i18n; espelhamento não é critério da WCAG"
+    "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_a_expansao_de_texto": "idem; a 1.4.12 fala de ESPAÇAMENTO aplicado, não de tradução mais longa"
+
+# Mapa critério WCAG -> teste. É o insumo do VPAT/ACR (docs/GUI.md §6) e existe
+# para que ninguém precise deduzir cobertura a partir de nome de arquivo.
+# Preenchido conforme cada check nasce; hoje declara a INTENÇÃO das OS-42/43/44.
+wcag:
+  "1.4.3":  [GUI-CONTR-01]
+  "2.1.1":  [GUI-RESP-05]
+  "1.4.4":  [GUI-TIPO-01]
+  "1.4.10": [GUI-RESP-01]
+  "2.3.3":  [GUI-MOV-01]
+  "2.4.3":  [GUI-FOCO-02]
+  "2.4.7":  [GUI-FOCO-01]
+  "2.4.11": [GUI-FOCO-03]
+  "2.5.8":  [GUI-ALVO-01]

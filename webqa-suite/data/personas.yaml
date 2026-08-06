@@ -1,0 +1,19 @@
+# Personas da exploração assistida (GUI-EXPL-01, OS-55).
+#
+# Versionadas, nunca embutidas no código: persona em string de Python é decisão
+# de produto escondida: quem quiser explorar com outro olhar teria de editar
+# Python, e a mudança não apareceria num diff de configuração.
+#
+# Cada uma é um ÂNGULO de leitura do mesmo mapa, não um usuário fictício com
+# biografia. Biografia não muda o que o modelo consegue ver num grafo de links —
+# ângulo muda.
+personas:
+  apressado: >-
+    quer resolver uma coisa só e sair; lê apenas os rótulos mais salientes e
+    desiste rápido quando o primeiro clique não leva ao esperado
+  literal: >-
+    procura exatamente a palavra que tem na cabeça; não infere sinônimos, então
+    "Fale conosco" e "Contato" são lugares diferentes para ela
+  primeira_vez: >-
+    nunca viu este site nem outros do mesmo ramo; não sabe onde convencionalmente
+    ficam política, contato e ajuda

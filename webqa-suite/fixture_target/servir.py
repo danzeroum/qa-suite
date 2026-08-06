@@ -35,6 +35,16 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+try:
+    # Caminho normal: importado como pacote (`from fixture_target import servir`).
+    from fixture_target.paginas_gui import PAGINAS_GUI
+except ImportError:  # pragma: no cover - só na execução direta
+    # `python fixture_target/servir.py` (Makefile e docker/entrypoint.sh) põe a
+    # PRÓPRIA pasta no sys.path, e aí o nome do pacote não resolve. As duas
+    # formas de subir o alvo têm de funcionar: uma é como os testes o usam, a
+    # outra é como a VPS o sobe todas as noites.
+    from paginas_gui import PAGINAS_GUI
+
 HOST = "127.0.0.1"
 
 # Domínio reservado pela RFC 2606: garantidamente inexistente, sem tráfego real.
@@ -59,9 +69,33 @@ COOKIES = (
 # exemplo público da documentação da AWS — formato válido, valor inerte, e
 # nenhum segredo real entra no repositório. O check tem de detectá-la e o
 # relatório tem de mostrá-la MASCARADA.
+#
+# VIOLAÇÃO (gui, GUI-PERF-01): seis blocos de ~110ms bloqueiam a thread
+# principal durante a carga. São 6 long tasks (> 50ms cada) e TBT ≈ 6 × (110−50)
+# = 360ms, acima do orçamento de 200ms. Precisa estar AQUI, e não numa página
+# nova: o bloqueio só é medível na página que o check carrega, e `app.js` é o
+# que a home puxa. É a única constante hasheada que esta OS toca por vontade
+# própria — ver o comentário de `identidade()`.
+#
+# **Os blocos são reagendados, não sequenciais num laço só.** Um `for` com seis
+# iterações síncronas é UMA tarefa de 660ms para o navegador, e a API de
+# `longtask` reporta 1, não 6 — a validação em navegador real mostrou
+# exatamente isso. Só o retorno ao laço de eventos (`setTimeout`) separa uma
+# tarefa da seguinte. O primeiro bloco fica síncrono de propósito: é ele que
+# atrasa o DOMContentLoaded, como um bundle pesado de verdade faria.
+#
+# Bloqueio por laço com prazo, nunca `while(true)`: seis tarefas curtas e
+# limitadas produzem o sinal sem risco de travar o navegador se algo mudar.
 APP_JS = (
     "// Bundle do alvo fixture.\n"
     "var config = { region: 'us-east-1', accessKeyId: 'AKIAIOSFODNN7EXAMPLE' };\n"
+    "var blocosRestantes = 6;\n"
+    "function bloquearThreadPrincipal() {\n"
+    "  var fim = Date.now() + 110;\n"
+    "  while (Date.now() < fim) { /* bloqueio deliberado */ }\n"
+    "  if (--blocosRestantes > 0) { setTimeout(bloquearThreadPrincipal, 0); }\n"
+    "}\n"
+    "bloquearThreadPrincipal();\n"
     "console.log('fixture');\n"
 )
 
@@ -168,9 +202,142 @@ JPEG_BASE = base64.b64decode(
 
 FOTO_GPS = _foto_com_gps()
 
+# Bloco de GUI da home. Fica numa constante própria só para o diff ficar
+# legível; o VALOR é interpolado em HOME, então mexer aqui muda `identidade()`
+# exatamente como mexer no resto da home — não há porta dos fundos para o hash.
+#
+# Cada regra abaixo é a contraparte de um dos dez primeiros checks
+# (docs/GUI-CATALOGO.md §3). Elas moram na home porque é a home que esses checks
+# carregam: violação em página não visitada não é detectada, e um fixture que
+# "reprova de propósito" onde ninguém olha dá a mesma confiança falsa que o
+# check ausente.
+_ESTILO_GUI = """
+/* VIOLACAO (gui, GUI-RESP-01): faixa de 900px nao cabe em 320 CSS px e
+   forca rolagem horizontal (WCAG 1.4.10). */
+.faixa-larga { min-width: 900px; background: #eee; }
+/* VIOLACAO (gui, GUI-RESP i18n, OS-52): margem FISICA em vez de logica.
+   `margin-right` nao move um bloco de largura fixa em LTR — ele ja encosta na
+   borda de inicio. Sob `dir=rtl` o bloco passa a alinhar pela direita e a margem
+   o empurra para FORA da viewport pela esquerda. Invisivel em LTR por
+   construcao, que e o criterio de aceite: violacao que aparecesse nos dois modos
+   nao provaria que o check mede RTL.
+   O conserto real seria `margin-inline-end`. */
+.margem-fisica { width: 1200px; margin-right: 320px; background: #f7f7f7; }
+/* VIOLACAO (gui, GUI-RESP expansao, OS-52): rotulo dimensionado no texto mais
+   curto. Em x1,0 o texto cabe exato; a x1,5 ele e CORTADO, e continua no DOM —
+   um teste que so olhasse o DOM aprovaria. `nowrap` impede a quebra de linha que
+   salvaria o layout, que e o que um botao de barra de acoes costuma ter. */
+.rotulo-justo { display: inline-block; width: 96px; white-space: nowrap;
+                overflow: hidden; background: #eef; }
+/* VIOLACAO (gui, GUI-TIPO-01): altura travada + overflow hidden cortam o
+   texto quando ele cresce a 200% (WCAG 1.4.4). */
+.altura-travada { height: 24px; overflow: hidden; }
+/* VIOLACAO (gui, GUI-FOCO-01): foco sem nenhum indicador visivel
+   (WCAG 2.4.7). */
+.sem-foco:focus { outline: none; box-shadow: none; }
+/* VIOLACAO (gui, GUI-FOCO-03): barra fixa cobre o que recebe foco no fim da
+   pagina (WCAG 2.4.11, criterio novo da 2.2). O z-index e explicito: sem ele a
+   cobertura depende da ordem do documento, e a violacao passaria a ser um
+   acidente de layout em vez de um fato. */
+.barra-fixa { position: fixed; left: 0; right: 0; bottom: 0; height: 72px;
+              background: #333; color: #fff; z-index: 10; }
+/* A pagina precisa ROLAR para a barra cobrir alguma coisa: numa pagina que
+   cabe na tela, o navegador nao rola e o ultimo botao fica acima da barra —
+   foi o que a validacao em navegador real mostrou. Com o documento mais alto
+   que a viewport, focar o ultimo botao rola o MINIMO necessario, o que o
+   deixa rente ao rodape, exatamente sob a barra. */
+.rolagem-longa { height: 1200px; }
+/* VIOLACAO (gui, GUI-ALVO-01): 16x16 px, abaixo dos 24 exigidos (WCAG 2.5.8).
+   Sao DOIS, colados: um alvo pequeno SOZINHO e conforme pela excecao de
+   espacamento da propria norma — um circulo de 24px centrado nele nao
+   encostaria em ninguem. Com o vizinho a 2px, os circulos se cruzam e a
+   excecao cai. Foi o check que mostrou isso: a primeira versao do fixture
+   declarava violacao onde a norma perdoa. */
+.alvo-pequeno { display: inline-block; width: 16px; height: 16px;
+                background: #567; }
+.alvo-pequeno + .alvo-pequeno { margin-left: 2px; }
+/* VIOLACAO (gui, GUI-MOV-01): animacao infinita e NENHUMA media query de
+   prefers-reduced-motion que a suprima (WCAG 2.3.3). */
+@keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.gira { display: inline-block; animation: girar 2s linear infinite; }
+/* VIOLACAO (gui, GUI-RESP-03): dois controles que se cobrem. O deslocamento e
+   NEGATIVO e para a esquerda de proposito: puxar para a direita empurraria a
+   largura do documento e plantaria de carona uma rolagem horizontal que ja tem
+   dono (GUI-RESP-01) — a violacao ficaria medida duas vezes e a correcao de uma
+   apagaria a outra. `position: relative` nao tira o elemento do fluxo, entao a
+   altura da linha e a ordem de tabulacao seguem as mesmas. */
+.acao-b { position: relative; left: -64px; }
+/* VIOLACAO (gui, GUI-RESP-05): abaixo de 700px a navegacao some e quem a abre e
+   um <div onclick> — nao recebe foco, nao responde a Enter, nao e anunciado
+   como acionavel. Funciona em todo teste manual feito com mouse, que e o que
+   torna este defeito tao comum. Acima de 700px a nav e visivel: o check PASSA
+   no perfil desktop e reprova no mobile, e sem os dois lados nao daria para
+   distinguir "reprova sempre" de "reprova onde deve". */
+.menu-gatilho { display: none; width: 44px; height: 44px; background: #567;
+                color: #fff; text-align: center; line-height: 44px; }
+@media (max-width: 700px) {
+  .nav-principal { display: none; }
+  .menu-gatilho { display: block; }
+}
+/* VIOLACAO (gui, GUI-CONTR-01): o tema escuro existe (logo, o check nao pula)
+   e nele o aviso fica em ~1.6:1, longe dos 4.5:1 (WCAG 1.4.3). */
+@media (prefers-color-scheme: dark) {
+  body { background: #222222; color: #ffffff; }
+  .aviso-tema { color: #3a3a3a; background: #222222; }
+}
+"""
+
+# VIOLACAO (gui, GUI-FOCO-02): na tela a ordem e Comprar, Cancelar, Salvar,
+# Voltar; os tabindex a invertem por completo (WCAG 2.4.3). tabindex positivo de
+# proposito — e o jeito de descolar ordem visual de ordem de foco sem depender de
+# CSS de layout.
+#
+# Sao QUATRO botoes, e nao dois, porque o limiar do check e folgado (2) na Fase 1:
+# a inversao e medida por geometria, e a geometria nao conhece a intencao do
+# layout, entao grade densa produz salto legitimo. Um par invertido gera UMA
+# inversao e passaria no limiar — o alvo fabricado precisa ultrapassa-lo para
+# exercer o check de verdade. Quatro em ordem reversa geram tres.
+_CORPO_GUI = """
+<section id="gui">
+  <h2>Area de compra</h2>
+  <div class="margem-fisica">Bloco de largura fixa com margem fisica.</div>
+<p><span class="rotulo-justo">Comprar agora</span></p>
+<p class="faixa-larga">Faixa de largura fixa que nao reflui.</p>
+  <p class="altura-travada">Este paragrafo cabe em uma linha na largura cheia e
+  passa a ocupar duas quando o usuario amplia a fonte, momento em que a segunda
+  linha e cortada pelo overflow hidden e deixa de estar disponivel.</p>
+  <p><button class="sem-foco">Buscar</button></p>
+  <p>
+    <button tabindex="4">Comprar</button>
+    <button tabindex="3">Cancelar</button>
+    <button tabindex="2">Salvar</button>
+    <button tabindex="1">Voltar</button>
+  </p>
+  <p><a class="alvo-pequeno" href="/gui/estados" aria-label="Galeria de estados"></a><a
+     class="alvo-pequeno" href="/gui/estados#armadilha" aria-label="Armadilha de foco"></a></p>
+  <p><span class="gira" aria-hidden="true">*</span> processando</p>
+  <p class="aviso-tema">Aviso que some no tema escuro.</p>
+  <p><button class="acao-a">Aplicar cupom</button><button class="acao-b">Remover</button></p>
+  <p id="pedidos">carregando pedidos...</p>
+  <p id="estoque">carregando estoque...</p>
+  <div class="rolagem-longa"></div>
+  <p><button>Finalizar</button></p>
+</section>
+<div class="barra-fixa">rodape fixo</div>
+"""
+
 HOME = f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
+<!-- NAO e violacao: e o que torna as demais observaveis. Sem `meta viewport`, a
+     emulacao movel do Chromium da a esta pagina o viewport de layout de
+     fallback (980px), e NENHUMA media query abaixo disso chega a valer — a
+     navegacao mobile de GUI-RESP-05 nunca se esconderia, e a familia inteira de
+     checks por viewport mediria o layout de desktop achando que mediu o de
+     celular. E a mesma licao que fez `reflow_aa` nascer sem emulacao
+     (data/gui-perfis.yaml), aplicada ao alvo em vez do perfil. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Loja Fixture — alvo deliberadamente nao conforme</title>
+<style>{_ESTILO_GUI}</style>
 <!-- VIOLACAO: script de terceiro sem integrity/crossorigin (SRI) -->
 <script src="{CDN_FALSO}"></script>
 <!-- VIOLACAO (seguranca): bundle de origem com credencial exposta -->
@@ -181,6 +348,9 @@ HOME = f"""<!doctype html>
 <script src="/bundle.js"></script>
 </head><body>
 <h1>Loja Fixture</h1>
+<div class="menu-gatilho"
+     onclick="document.querySelector('.nav-principal').style.display='block'">&#9776;</div>
+<nav class="nav-principal"><a href="/privacidade">Privacidade</a></nav>
 <!-- VIOLACAO: imagem sem atributo alt (WCAG / LBI Art. 63) -->
 <img src="/logo.png" width="1" height="1">
 <!-- VIOLACAO (seguranca Fase B): SVG com handler inline -->
@@ -198,11 +368,36 @@ HOME = f"""<!doctype html>
   <input id="email" name="email" type="text">
   <button type="submit">Enviar</button>
 </form>
+{_CORPO_GUI}
 <script>
 // VIOLACAO: tracker disparado antes de qualquer consentimento.
 // no-cors + catch: o evento de requisicao e registrado mesmo sem rede,
 // e nenhum codigo de terceiro chega a executar.
 fetch("{TRACKER}", {{mode: "no-cors"}}).catch(function () {{}});
+// VIOLACAO (gui, GUI-RESIL-01): consome a API SEM nenhum tratamento de falha —
+// sem .catch, sem checar r.ok, sem estado de erro. Em operacao normal a API
+// responde 200 e o paragrafo e preenchido; quando ela falha, #pedidos fica
+// preso em "carregando pedidos..." para sempre e nada avisa o visitante.
+// Quem forca a falha e o CHECK, no cliente, com page.route: o alvo nunca
+// precisa servir 500 para que a ausencia de tratamento fique observavel.
+fetch("/gui/api/pedidos")
+  .then(function (r) {{ return r.json(); }})
+  .then(function (d) {{
+    document.getElementById("pedidos").textContent = d.total + " pedidos";
+  }});
+// VIOLACAO (gui, GUI-RESIL-02): trata a falha e despeja a mensagem CRUA do erro
+// na tela. E o OUTRO lado do mesmo defeito do #pedidos: la a pagina nao avisa
+// nada, aqui ela avisa — e o aviso e para o programador, nao para quem esta
+// comprando (Nielsen H9). Consome o MESMO endpoint de proposito: dois widgets
+// lendo a mesma API e o caso comum, e mantem o inventario de endpoints em um so.
+fetch("/gui/api/pedidos")
+  .then(function (r) {{ return r.json(); }})
+  .then(function (d) {{
+    document.getElementById("estoque").textContent = d.itens.length + " em estoque";
+  }})
+  .catch(function (e) {{
+    document.getElementById("estoque").textContent = "Erro: " + e;
+  }});
 </script>
 </body></html>
 """
@@ -235,6 +430,19 @@ def identidade() -> str:
       sequência sem flake zeraria todo dia e nunca chegaria a 10;
     * mexer num comentário não muda a identidade, mas mexer numa violação muda —
       e aí a sequência recomeça, porque o alvo passou a ser outro.
+
+    **Por que as violações de GUI entraram todas de uma vez (OS-40).** Reiniciar
+    a caminhada custa o que já havia sido andado, e nada mais. Quando esta OS
+    foi executada a sequência oficial estava em **0/10**: reiniciar zero custa
+    zero. Espalhar as violações de GUI por três OS ao longo das fases teria
+    cobrado o reinício três vezes — e a terceira poderia cair sobre um 8/10,
+    custando oito noites de espera para destravar a LGPD Fase 2. É por isso que
+    esta OS é a primeira da fila em `docs/handoff/ordens-de-servico/OS-gui-fila.md`,
+    e não por preferência de ordenação.
+
+    Pelo mesmo motivo, `PAGINAS_GUI` fica **fora** deste hash, como as
+    `ISCAS_FASE_C`: são páginas que nenhum check do contrato passivo observa, e
+    incluí-las cobraria um reinício por conteúdo que ninguém mede.
     """
     digest = hashlib.sha256()
     for parte in (HOME, POLITICA, APP_JS, MIME_TROCADO, SVG_EXECUTAVEL,
@@ -270,6 +478,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._responder(PIXEL, "image/png", com_cookies=False)
         elif caminho.startswith("/privacidade"):
             self._responder(POLITICA.encode("utf-8"), "text/html; charset=utf-8")
+        elif caminho in PAGINAS_GUI:
+            # Páginas de GUI (OS-40). LINKADAS a partir da home, de propósito: a
+            # galeria é alcançável seguindo o que a aplicação oferece, então o
+            # crawl passivo chega nela sem ninguém fabricar endereço.
+            corpo, tipo = PAGINAS_GUI[caminho]
+            self._responder(corpo, tipo, com_cookies=False)
         elif caminho in ISCAS_FASE_C:
             # Iscas de exposição (Fase C): existência 2xx = achado. Inerte até C1.
             corpo, tipo = ISCAS_FASE_C[caminho]

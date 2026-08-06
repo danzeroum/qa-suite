@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from fixture_target import servir
+from fixture_target.paginas_gui import PAGINAS_GUI
 from fixture_target.servir import (
     CDN_FALSO,
     MARCA_ISCA,
@@ -202,6 +203,335 @@ def test_iscas_ficam_fora_da_identidade(monkeypatch):
     monkeypatch.setattr(servir, "ENV_ISCA", "API_KEY=outra-coisa-fake\n")
     monkeypatch.setattr(servir, "GIT_HEAD", "ref: refs/heads/outro\n")
     assert identidade() == antes
+
+
+# ---------- Violações de GUI (OS-40) ----------
+#
+# Um teste por violação, e cada um nomeia o check FUTURO que vai lê-la. Página
+# que "reprova de propósito" sem ninguém lendo é a classe de defeito "a garantia
+# existe, a ligação não" (docs/PROXIMOS-PASSOS.md §2.10) — dentro justamente do
+# PR que existe para preveni-la.
+
+@pytest.mark.parametrize(("marcador", "check"), [
+    ("min-width: 900px", "GUI-RESP-01 (reflow a 320px, WCAG 1.4.10)"),
+    ("height: 24px; overflow: hidden", "GUI-TIPO-01 (zoom 200%, WCAG 1.4.4)"),
+    (".sem-foco:focus { outline: none", "GUI-FOCO-01 (foco visível, WCAG 2.4.7)"),
+    ('tabindex="4">Comprar', "GUI-FOCO-02 (ordem de tabulação, WCAG 2.4.3)"),
+    # Quatro botões em ordem reversa geram TRÊS inversões: o limiar do check é
+    # folgado (2) de propósito, e um par só passaria sem exercer nada.
+    ('tabindex="1">Voltar', "GUI-FOCO-02 (o limiar folgado precisa ser ultrapassado)"),
+    ("position: fixed", "GUI-FOCO-03 (foco obscurecido, WCAG 2.4.11)"),
+    ("width: 16px; height: 16px", "GUI-ALVO-01 (alvo de toque, WCAG 2.5.8)"),
+    # Dois alvos colados, e não um: um alvo pequeno SOZINHO é conforme pela
+    # exceção de espaçamento da própria norma. Foi o check que mostrou isso.
+    (".alvo-pequeno + .alvo-pequeno { margin-left: 2px; }",
+     "GUI-ALVO-01 (a exceção de espaçamento precisa cair)"),
+    ("passa a ocupar duas quando o usuario amplia",
+     "GUI-TIPO-01 (o texto precisa CABER a 100% para poder sumir a 200%)"),
+    ("animation: girar 2s linear infinite", "GUI-MOV-01 (reduced-motion, WCAG 2.3.3)"),
+    ("prefers-color-scheme: dark", "GUI-CONTR-01 (contraste no tema escuro, WCAG 1.4.3)"),
+    ("carregando pedidos...", "GUI-RESIL-01 (falha de API sem tratamento)"),
+])
+def test_home_serve_a_violacao_de_gui(home, marcador, check):
+    """Cada violação de GUI está no HTML que a home realmente serve."""
+    corpo, _ = home
+    assert marcador in corpo, f"violação ausente da home — {check} não teria o que detectar"
+
+
+def _consumidores_da_api(corpo: str) -> list[str]:
+    """As cadeias `fetch("/gui/api/pedidos")…;` da home, uma por consumidor.
+
+    Recortar por `</script>` juntava os dois num trecho só — e foi o que este
+    par de testes pegou quando o segundo consumidor nasceu (OS-47): a guarda do
+    primeiro passou a ler o `.catch` do segundo e acusou tratamento onde não há.
+    """
+    partes = corpo.split('fetch("/gui/api/pedidos")')[1:]
+    return [parte.split("});", 1)[0] for parte in partes]
+
+
+def test_home_consome_a_api_sem_tratar_falha(home):
+    """GUI-RESIL-02: o primeiro fetch não tem `.catch` nem checa `r.ok`.
+
+    É metade da violação. O alvo responde 200; quem força o erro é o check, no
+    cliente (`page.route`) — e aí o parágrafo fica preso em "carregando", que é
+    o SILÊNCIO: a página não avisa nada, e o desfecho é `xfail`.
+    """
+    corpo, _ = home
+    trecho = _consumidores_da_api(corpo)[0]
+    assert ".catch" not in trecho, "o fetch trata a falha — não há violação a detectar"
+    assert "r.ok" not in trecho, "o fetch checa o status — não há violação a detectar"
+
+
+def test_home_tambem_despeja_o_erro_cru_na_tela(home):
+    """GUI-RESIL-01/03: a outra metade, e a que produz `failed` determinístico.
+
+    Sem ela o fixture só exerceria o silêncio, e os quatro checks terminariam em
+    `xfail` — nenhum entraria no contrato, e a classe "termo técnico vazado", que
+    é a mais grave das três, nunca seria exercida contra alvo de verdade.
+
+    O anti-padrão é literal e comum: `catch(e => elemento.textContent = e)`.
+    Medido no navegador: sob 500 com corpo HTML a tela mostra
+    `SyntaxError: Unexpected token '<'`.
+    """
+    corpo, _ = home
+    consumidores = _consumidores_da_api(corpo)
+    assert len(consumidores) == 2, "a home tem dois consumidores da mesma API"
+    assert '.catch' in consumidores[1], "o segundo consumidor trata a falha…"
+    assert 'textContent = "Erro: " + e' in consumidores[1], "…e despeja o erro cru"
+    assert 'id="estoque"' in corpo, "o elemento que recebe o erro precisa existir"
+
+
+def test_app_js_bloqueia_a_thread_principal():
+    """GUI-PERF-01: seis blocos acima de 50ms — long tasks e TBT observáveis."""
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + "/app.js")
+    assert status == 200
+    assert "blocosRestantes = 6" in corpo and "Date.now() + 110" in corpo
+    # Reagendado, não num laço só: seis iterações síncronas seriam UMA long
+    # task de 660ms para o navegador, e a API reportaria 1, não 6.
+    assert "setTimeout(bloquearThreadPrincipal, 0)" in corpo
+
+
+@pytest.mark.parametrize(("caminho", "marcador"), [
+    ("/gui/estados", 'onblur="this.focus()"'),      # GUI-FOCO-04: armadilha de foco
+    ("/gui/estados", "falso-desabilitado"),         # GUI-ESTADO-03: sem disabled
+    ("/gui/estados", "campo-erro"),                 # GUI-ESTADO-01: erro só por cor
+    ("/gui/api/pedidos", '"total": 3'),             # resposta estável que a home consome
+])
+def test_pagina_de_gui_responde_com_a_violacao(caminho, marcador):
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + caminho)
+    assert status == 200
+    assert marcador in corpo
+
+
+@pytest.mark.parametrize("marcador", [
+    "AbortController",            # pedido que não responde vira falha tratada
+    "if (!r.ok)",                 # 500 com corpo válido não é sucesso
+    "Tente novamente",            # a mensagem é para gente, e usa o vocabulário
+    "addEventListener('offline'", # o navegador avisa; esta página escuta
+    "<main>",                     # há conteúdo principal: não é tela branca
+])
+def test_pagina_resiliente_e_o_lado_CONFORME_do_contrato(marcador):
+    """Os quatro checks de resiliência precisam ser vistos PASSANDO em algum lugar.
+
+    Contra `/privacidade` eles pulam (aquela página não faz chamada nenhuma), e
+    check que nunca foi visto passando é check de que ninguém sabe se reprova por
+    regressão ou por natureza. Mesma razão de `test_transparencia_passa_no_fixture`
+    existir: o contrato precisa provar os dois lados, senão um check que reprova
+    tudo passaria por "funcionando".
+
+    Vive em `paginas_gui/`, logo FORA de `identidade()` — o lado conforme não
+    custa reinício de sequência no ledger.
+    """
+    with AlvoFixture() as alvo:
+        status, corpo, _ = _get(alvo.url + "/gui/resiliente")
+    assert status == 200
+    assert marcador in corpo
+
+
+def test_pagina_resiliente_nao_e_linkada_na_home():
+    """Omissão deliberada, e o teste existe para que ninguém a "conserte".
+
+    Um `<a>` a mais na home mudaria a contagem de alvos de toque e a caminhada de
+    foco — que são exatamente o que três checks do contrato medem. Esta página é
+    endereçada direto, como alvo (`WEBQA_TARGET_URL`), no papel que
+    `/privacidade` já cumpre no smoke.
+    """
+    with AlvoFixture() as alvo:
+        _, corpo, _ = _get(alvo.url)
+    assert 'href="/gui/resiliente"' not in corpo
+
+
+def test_galeria_de_gui_e_alcancavel_por_link(home):
+    """A galeria é LINKADA na home: o crawl passivo chega nela seguindo o que a
+    aplicação oferece, e nenhum check precisa fabricar endereço para alcançá-la.
+
+    É a diferença entre esta página e as iscas da Fase C, que são deliberadamente
+    não linkadas — e o teste ao lado (`test_iscas_nao_sao_linkadas_no_home`)
+    fixa o outro lado da mesma fronteira.
+    """
+    corpo, _ = home
+    assert 'href="/gui/estados"' in corpo
+
+
+def test_paginas_de_gui_ficam_fora_da_identidade(monkeypatch):
+    """Mexer numa página de GUI NÃO reinicia a caminhada do ledger.
+
+    Mesma razão das iscas: o ledger mede o contrato passivo, e estas páginas não
+    são observadas por nenhum check dele. Incluí-las cobraria um reinício da
+    sequência sem-flake por conteúdo que ninguém mede.
+    """
+    antes = identidade()
+    monkeypatch.setitem(PAGINAS_GUI, "/gui/estados", (b"<html>outra coisa</html>", "text/html"))
+    monkeypatch.setattr(servir, "PAGINAS_GUI", dict(PAGINAS_GUI))
+    assert identidade() == antes
+
+
+def test_violacao_de_gui_na_home_muda_a_identidade(monkeypatch):
+    """O outro lado da fronteira: o que está no hash reinicia a sequência.
+
+    Sem este par, o teste acima passaria também se `identidade()` tivesse parado
+    de observar QUALQUER COISA — provaria a ausência sem provar a presença.
+    """
+    antes = identidade()
+    monkeypatch.setattr(servir, "APP_JS",
+                    servir.APP_JS.replace("blocosRestantes = 6", "blocosRestantes = 2"))
+    assert identidade() != antes
+
+
+def test_contrato_cobra_os_checks_de_gui_existentes():
+    """O contrato lista os checks de `gui` que JÁ existem — nem mais, nem menos.
+
+    Este teste nasceu na OS-40 exigindo o contrário: `esperado.json` INTACTO,
+    porque nenhum check de `gui` existia e uma entrada para teste inexistente
+    seria o id fantasma que `tests/test_alvo_fixture.py` reprova. Ele cumpriu o
+    papel e agora afirma o outro lado da mesma regra: check que nasce entra no
+    contrato no MESMO PR, senão o alvo passa a reprovar sem ninguém ter
+    declarado que devia.
+
+    A lista é explícita de propósito. Derivá-la de um glob sobre `checks/gui/`
+    faria a cobertura encolher junto com o código removido, fechando o furo no
+    papel e deixando-o aberto no contrato.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    esperados = {
+        "checks/gui/test_alvos.py::test_area_minima_de_toque",
+        "checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px",
+        "checks/gui/test_reflow.py::test_zoom_200_nao_perde_conteudo",
+        "checks/gui/test_foco.py::test_indicador_de_foco_visivel",
+        "checks/gui/test_foco.py::test_ordem_de_tabulacao_segue_a_ordem_visual",
+        "checks/gui/test_foco.py::test_foco_nao_obscurecido",
+        "checks/gui/test_preferencias.py::test_reduced_motion_respeitado",
+        "checks/gui/test_resiliencia.py::test_erro_500_na_api_nao_vaza_detalhe_tecnico",
+        "checks/gui/test_resiliencia.py::test_json_truncado_nao_vaza_detalhe_tecnico",
+        "checks/gui/test_responsividade.py::test_sem_sobreposicao_de_interativos",
+        "checks/gui/test_responsividade.py::test_navegacao_principal_utilizavel_em_mobile",
+        "checks/gui/test_visual.py::test_paginas_estaveis_contra_a_linha_de_base",
+        # OS-51. Os dois determinísticos da jornada; o de TEMPO fica fora, e a
+        # razão de ele ter cenário próprio é justamente poder ficar.
+        "checks/gui/test_jornada.py::test_o_visitante_procura_como_falar_com_a_loja",
+        "checks/gui/test_jornada.py::test_nenhuma_página_deixa_o_visitante_sem_saída",
+        # OS-52. A home tem links distinguidos SÓ por fundo, sem texto próprio.
+        "checks/gui/test_preferencias.py::test_forced_colors_nao_apaga_informacao",
+        # OS-52 parte final. As duas violacoes plantadas sao INVISIVEIS em
+        # LTR/x1,0 por construcao — os 26 desfechos antigos foram revalidados
+        # identicos contra a home nova ANTES de estas duas serem declaradas.
+        "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_ao_espelhamento_rtl",
+        "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_a_expansao_de_texto",
+    }
+    declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
+    assert declarados == esperados
+
+
+def test_particao_dos_checks_de_resiliencia_segue_o_desfecho_e_nao_o_arquivo():
+    """Os quatro modos de falha moram no mesmo arquivo e caem em lados OPOSTOS.
+
+    É o teste que impede a simplificação errada — "são todos de resiliência,
+    ponham os quatro no contrato". A partição não é por assunto, é por desfecho:
+
+    * **500** e **JSON truncado** terminam em `failed` determinístico contra o
+      fixture, porque a home despeja o objeto de erro cru na tela. Entram;
+    * **não responde** e **offline** terminam em `xfail`, porque a home fica em
+      silêncio — e silêncio é ausência de mensagem, que a spec classificou como
+      sinal e não prova. Ficam fora, com motivo.
+
+    Pôr um xfail em `devem_falhar` faria o contrato cobrá-lo como "a menos" em
+    toda execução, reprovando por classificação e não por regressão.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    prefixo = "checks/gui/test_resiliencia.py::"
+    dentro = {i for i in contrato["devem_falhar"] if i.startswith(prefixo)}
+    fora = {i for i in contrato["fora_do_contrato"] if i.startswith(prefixo)}
+
+    assert dentro == {prefixo + "test_erro_500_na_api_nao_vaza_detalhe_tecnico",
+                      prefixo + "test_json_truncado_nao_vaza_detalhe_tecnico"}
+    assert fora == {prefixo + "test_api_que_nao_responde_avisa_o_visitante",
+                    prefixo + "test_perda_de_conexao_e_comunicada"}
+    for excluido in fora:
+        assert "xfail" in contrato["fora_do_contrato"][excluido], (
+            "a exclusão precisa nomear o desfecho que a motivou, senão vira "
+            "'não sei classificar' com aparência de decisão")
+
+
+def test_check_de_gui_que_depende_de_CDN_fica_fora_do_contrato():
+    """Check baseado em axe-core não entra em `devem_falhar` — e o motivo é o
+    mesmo dos dois irmãos dele na dimensão `ux`.
+
+    Ele baixa o axe de um CDN. Offline, PULA com motivo (o que é o
+    comportamento correto), e um `devem_falhar` que não é observado vira "a
+    menos": o contrato reprovaria por ambiente, não por regressão. A exclusão
+    protege a propriedade que o contrato existe para ter — reprovar quando um
+    check parou de detectar, e só então.
+
+    A detecção segue coberta, por outro mecanismo (§2.8): unidade sobre a
+    pré-checagem e sobre a verificação de hash, mais validação real registrada
+    no PR. Fingir que o contrato a exercita daria confiança falsa justamente na
+    regra mais fácil de errar.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    fora = contrato["fora_do_contrato"]
+    alvo = "checks/gui/test_preferencias.py::test_contraste_em_tema_escuro"
+    assert alvo in fora, "check de axe em devem_falhar tornaria o contrato dependente de rede"
+    assert "rede externa" in fora[alvo]
+    assert alvo not in contrato["devem_falhar"]
+
+
+def test_check_com_veredito_condicionado_ao_ambiente_fica_fora_do_contrato():
+    """A mesma navalha da OS-45, aplicada ao outro tipo de dependência externa.
+
+    O check de interatividade só reprova sob `WEBQA_ORIGEM=vps`; fora do ambiente
+    oficial o estouro de TBT vira `xfail`, porque numa máquina compartilhada o
+    número mede o vizinho, não o alvo. Isso o torna inelegível para
+    `devem_falhar`: o contrato o cobraria como "a menos" em toda execução que não
+    fosse da VPS — reprovando por AMBIENTE, e não por regressão.
+
+    O critério é um só, e vale para os dois casos: o contrato 1:1 aceita apenas
+    checks cujo desfecho contra o fixture dependa exclusivamente do que o fixture
+    serve. Rede externa (axe) e origem declarada (ledger) são a mesma classe de
+    exclusão, e é por isso que este teste fica ao lado daquele.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    fora = contrato["fora_do_contrato"]
+    alvo = "checks/gui/test_interatividade.py::test_tbt_long_tasks_e_inp"
+    assert alvo in fora, (
+        "veredito condicionado a WEBQA_ORIGEM em devem_falhar tornaria o contrato "
+        "dependente do ambiente — verde na VPS, vermelho em todo lugar que importa")
+    assert "WEBQA_ORIGEM" in fora[alvo], "a exclusão precisa nomear a condição"
+    assert alvo not in contrato["devem_falhar"]
+
+
+def test_check_que_depende_das_engines_instaladas_fica_fora_do_contrato():
+    """Terceira aplicação da mesma navalha, e a que fecha o critério.
+
+    A família `gui_compat` compara engines num run só. Com menos de duas ela
+    PULA — comparar uma engine consigo mesma é sempre verde. Logo o desfecho
+    contra o alvo fabricado depende de QUAIS engines estão instaladas, que é
+    ambiente, exatamente como a rede externa do axe (OS-45) e a origem declarada
+    do ledger (OS-46).
+
+    O critério, agora escrito por inteiro: o contrato 1:1 aceita apenas nodeids
+    cujo desfecho contra o fixture dependa **só do que o fixture serve**. Rede,
+    origem declarada e binários instalados são as três formas de o ambiente
+    entrar na conta, e nenhuma delas pode.
+    """
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    fora = contrato["fora_do_contrato"]
+    for nome in ("test_geometria_dos_marcos_nao_diverge_entre_engines",
+                 "test_sem_erro_de_console_exclusivo_de_uma_engine"):
+        alvo = f"checks/gui/test_compatibilidade.py::{nome}"
+        assert alvo in fora, "comparação entre engines em devem_falhar dependeria de binários"
+        assert "engines estão instaladas" in fora[alvo], "a exclusão precisa nomear a condição"
+        assert alvo not in contrato["devem_falhar"]
+
+
+def test_escopo_do_contrato_inclui_a_dimensao_gui():
+    """Sem `gui` na seleção, os três checks nem rodariam na execução interna — e
+    o contrato os cobraria como "a menos" a cada run. A seleção é lida do próprio
+    contrato por `tests/test_alvo_fixture.py`, então este é o único lugar em que
+    ela é afirmada."""
+    contrato = json.loads(CONTRATO.read_text(encoding="utf-8"))
+    assert "gui" in contrato["escopo"]
 
 
 # ---------- Identidade do alvo (chave do ledger) ----------

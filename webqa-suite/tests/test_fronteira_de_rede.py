@@ -53,6 +53,13 @@ FRONTEIRAS_DE_REDE: dict[str, tuple[str, ...]] = {
     "webqa/llm.py": (
         "test_endpoint_publico_e_recusado",
     ),
+    # evidencias consome a fronteira para decidir se um PNG pode chegar ao disco
+    # (R19). O ramo que precisa de prova é o PÚBLICO — alvo real sem opt-in NÃO
+    # grava —, porque é o único em que um vazamento de pixel é possível.
+    "webqa/evidencias.py": (
+        "test_alvo_fabricado_e_reconhecido_e_alvo_real_nao",
+        "test_sem_optin_alvo_real_NAO_pode_gravar_png",
+    ),
     # escopo consome `ips_de` de um jeito diferente dos outros três: não decide
     # local × terceiro, e sim POSSE — se os IPs do host ainda são os do
     # carregamento. O ramo que precisa de prova é a divergência (takeover), e é

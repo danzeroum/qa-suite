@@ -26,6 +26,8 @@ from webqa.http_utils import Timing, make_client, timed_get
 from webqa.navegacao import percorrer
 from webqa.navegador import engines_configurados
 from webqa.trackers import LoggedRequest, NetworkLog
+from webqa.rede_simulada import carregar_perfis_de_rede
+from webqa.viewports import carregar_perfis, opcoes_de_contexto
 
 
 @pytest.fixture(scope="session")
@@ -110,8 +112,57 @@ def soup(home_response) -> BeautifulSoup:
 _ENGINES = engines_configurados()
 
 
+@pytest.fixture(scope="session")
+def playwright_sessao():
+    """UMA instância de Playwright para a sessão inteira.
+
+    Existe porque a família `gui_compat` precisa de DUAS engines vivas ao mesmo
+    tempo, dentro de um teste só (o nodeid é único; a comparação entre engines
+    acontece no corpo). Abrir um segundo `sync_playwright()` no mesmo processo
+    para conseguir isso não é opção: a API síncrona mantém um despachante por
+    instância, e dois no mesmo thread disputam o mesmo laço.
+
+    Fixture separada, e não uma dentro da outra, para que `browser` continue
+    sendo o que sempre foi — uma engine por vez, parametrizada.
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        pytest.skip("Playwright não instalado (pip install playwright).")
+    with sync_playwright() as p:
+        yield p
+
+
+@pytest.fixture(scope="session")
+def motores_gui(playwright_sessao):
+    """{engine: Browser} das engines configuradas que ESTÃO instaladas.
+
+    Devolve o que conseguiu abrir, e o chamador decide o que fazer com o
+    tamanho: com menos de duas não há comparação possível, e o check pula
+    dizendo quantas havia (`webqa/compatibilidade.py::motivo_de_pular`).
+    Preencher a lacuna com a engine que existe daria sempre verde — comparar uma
+    engine consigo mesma é sempre verde, e esse verde seria indistinguível do
+    legítimo.
+
+    Engine ausente é registrada pelo nome: o aceite do noturno exige que a soma
+    de executados e pulados feche, e um skip anônimo faz uma engine sumir da
+    conta sem ninguém notar.
+    """
+    abertos, ausentes = {}, {}
+    for engine in _ENGINES:
+        try:
+            abertos[engine] = getattr(playwright_sessao, engine).launch()
+        except Exception as exc:       # engine sem binário instalado
+            ausentes[engine] = str(exc).splitlines()[0][:160]
+    try:
+        yield {"abertos": abertos, "ausentes": ausentes}
+    finally:
+        for instancia in abertos.values():
+            instancia.close()
+
+
 @pytest.fixture(scope="session", params=_ENGINES if len(_ENGINES) > 1 else None)
-def browser(request, settings):
+def browser(request, settings, playwright_sessao):
     """Instância de navegador por sessão, uma por engine configurada (contextos é
     que são isolados). As engines vêm de `WEBQA_BROWSER_ENGINES` (default só
     `chromium`; o noturno roda a matriz chromium/firefox/webkit — C3).
@@ -120,19 +171,18 @@ def browser(request, settings):
     (falha explicada > falha misteriosa). Engine não instalada nunca conta como
     aprovação — o teste é pulado, não passa em silêncio."""
     engine = getattr(request, "param", _ENGINES[0])
+    # A instância de Playwright vem de `playwright_sessao`, e não de um
+    # `sync_playwright()` próprio: a API síncrona mantém um despachante por
+    # instância, e uma segunda no mesmo processo estoura com "Sync API inside the
+    # asyncio loop" assim que outra fixture (`motores_gui`) abre a dela. Uma só,
+    # partilhada, é o que permite a comparação entre engines existir.
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        pytest.skip("Playwright não instalado (pip install playwright).")
-
-    with sync_playwright() as p:
-        try:
-            instance = getattr(p, engine).launch()
-        except Exception as exc:  # engine ausente/sem binário
-            pytest.skip(f"{engine} indisponível: rode "
-                        f"`python -m playwright install {engine}` ({exc}).")
-        yield instance
-        instance.close()
+        instance = getattr(playwright_sessao, engine).launch()
+    except Exception as exc:  # engine ausente/sem binário
+        pytest.skip(f"{engine} indisponível: rode "
+                    f"`python -m playwright install {engine}` ({exc}).")
+    yield instance
+    instance.close()
 
 
 @pytest.fixture(scope="session")
@@ -153,6 +203,98 @@ def browser_page(browser, credenciais_navegador, alvo_alcancavel):
     page = browser.new_page(**credenciais_navegador)
     yield page
     page.close()
+
+
+@pytest.fixture(scope="session")
+def perfis_gui():
+    """Perfis de viewport de `data/gui-perfis.yaml`.
+
+    Fixture, e não import no check: o alvo do check é o que MEDIR, não de
+    onde a configuração vem. Sessão porque o YAML não muda no meio da
+    execução — reler por teste seria I/O sem pergunta correspondente.
+    """
+    return carregar_perfis()
+
+
+@pytest.fixture(scope="session")
+def perfis_de_rede():
+    """Perfis de rede e CPU de `data/gui-perfis.yaml` (OS-50).
+
+    Fixture pelo mesmo motivo que `perfis_gui`: o alvo do check é o que MEDIR,
+    não de onde a configuração vem. Sessão porque o YAML não muda no meio da
+    execução.
+    """
+    return carregar_perfis_de_rede()
+
+
+def _contextos_de_gui(browser, settings, credenciais_navegador):
+    """Implementação ÚNICA das fixtures de contexto de GUI.
+
+    Uma só, e as duas fixtures abaixo apenas a delegam, porque a diferença entre
+    elas é só o escopo: há check que quer um contexto por teste e há check que
+    precisa de UMA observação partilhada — a caminhada de foco alimenta três
+    vereditos, e percorrer a página três vezes pagaria três vezes pela mesma
+    observação, com o risco extra de as três discordarem num alvo dinâmico.
+
+    Duas cópias deste corpo divergiriam no primeiro campo novo, e a divergência
+    apareceria como um check isolando e o outro não.
+    """
+    contextos = []
+
+    def abrir(viewport=None, **opcoes):
+        base = {"user_agent": settings.user_agent, **credenciais_navegador}
+        # A engine é passada porque a tradução do perfil DEPENDE dela (o Firefox
+        # recusa `is_mobile`) — e a decisão de como lidar com isso vive em
+        # `webqa/viewports.py`, não aqui. Esta fixture segue casca fina.
+        contexto = browser.new_context(
+            **opcoes_de_contexto(viewport, engine=browser.browser_type.name, **base, **opcoes))
+        contextos.append(contexto)
+        return contexto.new_page()
+
+    try:
+        yield abrir
+    finally:
+        # `finally`, e não depois do yield: teste que estoura no meio não pode
+        # deixar contexto de navegador vazando para o resto da sessão.
+        for contexto in contextos:
+            contexto.close()
+
+
+@pytest.fixture()
+def contexto_gui(browser, settings, credenciais_navegador, alvo_alcancavel):
+    """Fábrica de páginas em contexto NOVO — uma por variação de GUI.
+
+    Devolve `abrir(viewport=..., **opcoes)`, que abre um `browser.new_context`
+    próprio e o fecha no fim do teste. Todo check de `gui` passa por aqui, e
+    **nenhum deles toca `browser_page`**.
+
+    A regra não é higiene: `browser_page` é de SESSÃO e é a mesma página que
+    `checks/frontend/test_rendering.py` usa para medir FCP, LCP e CLS. Um check
+    de GUI que mudasse o viewport ou o tema nela deixaria as Web Vitals das
+    outras dimensões medidas num viewport que ninguém declarou — e o número
+    sairia errado sem nada ficar vermelho (R20). É a mesma lição que já fez o
+    `network_log` nascer com contexto virgem: estado herdado de um teste
+    anterior é o pior falso resultado possível, porque é silencioso.
+
+    As opções vêm de `webqa/viewports.py::opcoes_de_contexto`, que é pura — o
+    detalhe vive na biblioteca, os checks só conhecem esta fixture.
+    """
+    yield from _contextos_de_gui(browser, settings, credenciais_navegador)
+
+
+@pytest.fixture(scope="module")
+def contexto_gui_modulo(browser, settings, credenciais_navegador, alvo_alcancavel):
+    """A mesma fábrica, viva pelo módulo inteiro.
+
+    Existe para a observação CARA e partilhada: a caminhada de foco percorre a
+    página com Tab, alimenta três critérios e mexe no estado do navegador —
+    refazê-la por teste seria pagar três vezes por uma observação só. Mesma
+    doutrina de `home_response` nas dimensões HTTP.
+
+    Continua sendo contexto PRÓPRIO: partilhar entre testes do mesmo módulo não
+    é o mesmo que partilhar com `browser_page`, que atende outras dimensões.
+    """
+    yield from _contextos_de_gui(browser, settings, credenciais_navegador)
 
 
 @pytest.fixture(scope="session")

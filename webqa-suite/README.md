@@ -205,6 +205,9 @@ violações WCAG críticas primeiro.
 | Usabilidade Heurística (Nielsen) | `checks/ux/test_heuristicas_nielsen.py` |
 | Arquitetura de Informação | `checks/ux/test_arquitetura_informacao.py` |
 | Design Centrado no Usuário | acessibilidade + Core Web Vitals medem a experiência real (`checks/ux/test_acessibilidade.py`, `checks/frontend/test_rendering.py`) |
+| Usabilidade não funcional (reflow, foco, contraste, movimento, alvo de toque) | `docs/GUI.md` + `docs/GUI-CATALOGO.md` — camada **planejada**; `checks/gui/` ainda não existe |
+| WCAG 2.2, critérios novos (2.4.11 foco não obscurecido, 2.5.8 tamanho de alvo) | `docs/GUI-CATALOGO.md §1` — mapeados um a um, com o que é automatizável e o que não é |
+| Limites da automação e teste com usuários reais (SUS/SEQ, protocolo moderado) | `docs/RECOMENDACOES.md` + `docs/GUI.md §5` (o que não se automatiza, e o protocolo que o cobre) |
 | Atributos de Qualidade (-ilities) | performance (`test_performance.py`), segurança (`test_security_headers.py`), disponibilidade (`test_http_basics.py`), testabilidade (a própria suíte), documentados em `docs/ARQUITETURA.md` |
 | Observabilidade (logging/tracing/monitoramento) | `checks/backend/test_observability.py` |
 | Segurança por Design (LGPD/GDPR, privilégio mínimo) | headers, cookies `Secure/HttpOnly/SameSite`, ausência de vazamento de stack trace |
