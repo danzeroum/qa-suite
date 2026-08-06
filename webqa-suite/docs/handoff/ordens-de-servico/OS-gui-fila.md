@@ -32,7 +32,13 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 | OS‑52 | #97 #98 | `f0f75aa` `9783fdf` | `webqa/i18n.py`: forced-colors, RTL e expansão ×1,5, mais a guarda de coletores órfãos |
 | OS‑53 | #99 | `29873b1` | `webqa/conformidade.py`: SARIF de GUI, VPAT parcial e PDF executivo |
 | OS‑54 | #100 | `934608d` | `docs/GUI-PROTOCOLO-HUMANO.md` + `webqa/sessao.py`: protocolo de sessão moderada |
-| OS‑55 | — | — | `webqa/exploracao.py`: fricções por LLM local sobre material já coletado |
+| OS‑55 | #101 | `cb71789` | `webqa/exploracao.py`: fricções por LLM local sobre material já coletado |
+
+A linha da OS‑55 foi preenchida **depois** do squash, e não podia ser de outro
+jeito: o commit de um squash não existe enquanto o PR não é mergeado. Nas
+demais, quem preencheu foi a OS seguinte, de carona; a última não tem seguinte,
+então precisa de um commit próprio — ou o `—` fica lá para sempre passando por
+"não entregue".
 
 **A fila original FECHA aqui.** OS‑40 a OS‑55, mais as duas que nasceram de
 execução e não de planejamento: a **OS‑56** (do run real da matriz da OS‑48) e a
