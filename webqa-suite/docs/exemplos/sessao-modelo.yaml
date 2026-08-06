@@ -1,0 +1,43 @@
+# Ficha de sessão moderada — preencha DURANTE a sessão (docs/GUI-PROTOCOLO-HUMANO.md).
+#
+# Não existe campo `nome`, e o consolidador RECUSA a ficha que o tenha:
+# minimização é de desenho, não de disciplina.
+iniciais: "MR"
+perfil: "usa teclado; nunca viu o produto"
+
+consentimento:
+  finalidade: "avaliar a facilidade de encontrar informação no site"
+  retencao_dias: 30
+  expurgo: "gravação apagada do disco e da nuvem pela moderadora"
+  gravacao: "tela e áudio, autorizados verbalmente no início"
+  data: "2026-08-06"
+
+# `cenario` é o NOME do cenário na feature — é o que liga esta linha à medida
+# sintética correspondente.
+tarefas:
+  - cenario: "O visitante encontra a política de privacidade"
+    concluiu: true
+    segundos: 47
+    cliques: 3
+    seq: 5
+  - cenario: "O visitante procura como falar com a loja"
+    concluiu: false      # desistir é RESULTADO, não falta de dado
+    segundos: 182
+    cliques: 11
+    seq: 2
+
+# Dez itens, na ordem, 1–5. Incompleto vira `None` — não vira média.
+sus: [4, 2, 4, 2, 4, 2, 5, 2, 4, 2]
+
+achados:
+  - descricao: "Procurou 'contato' no rodapé por 40s; não há rota para atendimento."
+    severidade: 4
+    cenario: "O visitante procura como falar com a loja"
+    criterio: ""
+  - descricao: "Leu 'Privacidade' e 'Politica de Privacidade' como dois lugares diferentes."
+    severidade: 2
+    cenario: "O visitante encontra a política de privacidade"
+    criterio: "2.4.6"
+
+notas: |
+  Disse "achei que ia ter um chat" duas vezes.

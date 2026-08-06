@@ -296,11 +296,21 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 | **OS‑53** | Evidência de conformidade: exportador SARIF de GUI, PDF executivo, VPAT parcial | exportador é função **pura** lendo `summary.json` (a dimensão `gui` não constrói `Finding` — `dominio.py:76-79`); PDF por `page.pdf()` do Chromium, zero dep; mapa critério→teste vem de `data/gui-perfis.yaml`, nunca digitado no template | 5 | OS‑45..49 |
 | **OS‑54** | Protocolo humano — rodada piloto | roteiro, consentimento com prazo de retenção declarado e expurgo executado, SUS/SEQ, e a ponte achado→backlog com severidade Nielsen | 5 | OS‑51 |
 | ~~**OS‑57**~~ | ~~`scripts/afere_ancoras.py` + `data/ancoras.yaml`: mecanizar a conferência das âncoras `arquivo:linha`~~ | **entregue.** Guarda bidirecional sobre documentos AUDITADOS, cobertura declarada por documento (`auditado`/`pendente`/`congelado`, todos com motivo) e placar de pendentes impresso em toda execução. Tranche 1 (GUI.md, GUI‑CATALOGO.md, OS‑gui‑fila.md, PROXIMOS‑PASSOS.md): **85 âncoras conferidas, 10 mentiam** e foram corrigidas no mesmo PR. Duas descobertas do desenho: 21 das 91 âncoras eram citadas a partir de raízes implícitas (`ARQUITETURA.md:44` de `docs/`) e teriam sido ignoradas como "inexistentes", deixando um buraco de 23% com a guarda parecendo completa; e o `PROXIMOS-PASSOS.md` não tem âncora `arquivo:linha` NENHUMA — cita por `§seção`, então o risco dele é ser citado, não citar | 5 | — |
+| ~~**OS‑54**~~ | ~~Protocolo humano — rodada piloto~~ | **PROTOCOLO entregue; a RODADA é pendência do dono.** O roteiro NÃO reescreve os cenários: aponta para `jornada_usabilidade.feature`, porque duas versões divergiriam na primeira edição e a comparabilidade entre TSR humano e sintético — que foi o produto da OS‑51 — morreria aí. A pauta vem dos cinco `exige_humano` do mapa por referência. Consentimento com finalidade, retenção e expurgo obrigatórios (o consolidador RECUSA sem eles) e transcrição por `sanitize_text` antes do disco. Ensaio cronometrado achou três coisas antes de convidar alguém, uma delas uma contradição do próprio documento entre §3 e §6 sobre apontar | 5 | OS‑51 |
 | **OS‑55** | GUI‑EXPL‑01: LLM local sobre a jornada **já coletada** | gate `WEBQA_LLM_ENABLED`; a LLM **não** clica (`tests/test_convencoes.py:209-224`); saída nunca vira veredito; detector de omissão sobre o texto, como `scripts/sumario.py` já faz | 8 | OS‑51 |
 
 ---
 
 ## Pendências do dono (não‑código)
+
+- **Rodar o piloto da OS‑54.** O protocolo está pronto e ensaiado; a sessão com
+  gente é decisão de quem tem o alvo e a agenda. O que ela precisa:
+  **cinco participantes por perfil** (piso de Nielsen, não meta), com variedade
+  deliberada — alguém que use teclado, alguém que use leitor de tela, alguém que
+  nunca viu o produto —, **ninguém do time** (quem conhece não consegue não
+  saber), **45 minutos** por sessão e um lugar para guardar a gravação com
+  expurgo em **30 dias**. Prometer a sessão executada num PR seria o VPAT que
+  promete; ela entra aqui, onde pendência de dono mora.
 
 - **Decidir sobre a dimensão dupla `gui + lgpd`.** Acessibilidade é obrigação
   legal (LBI Art. 63) e `checks/ux/test_acessibilidade.py:24` já reivindica as
