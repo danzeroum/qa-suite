@@ -319,7 +319,35 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 
 ---
 
+## Decidido pelo dono (ratificado no fechamento da fila)
+
+Três das cinco pendências abaixo **deixaram de ser pendências**: o dono decidiu,
+e a decisão coincidiu com a recomendação já registrada. Ficam aqui, e não
+apagadas, porque decisão sem rastro volta como pergunta — e a próxima pessoa
+precisa saber que o silêncio destes três pontos é escolha, não esquecimento.
+
+- **Dimensão dupla `gui + lgpd` — NÃO**, enquanto a sequência de dez noites da
+  LGPD Fase 2 não amadurecer. Acessibilidade é obrigação legal (LBI Art. 63) e
+  `checks/ux/test_acessibilidade.py:24` já reivindica as duas dimensões, então a
+  extensão seria defensável; o que a barra é o **preço**: o noturno roda
+  `pytest -m lgpd` (`docker/entrypoint.sh:93`), e todo check de GUI que
+  reivindicasse `lgpd` passaria a poder zerar a sequência ao oscilar. A
+  recomendação da OS‑41, registrada em `GUI.md §2.3a`, era essa — e chega ao
+  fechamento com **dezessete reinícios de custo zero** provando que a janela foi
+  bem usada. Reavaliar quando a sequência estiver estável.
+- **Clique em banner de consentimento — segue atrás do gate**, que é decisão da
+  trilha LGPD e não desta. Continua exigindo `WEBQA_ACTIVE_PROBES_AUTHORIZED=1`;
+  o primeiro check que o consumir altera `tests/test_fase_c_travada.py:314-326`,
+  protegido por CODEOWNERS.
+- **Orçamento de tempo do `quality-gate` — confirmado** no patamar atual. O smoke
+  de GUI e os três passos de placar (âncoras, coletores, mapa) somam segundos a
+  um job que já roda lint, SAST, unidade com cobertura e instalação de Chromium.
+  Nada a ajustar.
+
 ## Pendências do dono (não‑código)
+
+Duas, e as duas são execução — não decisão. Precisam de gente, agenda ou
+máquina, coisas que nenhum PR entrega.
 
 - **Rodar o piloto da OS‑54.** O protocolo está pronto e ensaiado; a sessão com
   gente é decisão de quem tem o alvo e a agenda. O que ela precisa:
@@ -329,18 +357,13 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
   saber), **45 minutos** por sessão e um lugar para guardar a gravação com
   expurgo em **30 dias**. Prometer a sessão executada num PR seria o VPAT que
   promete; ela entra aqui, onde pendência de dono mora.
+- **Rodar a OS‑55 contra um modelo local de verdade.** O validador foi exercido
+  nas duas direções com insumo sintético, mas nenhum contêiner desta trilha teve
+  runtime local — e a camada é local **por invariante**, não por preferência, então
+  não existe atalho por API externa. Declarar a execução como não realizada é o
+  contrário de simulá-la.
 
-- **Decidir sobre a dimensão dupla `gui + lgpd`.** Acessibilidade é obrigação
-  legal (LBI Art. 63) e `checks/ux/test_acessibilidade.py:24` já reivindica as
-  duas dimensões. Estender isso aos checks de GUI os coloca no noturno
-  (`docker/entrypoint.sh:93` roda `pytest -m lgpd`) e sujeita a sequência de dez
-  noites à oscilação deles. A recomendação registrada em `GUI.md §2.3a` é **não**
-  na Fase 1, e reavaliar quando a sequência estiver estável. É decisão sua.
-- **Autorizar (ou não) o clique em banner de consentimento.** Está atrás de
-  `WEBQA_ACTIVE_PROBES_AUTHORIZED=1` e fora desta trilha. O primeiro check que o
-  consumir altera `tests/test_fase_c_travada.py:314-326`, que é protegido por
-  CODEOWNERS.
-- **Confirmar o orçamento de tempo do `quality-gate`.** O smoke de GUI acrescenta
-  minutos ao job que roda em todo push.
-- **Definir onde vive `WEBQA_GUI_BASELINE_DIR` na VPS**, se a comparação visual
-  de alvo real for desejada — sob `report/` ela expira em 7 dias com o artefato.
+**Condicional, não pendente:** onde vive `WEBQA_GUI_BASELINE_DIR` na VPS só
+precisa de resposta **se** a comparação visual de alvo real for desejada — a
+condição está escrita desde a OS‑49. Sob `report/` a referência expira em 7 dias
+junto com o artefato, que é o mesmo que não ter referência.
