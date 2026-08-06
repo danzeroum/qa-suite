@@ -95,6 +95,10 @@ thresholds:
   #   conforme  /gui/resiliente  sob 3g_rapido: FCP/LCP 208-212ms, TBT 0
   #   ofensora  /gui/pesado      sob 3g_rapido: FCP/LCP 3376-3388ms, TBT 1242-1332
   #   ofensora  /gui/pesado      SEM throttle:  FCP/LCP 68-76ms,     TBT 0
+  # GUI-CONTR-03 (OS-52). Informacao que era so cor e some sob forced-colors.
+  # Zero: se a cor era o UNICO portador, perde-la e perder a informacao — e a
+  # 1.4.1 ja proibe cor como portador unico, entao um alvo conforme tem zero.
+  gui_fc_informacao_perdida_max: 0
   gui_fcp_ms_rede_lenta: 1800
   gui_lcp_ms_rede_lenta: 2500
   gui_tbt_ms_cpu_lento: 200

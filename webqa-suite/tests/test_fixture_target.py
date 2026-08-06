@@ -412,6 +412,8 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
         # razão de ele ter cenário próprio é justamente poder ficar.
         "checks/gui/test_jornada.py::test_o_visitante_procura_como_falar_com_a_loja",
         "checks/gui/test_jornada.py::test_nenhuma_página_deixa_o_visitante_sem_saída",
+        # OS-52. A home tem links distinguidos SÓ por fundo, sem texto próprio.
+        "checks/gui/test_preferencias.py::test_forced_colors_nao_apaga_informacao",
     }
     declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
     assert declarados == esperados

@@ -20,6 +20,12 @@ import pytest
 
 from webqa import metricas
 from webqa.axe import baixar_axe_verificado, resumo_de_violacoes, violacoes_por_impacto
+from webqa.i18n import (
+    JS_DISTINTIVOS,
+    distintivos_de,
+    informacao_perdida,
+    relato_de_perdas,
+)
 from webqa.movimento import JS_ANIMACOES, animacoes_persistentes, resumo_de_animacoes
 from webqa.tema import JS_FUNDO_DO_BODY, implementa_tema_escuro, motivo_de_pular
 
@@ -109,3 +115,51 @@ def test_contraste_em_tema_escuro(contexto_gui, settings, perfis_gui, client):
         f"checks/ux/test_acessibilidade.py; este mede o outro:\n"
         + resumo_de_violacoes(serias + criticas)
         + f"\nFundo do body: {fundo_claro} no claro, {fundo_escuro} no escuro.")
+
+
+def test_forced_colors_nao_apaga_informacao(contexto_gui, settings, perfis_gui):
+    """GUI-CONTR-03: no modo de alto contraste, o que era só cor continua legível.
+
+    O modo de cores forçadas substitui a paleta do autor pela do sistema. Isso é
+    o RECURSO, não o defeito — quem o liga quer exatamente isso. O defeito é
+    outro: um elemento que se distinguia dos vizinhos **só** por fundo ou borda e
+    que, sob a substituição, passa a ser indistinguível deles. A informação que a
+    cor carregava não foi substituída por nada.
+
+    **Mudar de cor não é perder informação.** Acusar mudança de cor acusaria o
+    recurso, e o laudo viraria uma lista do que o modo faz de propósito. Por isso
+    o comparador isenta quem tem texto próprio (o texto atravessa) e quem tem
+    borda que sobrevive — o caso do `.campo-erro` do alvo fabricado, cuja borda
+    permanece `solid` e só troca de cor.
+
+    A capacidade é perguntada ao NAVEGADOR, nunca a uma lista de engines
+    (lição das OS-46/56): se a media query não acompanhar a emulação, a
+    comparação não mediria nada e o check pula nomeando a incapacidade — verde
+    permanente é o que `tests/test_i18n.py` fixa como proibido.
+    """
+    def colher(forcado: bool):
+        pagina = contexto_gui(viewport=perfis_gui["desktop"])
+        if forcado:
+            pagina.emulate_media(forced_colors="active")
+        pagina.goto(settings.target_url, wait_until="load", timeout=60_000)
+        pagina.evaluate("() => document.fonts && document.fonts.ready")
+        return pagina, pagina.evaluate(JS_DISTINTIVOS)
+
+    pagina_forcada, forcado = colher(True)
+    if not pagina_forcada.evaluate("() => matchMedia('(forced-colors: active)').matches"):
+        pytest.skip(
+            "Esta engine não aplicou `forced-colors: active` — a media query não "
+            "acompanhou a emulação, então comparar estilo computado entre os dois "
+            "modos não mediria nada. Rode a dimensão gui em chromium para obter o "
+            "veredito; engine sem o modo não é aprovação.")
+    _, normal = colher(False)
+
+    perdidos = informacao_perdida(distintivos_de(normal, forcado))
+    metricas.registrar("gui_fc_informacao_perdida_n", len(perdidos))
+
+    limite = settings.threshold("gui_fc_informacao_perdida_max")
+    assert len(perdidos) <= limite, (
+        f"{len(perdidos)} elemento(s) perderam sob forced-colors o ÚNICO distintivo "
+        f"que tinham (limite {limite:.0f}) — WCAG 1.4.1 pelo avesso: a cor era o "
+        f"portador único, e o modo de alto contraste a substituiu.\n"
+        + relato_de_perdas(perdidos[:10]))
