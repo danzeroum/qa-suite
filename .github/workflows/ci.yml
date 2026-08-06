@@ -89,6 +89,12 @@ jobs:
       - name: Placar das ancoras da documentacao
         run: python scripts/afere_ancoras.py
 
+      # Coletores JS_ de webqa/ que nenhum check executa (OS-52). Passo proprio
+      # pela mesma licao do placar de ancoras: a reprovacao ja aconteceu no
+      # pytest acima, mas o NUMERO so aparece se alguem o imprimir.
+      - name: Placar dos coletores sem consumidor
+        run: python scripts/afere_simbolos.py
+
       # ---------- Smoke de GUI ----------
       #
       # A dimensao `gui` ja e exercida na direcao "reprova o que deve": o

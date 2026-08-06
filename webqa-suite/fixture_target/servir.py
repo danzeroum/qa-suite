@@ -215,6 +215,20 @@ _ESTILO_GUI = """
 /* VIOLACAO (gui, GUI-RESP-01): faixa de 900px nao cabe em 320 CSS px e
    forca rolagem horizontal (WCAG 1.4.10). */
 .faixa-larga { min-width: 900px; background: #eee; }
+/* VIOLACAO (gui, GUI-RESP i18n, OS-52): margem FISICA em vez de logica.
+   `margin-right` nao move um bloco de largura fixa em LTR — ele ja encosta na
+   borda de inicio. Sob `dir=rtl` o bloco passa a alinhar pela direita e a margem
+   o empurra para FORA da viewport pela esquerda. Invisivel em LTR por
+   construcao, que e o criterio de aceite: violacao que aparecesse nos dois modos
+   nao provaria que o check mede RTL.
+   O conserto real seria `margin-inline-end`. */
+.margem-fisica { width: 1200px; margin-right: 320px; background: #f7f7f7; }
+/* VIOLACAO (gui, GUI-RESP expansao, OS-52): rotulo dimensionado no texto mais
+   curto. Em x1,0 o texto cabe exato; a x1,5 ele e CORTADO, e continua no DOM —
+   um teste que so olhasse o DOM aprovaria. `nowrap` impede a quebra de linha que
+   salvaria o layout, que e o que um botao de barra de acoes costuma ter. */
+.rotulo-justo { display: inline-block; width: 96px; white-space: nowrap;
+                overflow: hidden; background: #eef; }
 /* VIOLACAO (gui, GUI-TIPO-01): altura travada + overflow hidden cortam o
    texto quando ele cresce a 200% (WCAG 1.4.4). */
 .altura-travada { height: 24px; overflow: hidden; }
@@ -286,7 +300,9 @@ _ESTILO_GUI = """
 _CORPO_GUI = """
 <section id="gui">
   <h2>Area de compra</h2>
-  <p class="faixa-larga">Faixa de largura fixa que nao reflui.</p>
+  <div class="margem-fisica">Bloco de largura fixa com margem fisica.</div>
+<p><span class="rotulo-justo">Comprar agora</span></p>
+<p class="faixa-larga">Faixa de largura fixa que nao reflui.</p>
   <p class="altura-travada">Este paragrafo cabe em uma linha na largura cheia e
   passa a ocupar duas quando o usuario amplia a fonte, momento em que a segunda
   linha e cortada pelo overflow hidden e deixa de estar disponivel.</p>
