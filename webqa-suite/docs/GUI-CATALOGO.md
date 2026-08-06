@@ -980,3 +980,26 @@ O grau de liberdade que sobra é a **contagem** de blocos, não o tamanho de cad
 um. Máquina muito mais rápida encolhe o bloco e pode apagar o sinal — limite
 conhecido, e o motivo de o veredito duro desta família só existir sob
 `WEBQA_ORIGEM=vps`, onde a máquina é uma só e conhecida.
+
+### 4.3 Zoom 400% — **coberto**, não implementado (OS-52)
+
+A WCAG 1.4.10 define reflow a **320 CSS px**, e a nota da própria norma diz que
+isso equivale a uma viewport de 1280 px a **400% de zoom**. O
+`checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px` (OS‑42) já mede
+essa largura — o perfil `reflow_aa` de `data/gui-perfis.yaml` é 320×640 — e a
+docstring dele já afirma a equivalência. Um check de "zoom 400%" mediria a mesma
+coisa com outro nome, e seria a **primeira duplicação da trilha em 12 OSs**.
+
+> **Conferido antes de implementar, e é esse o barato que vale a nota.** A
+> conferência custou uma leitura; a duplicação custaria um check a manter para
+> sempre, dois números com o mesmo significado no laudo e a dúvida, daqui a um
+> ano, sobre qual dos dois é o certo quando discordarem.
+
+**O vizinho que pareceria sobrar, e por que ele também não entra.** A 1.4.10 tem
+outra metade — "sem perda de informação ou funcionalidade" —, e a suíte só mede
+perda a **200%** (`test_zoom_200_nao_perde_conteudo`, viewport de 683 px). Medir
+perda a 320 px seria cobertura nova de verdade. Foi recusado mesmo assim:
+`perdidos_entre` acusaria toda navegação que colapsa **legitimamente** em tela
+estreita — menu que vira hambúrguer, coluna secundária que desce —, que é
+território do **GUI‑RESP‑05**. Seria gerador de falso positivo, e falso positivo
+em bateria de acessibilidade custa a credibilidade da bateria inteira.

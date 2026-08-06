@@ -155,7 +155,27 @@ _TRANSPARENTES = ("rgba(0, 0, 0, 0)", "transparent", "")
 
 
 def _tem_fundo(valor: str) -> bool:
-    return (valor or "").strip() not in _TRANSPARENTES
+    """Este fundo pinta alguma coisa?
+
+    **Alfa zero conta como transparente, seja qual for a cor.** A primeira
+    versão comparava a string com uma lista curta e não reconhecia
+    `rgba(255, 255, 255, 0)` — branco com alfa 0 —, que é exatamente o que o
+    Chromium devolve para o entorno sob `forced-colors`. O efeito era o pior
+    possível: o elemento ficava igual ao entorno de fato, o comparador via duas
+    strings diferentes e NÃO acusava. Verde permanente, medido em `/gui/estados`,
+    numa página que carrega violação declarada.
+    """
+    bruto = (valor or "").strip()
+    if bruto in _TRANSPARENTES:
+        return False
+    if bruto.startswith("rgba(") and bruto.endswith(")"):
+        partes = bruto[5:-1].split(",")
+        if len(partes) == 4:
+            try:
+                return float(partes[3]) > 0
+            except ValueError:
+                return True
+    return True
 
 
 def _distinguia_por_cor(d: Distintivo) -> bool:
@@ -187,8 +207,12 @@ def perdeu_informacao(d: Distintivo) -> bool:
         return False
     if not _distinguia_por_cor(d):
         return False
-    virou_igual = (not _tem_fundo(d.fundo_forcado)
-                   or d.fundo_forcado == d.fundo_de_referencia_forcado)
+    # Entorno transparente = o que estiver atrás, e no fim da cadeia é o Canvas.
+    # Comparar a string crua faria "branco opaco" e "branco com alfa 0" parecerem
+    # cores diferentes quando pintam o mesmo.
+    entorno = (d.fundo_de_referencia_forcado if _tem_fundo(d.fundo_de_referencia_forcado)
+               else "rgb(255, 255, 255)")
+    virou_igual = not _tem_fundo(d.fundo_forcado) or d.fundo_forcado == entorno
     return virou_igual and not _tem_borda(d.borda_forcada)
 
 
