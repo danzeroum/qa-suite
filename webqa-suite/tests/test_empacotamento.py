@@ -61,6 +61,14 @@ def test_versao_e_fonte_unica_em_webqa(proj):
     assert proj["tool"]["setuptools"]["dynamic"]["version"]["attr"] == "webqa.__version__"
 
 
+def test_readme_declarado_e_existe(proj):
+    """Um pacote publicável precisa de long_description: o README é a página do
+    wheel/PyPI, e documenta a adoção (uses: auditar.yml / webqa-sondar)."""
+    readme = proj["project"]["readme"]
+    assert readme == "README.md"
+    assert (_PYPROJECT.parent / readme).exists()
+
+
 def test_versao_e_string_valida_para_tag_de_release():
     """E2: a versão precisa ser uma string PEP440 simples para uma tag `v<versao>`
     do release casar com ela."""

@@ -943,7 +943,7 @@ e o diff visual emite veredito sobre uma imagem que não existe.
 
 Duas consequências para a estimativa da OS: o *unfiltering* do PNG tem cinco
 tipos por linha (None, Sub, Up, Average, Paeth) e não cabe numa função sob
-`C901 max-complexity = 8` (`pyproject.toml:46-51`) — são umas quatro ou cinco
+`C901 max-complexity = 8` (`pyproject.toml:47-52`) — são umas quatro ou cinco
 funções, e é bom que sejam, porque cada filtro fica testável isoladamente contra
 vetor conhecido. E o gate de complexidade vale em `webqa/`, que é onde o módulo
 mora — escondê‑lo no check para escapar dele seria contornar a guarda, não

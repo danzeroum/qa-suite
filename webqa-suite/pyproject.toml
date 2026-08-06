@@ -8,6 +8,7 @@ name = "webqa-suite"
 # essa mesma versão — se o pyproject a duplicasse, um laudo poderia mentir a régua.
 dynamic = ["version"]
 description = "Testes genéricos de qualidade (performance, funcionalidade, UX) para qualquer aplicação web via HTTP"
+readme = "README.md"
 requires-python = ">=3.11"
 # Dependências de RUNTIME da biblioteca webqa/ (o motor). playwright é do
 # navegador (dimensão browser), não do motor — fica em extra opcional para o

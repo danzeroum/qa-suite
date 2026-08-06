@@ -106,6 +106,57 @@ pytest -m load                              # rajada leve embutida (httpx assín
 locust -f loadtest/locustfile.py --host "$WEBQA_TARGET_URL"   # carga real com Locust
 ```
 
+## Adotar em outro projeto (padrão declarado, não copiado)
+
+A partir da frente E, um projeto **declara** a suíte em vez de copiá-la — a régua é
+uma só, versionada, com a lista curada fora do alcance do projeto (ver
+[`docs/handoff-cockpit-dev/docs/ARQUITETURA-suite-como-padrao-em-harness.md`](docs/handoff-cockpit-dev/docs/ARQUITETURA-suite-como-padrao-em-harness.md)
+§3/§4). Duas formas:
+
+### Via workflow reutilizável (recomendado para CI)
+
+No `.github/workflows/qa.yml` do **seu** projeto:
+
+```yaml
+jobs:
+  qa:
+    uses: danzeroum/qa-suite/.github/workflows/auditar.yml@main
+    with:
+      target_url: https://homolog.meu-projeto.danzeroum.com
+    secrets:
+      basic_auth_user: ${{ secrets.WEBQA_USER }}   # só se o alvo pedir login
+      basic_auth_pass: ${{ secrets.WEBQA_PASS }}
+```
+
+> **`@main`, e não `@v1`:** a régua é a versão, e **nenhuma tag foi cortada
+> ainda** — `release.yml` dispara em `push: tags: v*`, e o repositório está sem
+> tags. Enquanto isso for verdade, `@v1` não resolve e o workflow do consumidor
+> falha na primeira execução. `@main` funciona hoje, ao preço de a régua andar
+> sozinha: quem precisa de laudo comparável no tempo deve fixar um commit
+> (`@<sha>`) até existir a tag. Trocar para `@v1` é a última linha da E2‑publicar,
+> não um detalhe de redação.
+
+O caminho **passivo** (o padrão, `dimensoes: "not load"`) roda **sem gate de rede**
+— é o que agentes rodam livremente, em qualquer projeto. A **Fase C** (sondagem
+ativa) é opt-in explícito (`sondagem_fase_c: true` + secret `escopo` com o
+`escopo-autorizado.yaml`); o gate vive só no passo dela, e escopo+posse ainda
+travam por host — o gate é necessário, não suficiente.
+
+### Via pacote instalável (CLI)
+
+```bash
+pip install webqa-suite            # índice a definir; `make build` gera o wheel
+webqa-sondar --alvo https://homolog.meu-projeto.danzeroum.com \
+             --caminhos data/caminhos-sensiveis.yaml
+```
+
+Todo laudo carrega a **procedência** (versão do padrão + hash da lista curada);
+dois laudos só se comparam sob a mesma régua:
+
+```bash
+python -m webqa.comparador laudo-a.json laudo-b.json   # recusa réguas diferentes
+```
+
 ## Estrutura (EAP do repositório)
 
 ```
