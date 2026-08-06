@@ -199,7 +199,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 ```xml
 <lang>Python 3.11 + Playwright — webqa/geometria.py, checks/gui/test_reflow.py, checks/gui/test_alvos.py</lang>
 <task>Implementar GUI-RESP-01 (reflow 320px), GUI-TIPO-01 (zoom 200%) e GUI-ALVO-01 (alvo de toque >= 24px com as exceções da norma), com o algoritmo puro em webqa/geometria.py.</task>
-<context>Specs completas em docs/GUI-CATALOGO.md §3.1, §3.2 e §3.6. As exceções da 2.5.8 (inline, equivalente, espaçamento) são o miolo do algoritmo e a fonte de falso positivo se ignoradas. C901 max-complexity = 8 vale em webqa/ e é dispensado em checks/** (pyproject.toml:46-56) — o algoritmo vive na biblioteca, decomposto, e fica testável sem navegador sobre caixas fabricadas. Medir o elemento CLICÁVEL, não o ícone interno: a área de toque costuma vir do padding do ancestral.</context>
+<context>Specs completas em docs/GUI-CATALOGO.md §3.1, §3.2 e §3.6. As exceções da 2.5.8 (inline, equivalente, espaçamento) são o miolo do algoritmo e a fonte de falso positivo se ignoradas. C901 max-complexity = 8 vale em webqa/ e é dispensado em checks/** (pyproject.toml:47-57) — o algoritmo vive na biblioteca, decomposto, e fica testável sem navegador sobre caixas fabricadas. Medir o elemento CLICÁVEL, não o ícone interno: a área de toque costuma vir do padding do ancestral.</context>
 <rules>
 - Pense passo a passo antes de responder.
 - Iteração de viewport DENTRO do corpo do teste — um nodeid por check (conftest.py:105-113 explica por quê: o contrato de esperado.json é por nodeid exato).

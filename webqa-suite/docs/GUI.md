@@ -174,7 +174,7 @@ Cada uma é imposta por um teste, não por combinação. A coluna da direita é 
 | 15 | Verificação **e** validação no mesmo PR | `PROXIMOS-PASSOS.md §5.2` | entregar check sem unidade em `tests/` sobre dado fabricado |
 | 16 | "A garantia existe, a ligação não" | `PROXIMOS-PASSOS.md §2.10`; `tests/test_derivadores_ligados.py` | propor chave de configuração sem teste que prove que **algum check a lê**. Threshold que ninguém lê é exatamente essa classe de defeito |
 | 17 | Loopback prova a lógica, nunca a fronteira | `PROXIMOS-PASSOS.md §2.11` | dar por provado, contra o alvo fixture (`127.0.0.1`, isento de etiqueta), qualquer comportamento que dependa de rede pública |
-| 18 | C901 máx. 8 e linha 110 na biblioteca | `pyproject.toml:41-51`; `checks/**` tem isenção em `:56` | esconder o algoritmo de geometria dentro do check para escapar do gate. Ele vive em `webqa/`, decomposto — que é também onde ele fica testável sem navegador |
+| 18 | C901 máx. 8 e linha 110 na biblioteca | `pyproject.toml:42-52`; `checks/**` tem isenção em `:57` | esconder o algoritmo de geometria dentro do check para escapar do gate. Ele vive em `webqa/`, decomposto — que é também onde ele fica testável sem navegador |
 | 19 | axe‑core está pinado com hash | `webqa/axe.py:21-24` (movido para lá na OS‑45; era privado no check) | subir a versão do axe dentro de uma OS desta camada. O SHA‑384 é controle de segurança, não número de versão. Mapear critério→regra só depois de confirmar que a regra existe na 4.9.1 |
 | 20 | `mutacao.yml` exige ambiente sem gate | `.github/workflows/mutacao.yml` | depender de variável de gate ligada para o teste passar |
 
@@ -285,8 +285,8 @@ webqa-suite/
 A lei é `ARQUITETURA.md:44` e `conftest.py:3-5`: **`checks/gui/` só conhece
 fixtures; todo detalhe vive em `webqa/`.** Aqui isso tem uma consequência prática
 que vale além da estética — o gate de complexidade `C901 max-complexity = 8`
-(`pyproject.toml:46-51`) vale para `webqa/` e é **dispensado** em `checks/**`
-(`:56`). Um algoritmo de geometria escrito dentro do check escaparia do gate; o
+(`pyproject.toml:47-52`) vale para `webqa/` e é **dispensado** em `checks/**`
+(`:57`). Um algoritmo de geometria escrito dentro do check escaparia do gate; o
 mesmo algoritmo em `webqa/geometria.py` é obrigado a se decompor — e, decomposto,
 fica testável sem navegador, sobre caixas fabricadas.
 
