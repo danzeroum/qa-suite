@@ -152,8 +152,17 @@ não entrou.
 
 | ID | Cenário | Nível | Métrica | Ferramenta | Sev | Freq |
 |---|---|---|---|---|---|---|
-| GUI-JORN-01 | Jornada BDD instrumentada: TSR, ToT, cliques além do caminho ótimo | A | `gui_tsr_pct`, `gui_tot_ms`, cliques excedentes | pytest‑bdd + `webqa/jornada.py` | A | N |
-| GUI-JORN-02 | Becos sem saída e retorno no grafo do crawl | S | páginas sem saída além do voltar; taxa de retorno | grafo `origem→destino` que `webqa/navegacao.py::percorrer` **já** produz | M | N |
+| GUI-JORN-01 | Jornada BDD instrumentada: TSR e cliques além do caminho ótimo | A | `gui_jornada_tsr_*`, `gui_jornada_cliques_*`, `gui_jornada_excedente_*` | pytest‑bdd + `webqa/jornada.py` (BFS sobre o grafo do crawl) | A | PR |
+| GUI-JORN-03 | ToT: tempo de tarefa, contra orçamento próprio | A | `gui_jornada_tot_ms_*` | o mesmo percurso, cronometrado — cenário PRÓPRIO porque tempo é ambiente | M | PR |
+| GUI-JORN-02 | Becos sem saída: página em que se entra e de onde só se sai voltando | S | `gui_jornada_becos_n` | grafo `origem→destino` que `webqa/navegacao.py::percorrer` já produz | A | PR |
+
+> **Numeração declarada (OS-51).** O ToT nasceu como parte do GUI‑JORN‑01 e virou
+> **GUI‑JORN‑03** na implementação, por uma razão que só aparece ao codar: TSR e
+> cliques são determinísticos contra o alvo fabricado e ToT é **tempo**, logo
+> ambiente. Compartilhando nodeid, o desfecho do conjunto passaria a depender do
+> ambiente — e nenhuma das medidas determinísticas poderia entrar no contrato 1:1.
+> A separação não é de arrumação: é o que permite duas delas serem contratuais.
+> Conferido antes de renumerar: `GUI-JORN-03` não existia e ninguém o referencia.
 
 ### 1.12 `GUI-VIS` — regressão visual
 

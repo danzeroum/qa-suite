@@ -408,6 +408,10 @@ def test_contrato_cobra_os_checks_de_gui_existentes():
         "checks/gui/test_responsividade.py::test_sem_sobreposicao_de_interativos",
         "checks/gui/test_responsividade.py::test_navegacao_principal_utilizavel_em_mobile",
         "checks/gui/test_visual.py::test_paginas_estaveis_contra_a_linha_de_base",
+        # OS-51. Os dois determinísticos da jornada; o de TEMPO fica fora, e a
+        # razão de ele ter cenário próprio é justamente poder ficar.
+        "checks/gui/test_jornada.py::test_o_visitante_procura_como_falar_com_a_loja",
+        "checks/gui/test_jornada.py::test_nenhuma_página_deixa_o_visitante_sem_saída",
     }
     declarados = {i for i in contrato["devem_falhar"] if "checks/gui/" in i}
     assert declarados == esperados

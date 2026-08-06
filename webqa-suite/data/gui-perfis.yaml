@@ -114,6 +114,46 @@ visual:
       regravar: false
       componentes: []
 
+# Tarefas de jornada (GUI-JORN-01/02, OS-51).
+#
+# São as MESMAS tarefas que o protocolo humano (OS-54) leva para a sessão
+# moderada — é o que torna TSR e ToT sintético e humano comparáveis na mesma
+# régua. Quem conhece o alvo declara aqui; o check não adivinha tarefa, do mesmo
+# jeito que não adivinha rota.
+#
+# `procura` são as palavras que a PESSOA levaria na cabeça — é o que o rótulo do
+# link precisa evocar para ser encontrável. `marco` é como se reconhece que
+# chegou: o texto que ela leria na página de destino para ter certeza. A
+# comparação é sem acento e sem caixa.
+#
+# Fail-closed: cenário que cite tarefa inexistente é ERRO nomeando as válidas,
+# nunca "não mediu e passou".
+jornadas:
+  # Direção CONFORME contra o alvo fabricado: a home rotula o link como
+  # "Politica de Privacidade", que é exatamente o que se procura — um clique,
+  # zero excedente. É o lado que prova que o check não reprova tudo.
+  - nome: "encontrar a política de privacidade"
+    procura: ["politica", "privacidade"]
+    marco: "Politica de Privacidade"
+    # 1, e não 0: a home oferece DOIS links para o mesmo destino ("Privacidade" e
+    # "Politica de Privacidade"), e um alvo real costuma ter o mesmo conteúdo
+    # atrás de rodapé e de menu. Teto zero transformaria redundância legítima de
+    # navegação em achado.
+    cliques_extras_max: 1
+    # Orçamento de tarefa, não de página: inclui a leitura dos rótulos e as
+    # navegações. Folgado de propósito — o que ele pega é a rota que demora, não
+    # a página que demora (isso é GUI-PERF).
+    tot_ms: 8000
+  # Direção FAILED: nenhum rótulo do alvo fabricado evoca atendimento, e não há
+  # página de contato alcançável. A pessoa desiste na home, e desistir é
+  # resultado (TSR=0), não erro do medidor. Loja sem rota para falar com alguém é
+  # defeito de usabilidade de verdade — não foi preciso plantar nada.
+  - nome: "encontrar como falar com a loja"
+    procura: ["contato", "atendimento", "falar", "suporte"]
+    marco: "Fale conosco"
+    cliques_extras_max: 1
+    tot_ms: 8000
+
 # Marcos comparados entre engines (GUI-COMPAT-01, OS-48).
 #
 # Lista CURTA e declarada, e não "todo elemento": antialiasing de fonte,
