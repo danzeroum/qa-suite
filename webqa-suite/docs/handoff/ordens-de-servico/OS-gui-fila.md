@@ -28,7 +28,19 @@ duas vezes (`docs/PROXIMOS-PASSOS.md §4.1`, duas OS‑24) — a folga é barata
 | OS‑49 | #93 | `cd16e9f` | `webqa/imagem.py` + `evidencias.py` + `referencia_visual.py`: contrato visual |
 | OS‑50 | #94 | `2381493` | `webqa/rede_simulada.py`: pintura sob 3G e bloqueio sob CPU ×4, por CDP |
 | OS‑57 | #95 | `e1553ad` | `scripts/afere_ancoras.py`: guarda bidirecional das âncoras `arquivo:linha`, com cobertura declarada |
-| OS‑51 | — | — | `webqa/jornada.py`: TSR, cliques excedentes, becos e ToT sobre o grafo do crawl |
+| OS‑51 | #96 | `3db5aeb` | `webqa/jornada.py`: TSR, cliques excedentes, becos e ToT sobre o grafo do crawl |
+| OS‑52 | #97 #98 | `f0f75aa` `9783fdf` | `webqa/i18n.py`: forced-colors, RTL e expansão ×1,5, mais a guarda de coletores órfãos |
+| OS‑53 | #99 | `29873b1` | `webqa/conformidade.py`: SARIF de GUI, VPAT parcial e PDF executivo |
+| OS‑54 | #100 | `934608d` | `docs/GUI-PROTOCOLO-HUMANO.md` + `webqa/sessao.py`: protocolo de sessão moderada |
+| OS‑55 | — | — | `webqa/exploracao.py`: fricções por LLM local sobre material já coletado |
+
+**A fila original FECHA aqui.** OS‑40 a OS‑55, mais as duas que nasceram de
+execução e não de planejamento: a **OS‑56** (do run real da matriz da OS‑48) e a
+**OS‑57** (das âncoras que derivaram duas vezes em três OSs). Dezessete ordens.
+
+O que sobra não é código: são as **pendências do dono** no fim deste documento —
+decisões que precisam de alvo, agenda ou máquina. Uma fila que fecha declarando o
+que ficou fora é o oposto de uma que fecha em silêncio.
 
 **Por que a OS‑56 aparece aqui e não na fila abaixo.** Ela não foi planejada: nasceu
 do run real da matriz da OS‑48, que acusou três `error` do Firefox em `test_foco.py`.
@@ -297,7 +309,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 | **OS‑54** | Protocolo humano — rodada piloto | roteiro, consentimento com prazo de retenção declarado e expurgo executado, SUS/SEQ, e a ponte achado→backlog com severidade Nielsen | 5 | OS‑51 |
 | ~~**OS‑57**~~ | ~~`scripts/afere_ancoras.py` + `data/ancoras.yaml`: mecanizar a conferência das âncoras `arquivo:linha`~~ | **entregue.** Guarda bidirecional sobre documentos AUDITADOS, cobertura declarada por documento (`auditado`/`pendente`/`congelado`, todos com motivo) e placar de pendentes impresso em toda execução. Tranche 1 (GUI.md, GUI‑CATALOGO.md, OS‑gui‑fila.md, PROXIMOS‑PASSOS.md): **85 âncoras conferidas, 10 mentiam** e foram corrigidas no mesmo PR. Duas descobertas do desenho: 21 das 91 âncoras eram citadas a partir de raízes implícitas (`ARQUITETURA.md:44` de `docs/`) e teriam sido ignoradas como "inexistentes", deixando um buraco de 23% com a guarda parecendo completa; e o `PROXIMOS-PASSOS.md` não tem âncora `arquivo:linha` NENHUMA — cita por `§seção`, então o risco dele é ser citado, não citar | 5 | — |
 | ~~**OS‑54**~~ | ~~Protocolo humano — rodada piloto~~ | **PROTOCOLO entregue; a RODADA é pendência do dono.** O roteiro NÃO reescreve os cenários: aponta para `jornada_usabilidade.feature`, porque duas versões divergiriam na primeira edição e a comparabilidade entre TSR humano e sintético — que foi o produto da OS‑51 — morreria aí. A pauta vem dos cinco `exige_humano` do mapa por referência. Consentimento com finalidade, retenção e expurgo obrigatórios (o consolidador RECUSA sem eles) e transcrição por `sanitize_text` antes do disco. Ensaio cronometrado achou três coisas antes de convidar alguém, uma delas uma contradição do próprio documento entre §3 e §6 sobre apontar | 5 | OS‑51 |
-| **OS‑55** | GUI‑EXPL‑01: LLM local sobre a jornada **já coletada** | gate `WEBQA_LLM_ENABLED`; a LLM **não** clica (`tests/test_convencoes.py:209-224`); saída nunca vira veredito; detector de omissão sobre o texto, como `scripts/sumario.py` já faz | 8 | OS‑51 |
+| ~~**OS‑55**~~ | ~~GUI‑EXPL‑01: LLM local sobre a jornada já coletada~~ | **entregue.** A LLM apresenta, o CÓDIGO julga — e o julgamento é mecânico: página ∈ grafo, tipo ∈ vocabulário fechado, evidência = trecho literal do insumo. Fricção que cita página inexistente morre como alucinação. Validador escrito ANTES do prompt, de propósito. Fricção fica FORA do SARIF (doutrina da OS‑53: achado é `failed` medido) e fora do contrato (não-determinística por natureza). Fail-closed em duas portas com mensagens distintas, sem caída para API externa. O alvo fabricado expôs um erro meu: eu preservava a URL crua no insumo, e ele serve `/newsletter?email=...` — PII mora em URL também | 8 | OS‑51 |
 
 ---
 
