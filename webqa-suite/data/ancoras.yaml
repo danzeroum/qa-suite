@@ -63,6 +63,13 @@ documentos:
       "tests/test_fase_c_travada.py:314-326": "def test_nenhum_check_consome_o_gate_ativo_hoje"
       "ESCOPO-EAP.md:19-24": "anti-scope-creep"
       "pyproject.toml:46-51": "max-complexity = 8"
+  webqa-suite/docs/GUI-PROTOCOLO-HUMANO.md:
+    estado: auditado
+    # Zero âncoras `arquivo:linha` — e é decisão, não acaso: o protocolo é
+    # executado por quem não lê código, e número de linha num roteiro de sessão
+    # seria ruído para a leitora e dívida para quem mantém. As referências são a
+    # ARQUIVO (a feature, o mapa), que não deslocam.
+    ancoras: {}
   webqa-suite/docs/GUI.md:
     estado: auditado
     ancoras:
