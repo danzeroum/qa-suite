@@ -95,6 +95,11 @@ jobs:
       - name: Placar dos coletores sem consumidor
         run: python scripts/afere_simbolos.py
 
+      # Mapa criterio WCAG -> teste (OS-53). Bidirecional: nodeid citado que a
+      # coleta nao produz reprova, e check de gui que o mapa nao conhece tambem.
+      - name: Placar do mapa de conformidade
+        run: python scripts/exporta_conformidade.py --placar
+
       # ---------- Smoke de GUI ----------
       #
       # A dimensao `gui` ja e exercida na direcao "reprova o que deve": o

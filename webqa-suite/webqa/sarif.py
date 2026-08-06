@@ -16,7 +16,16 @@ from collections.abc import Iterable
 from webqa.dominio import Finding
 
 FERRAMENTA = "WebQA-FaseC"
-_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
+
+# Publicos porque a dimensao `gui` emite SARIF proprio (webqa/conformidade.py,
+# OS-53) e precisa do MESMO schema e da MESMA versao. Duas constantes iguais em
+# dois modulos divergiriam no primeiro upgrade de schema, e a divergencia
+# apareceria como um exportador aceito e o outro recusado pela mesma
+# ferramenta — a licao do _contextos_de_gui aplicada a serializacao.
+SCHEMA_SARIF = "https://json.schemastore.org/sarif-2.1.0.json"
+VERSAO_SARIF = "2.1.0"
+
+_SCHEMA = SCHEMA_SARIF
 
 # Severidade curada → nível SARIF. Alta = error (reprova o CI / aba Security).
 _NIVEL = {"alta": "error", "media": "warning", "baixa": "note"}
@@ -50,7 +59,7 @@ def para_sarif(findings: Iterable[Finding]) -> dict:
         for f in findings
     }
     return {
-        "version": "2.1.0",
+        "version": VERSAO_SARIF,
         "$schema": _SCHEMA,
         "runs": [{
             "tool": {"driver": {"name": FERRAMENTA, "rules": list(regras.values())}},

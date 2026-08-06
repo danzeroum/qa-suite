@@ -172,6 +172,95 @@ compatibilidade:
     - "form"
     - "nav, [role=navigation]"
 
+# Conformidade: mapa critério WCAG -> NODEID, e os três estados do VPAT (OS-53).
+#
+# **Populado lendo cada CHECK, não cada critério.** A tentação é partir da lista
+# da WCAG e "achar" um teste para cada linha — é assim que nasce VPAT que
+# promete. Partindo dos checks, o que sobra sem critério é DECLARADO, e o que
+# sobra sem teste vira `exige_humano` ou `nao_coberto`, que são as duas linhas
+# honestas.
+#
+# Guarda bidirecional (`webqa/conformidade.py`): nodeid citado aqui que não
+# existe na coleta reprova, e check de `gui` que não esteja nem mapeado nem em
+# `sem_criterio` reprova. Sem os dois lados, o mapa envelhece mentindo.
+conformidade:
+  # Critérios que UM TESTE cobre. O nodeid é a prova; o ID de catálogo não serve
+  # aqui porque não é o que a coleta produz.
+  criterios:
+    "1.4.1":
+      nome: "Uso de cor"
+      nodeids: ["checks/gui/test_preferencias.py::test_forced_colors_nao_apaga_informacao"]
+    "1.4.3":
+      nome: "Contraste (mínimo)"
+      nodeids: ["checks/gui/test_preferencias.py::test_contraste_em_tema_escuro"]
+    "1.4.4":
+      nome: "Redimensionar texto"
+      nodeids: ["checks/gui/test_reflow.py::test_zoom_200_nao_perde_conteudo"]
+    "1.4.10":
+      nome: "Reflow"
+      nodeids: ["checks/gui/test_reflow.py::test_sem_rolagem_horizontal_em_320px"]
+    "2.1.1":
+      nome: "Teclado"
+      nodeids: ["checks/gui/test_responsividade.py::test_navegacao_principal_utilizavel_em_mobile"]
+    "2.3.3":
+      nome: "Animação por interação"
+      nodeids: ["checks/gui/test_preferencias.py::test_reduced_motion_respeitado"]
+    "2.4.3":
+      nome: "Ordem de foco"
+      nodeids: ["checks/gui/test_foco.py::test_ordem_de_tabulacao_segue_a_ordem_visual"]
+    "2.4.7":
+      nome: "Foco visível"
+      nodeids: ["checks/gui/test_foco.py::test_indicador_de_foco_visivel"]
+    "2.4.11":
+      nome: "Foco não obscurecido (mínimo)"
+      nodeids: ["checks/gui/test_foco.py::test_foco_nao_obscurecido"]
+    "2.5.8":
+      nome: "Tamanho de alvo (mínimo)"
+      nodeids: ["checks/gui/test_alvos.py::test_area_minima_de_toque"]
+
+  # Critérios que a suíte NÃO consegue julgar sozinha, e que aparecem no VPAT de
+  # propósito: omiti-los fingiria completude. Cada um com o que falta.
+  exige_humano:
+    "1.1.1":
+      nome: "Conteúdo não textual"
+      motivo: "presença de `alt` é automatizável e já é medida; se o texto DESCREVE a imagem é julgamento humano"
+    "1.3.1":
+      nome: "Informação e relações"
+      motivo: "a árvore de acessibilidade é proxy; se a estrutura corresponde ao sentido exige leitor de tela real"
+    "2.4.6":
+      nome: "Cabeçalhos e rótulos"
+      motivo: "se o rótulo DESCREVE o propósito não é decidível por máquina"
+    "3.3.2":
+      nome: "Rótulos ou instruções"
+      motivo: "suficiência da instrução é compreensão, não estrutura"
+    "4.1.2":
+      nome: "Nome, função, valor"
+      motivo: "NVDA/JAWS/VoiceOver não rodam em CI Linux headless; o que se automatiza é proxy"
+
+  # Checks de `gui` que NÃO correspondem a critério WCAG, declarados um a um. Sem
+  # esta lista a guarda não teria como distinguir "esqueceram de mapear" de "não
+  # há critério" — e a primeira é defeito, a segunda é fato.
+  sem_criterio:
+    "checks/gui/test_compatibilidade.py::test_geometria_dos_marcos_nao_diverge_entre_engines": "paridade entre engines; a WCAG não fala de engines"
+    "checks/gui/test_compatibilidade.py::test_sem_erro_de_console_exclusivo_de_uma_engine": "idem"
+    "checks/gui/test_interatividade.py::test_tbt_long_tasks_e_inp": "Core Web Vitals / ISO 25010, não WCAG"
+    "checks/gui/test_perf_condicoes.py::test_pintura_sob_rede_lenta": "idem, sob condição degradada"
+    "checks/gui/test_perf_condicoes.py::test_bloqueio_sob_cpu_lenta": "idem"
+    "checks/gui/test_responsividade.py::test_cls_por_viewport": "estabilidade visual (CWV), não WCAG"
+    "checks/gui/test_responsividade.py::test_sem_sobreposicao_de_interativos": "geometria de interativos; a 2.5.8 fala de TAMANHO e espaçamento, não de sobreposição — mapear aqui seria forçar"
+    "checks/gui/test_resiliencia.py::test_erro_500_na_api_nao_vaza_detalhe_tecnico": "Nielsen H9 (recuperação de erro), não WCAG"
+    "checks/gui/test_resiliencia.py::test_api_que_nao_responde_avisa_o_visitante": "idem"
+    "checks/gui/test_resiliencia.py::test_json_truncado_nao_vaza_detalhe_tecnico": "idem"
+    "checks/gui/test_resiliencia.py::test_perda_de_conexao_e_comunicada": "idem"
+    "checks/gui/test_jornada.py::test_o_visitante_encontra_a_política_de_privacidade": "usabilidade quantitativa (TSR), não WCAG"
+    "checks/gui/test_jornada.py::test_o_visitante_procura_como_falar_com_a_loja": "idem"
+    "checks/gui/test_jornada.py::test_nenhuma_página_deixa_o_visitante_sem_saída": "idem"
+    "checks/gui/test_jornada.py::test_o_visitante_conclui_a_tarefa_no_tempo_previsto": "idem (ToT)"
+    "checks/gui/test_visual.py::test_paginas_estaveis_contra_a_linha_de_base": "regressão visual; a WCAG não fala de mudança não intencional"
+    "checks/gui/test_visual.py::test_componentes_estaveis_contra_a_linha_de_base": "idem"
+    "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_ao_espelhamento_rtl": "qualidade de i18n; espelhamento não é critério da WCAG"
+    "checks/gui/test_internacionalizacao.py::test_layout_sobrevive_a_expansao_de_texto": "idem; a 1.4.12 fala de ESPAÇAMENTO aplicado, não de tradução mais longa"
+
 # Mapa critério WCAG -> teste. É o insumo do VPAT/ACR (docs/GUI.md §6) e existe
 # para que ninguém precise deduzir cobertura a partir de nome de arquivo.
 # Preenchido conforme cada check nasce; hoje declara a INTENÇÃO das OS-42/43/44.

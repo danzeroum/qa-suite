@@ -52,6 +52,8 @@ verify:
 	@# Placar dos coletores JS_ sem check que os execute (OS-52), mesmo motivo:
 	@# o numero precisa aparecer, e pytest engole print.
 	python scripts/afere_simbolos.py
+	@# Placar do mapa criterio->teste (OS-53), mesma licao do placar invisivel.
+	python scripts/exporta_conformidade.py --placar
 # Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
 # Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
 cockpit: ; python scripts/cockpit.py --html
