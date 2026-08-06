@@ -75,11 +75,27 @@ jobs:
         run: pytest tests -m verification --cov=webqa --cov-report=term
              --cov-report=json:report/coverage.json --cov-fail-under=78
 
+      # Placar das ancoras arquivo:linha (OS-57). A REPROVACAO ja aconteceu no
+      # passo acima (tests/test_ancoras.py); este passo existe pelo PLACAR.
+      #
+      # Sem ele o run fica verde sem ninguem ver quantos documentos estao
+      # PENDENTES, e "guarda de ancoras verde" passa a ser lido como "a
+      # documentacao esta conferida" quando significa "a parte que alguem
+      # conferiu esta conferida". E a mesma classe que o smoke de GUI abaixo
+      # fecha com script proprio: verde que nao diz o que exerceu.
+      #
+      # `make verify` roda isto localmente; aqui vai explicito porque o job chama
+      # o pytest direto, e nao o alvo do Makefile.
+      - name: Placar das ancoras da documentacao
+        run: python scripts/afere_ancoras.py
+
       # ---------- Smoke de GUI ----------
       #
       # A dimensao `gui` ja e exercida na direcao "reprova o que deve": o
       # contrato 1:1 (tests/test_alvo_fixture.py, dentro do passo acima) roda os
-      # checks contra o alvo fabricado e exige os 18 FAILs exatos.
+      # checks contra o alvo fabricado e exige os FAILs exatos do contrato.
+      # O numero vive em fixture_target/esperado.json, nunca aqui: comentario
+      # que repete contagem envelhece calado (este dizia 18 ate a OS-57).
       #
       # O que FALTA, e e o que este smoke acrescenta, e a direcao oposta: um
       # check de GUI nao pode reprovar uma pagina CONFORME. O alvo fabricado tem

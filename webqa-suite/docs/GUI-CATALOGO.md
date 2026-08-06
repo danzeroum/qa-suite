@@ -26,7 +26,7 @@ vocabulário a dimensão `gui` não usa (`GUI.md §3.5`).
 `GUI.md §4.2`.
 
 **Ferramenta** — só o que já está em `requirements.txt`. Nenhum item deste
-catálogo introduz dependência: é restrição do projeto, e `PROXIMOS-PASSOS.md:547`
+catálogo introduz dependência: é restrição do projeto, e `PROXIMOS-PASSOS.md:585`
 já registra `Pillow`, `piexif`, `pypdf` e `python-magic` como rejeitadas com
 fundamento. Onde uma ferramenta externa seria natural, o §4 diz qual e por que
 não entrou.
@@ -576,7 +576,7 @@ def test_area_minima_de_toque(contexto_gui, settings, perfis):
 navegador trouxer. Uma régua, dois temas.
 
 **2. Pré‑condições.** `contexto_gui(color_scheme="dark")`. O axe vem de
-`_fetch_axe_verified`, hoje privado em `checks/ux/test_acessibilidade.py:26` —
+`_fetch_axe_verified`, à época privado no check de acessibilidade — hoje `baixar_axe_verificado` em `webqa/axe.py:27`, movido pela OS‑45 —
 a OS que introduz este teste move a função para `webqa/` e a importa dos dois
 lugares, preservando versão pinada e verificação de SHA‑384.
 
@@ -895,13 +895,13 @@ entraria no contrato — e a página CONFORME `/gui/resiliente`, em `paginas_gui
 
 | Proposta | Por que não entra | O que entra no lugar |
 |---|---|---|
-| **Storybook / teste de componente isolado** | a suíte é caixa‑preta contra uma URL e não vê o fonte da interface do alvo (`ARQUITETURA.md:12-13`, `ESCOPO-EAP.md:18`) | galeria de estados servida por `fixture_target/paginas_gui/`, no padrão que `scripts/audita_design.py` já usa: servidor local + pytest contra arquivos. É "nível componente" possível numa suíte caixa‑preta |
+| **Storybook / teste de componente isolado** | a suíte é caixa‑preta contra uma URL e não vê o fonte da interface do alvo (`ARQUITETURA.md:12-13`, `ESCOPO-EAP.md:34`) | galeria de estados servida por `fixture_target/paginas_gui/`, no padrão que `scripts/audita_design.py` já usa: servidor local + pytest contra arquivos. É "nível componente" possível numa suíte caixa‑preta |
 | **Leitor de tela real (NVDA/JAWS/VoiceOver)** | não roda em CI Linux headless, e o comportamento é específico de cada leitor | árvore de acessibilidade do Playwright (nome, papel, estado) — **proxy declarado**, não substituto (`GUI.md §5.1`) |
 | **SUS, SEQ, satisfação, sucesso real de tarefa** | exigem pessoas respondendo | protocolo do `GUI.md §5.2`, com as mesmas jornadas dos cenários BDD para as réguas coincidirem |
 | **Pixel‑diff como veredito primário** | converte deriva de fonte e revisão de navegador em PR vermelho, e treina a equipe a aprovar imagem sem olhar (R18) | veredito por geometria e CSS computado; diff por bloco só contra o alvo fabricado, com máscara e tolerância declaradas |
-| **Pillow, pixelmatch, numpy, Percy** | dependência nova; `Pillow` **já foi rejeitada com fundamento registrado** (`PROXIMOS-PASSOS.md:547`) | `zlib` + `struct` sobre o PNG do Playwright, diff por bloco 16×16 — com a ressalva abaixo, que é condição de aceite, não detalhe |
+| **Pillow, pixelmatch, numpy, Percy** | dependência nova; `Pillow` **já foi rejeitada com fundamento registrado** (`PROXIMOS-PASSOS.md:585`) | `zlib` + `struct` sobre o PNG do Playwright, diff por bloco 16×16 — com a ressalva abaixo, que é condição de aceite, não detalhe |
 | **Lighthouse** | dependência de runtime Node, e — mais importante — **score de Lighthouse não é usabilidade**. Tratar os dois como sinônimo é o erro que esta camada existe para não cometer | medição direta de INP/TBT/long tasks pelos observers do próprio navegador |
-| **Injeção de XSS, fuzzing de formulário** | pentest ofensivo está fora do escopo (`ESCOPO-EAP.md:25`) | GUI‑SEC‑01: leitura **passiva** das diretivas da CSP que já vieram no cabeçalho |
+| **Injeção de XSS, fuzzing de formulário** | pentest ofensivo está fora do escopo (`ESCOPO-EAP.md:28`) | GUI‑SEC‑01: leitura **passiva** das diretivas da CSP que já vieram no cabeçalho |
 | **Clique em banner de consentimento, DSAR pela interface** | escreve no sistema do alvo; exige `WEBQA_ACTIVE_PROBES_AUTHORIZED=1` (`webqa/gates.py:121-131`) | nada na Fase 1. Fica no backlog, atrás do gate — e o primeiro check que o consumir altera `tests/test_fase_c_travada.py:314-326`, num PR que diga isso |
 | **Fluxo logado (formulário de login, sessão, MFA)** | fora do escopo (`ESCOPO-EAP.md:19-24`); Basic Auth está dentro, formulário está fora | área autenticada por Basic Auth, via `paginas_internas` |
 | **Dispositivo real, notch, teclado virtual, Safari de verdade** | emulação é emulação; WebKit ≠ Safari | emulação declarada como tal no laudo, para ninguém ler aprovação emulada como aprovação em dispositivo |

@@ -44,6 +44,11 @@ campanha-vps: ; docker compose -f ../docker/compose.yml run --rm campanha
 verify:
 	@ls report 2>/dev/null | grep -qvE '^summary\.(json|html)$$' && echo "AVISO: report/ tem residuo alem do summary da ultima execucao (campanha/, smoke-gui/, medicoes...). A contagem de skips do dogfooding pode divergir do CI, que comeca limpo. Apague com 'rm -rf report' antes de comparar." || true
 	pytest -m verification tests
+	@# Placar das ancoras arquivo:linha (OS-57). Fora do pytest de proposito: o
+	@# numero de PENDENTES precisa aparecer na tela em toda execucao, e pytest
+	@# engole print. Cobertura parcial silenciosa induz mais confianca que
+	@# cobertura nenhuma. A reprovacao em si e do tests/test_ancoras.py.
+	python scripts/afere_ancoras.py
 # Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
 # Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
 cockpit: ; python scripts/cockpit.py --html
