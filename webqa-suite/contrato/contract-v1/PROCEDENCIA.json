@@ -1,0 +1,30 @@
+{
+  "descricao": "Contrato de Régua v1, CONSUMIDO POR PIN a partir do consumidor. Estes arquivos NÃO são desta suíte e não se editam aqui: eles dizem o que uma régua precisa entregar para ser consumível, e uma cópia editável deles seria a régua escrevendo a própria prova. O digest é a âncora — os dois primeiros são exatamente os que o `contract-manifest.json` do consumidor declara, e uma divergência acusa que o contrato mudou sob os pés.",
+  "origem": "danzeroum/project",
+  "contrato": "v1",
+  "fixado_em": "2026-08-07",
+  "arquivos": {
+    "SUITE_CONTRACT.md": {
+      "origem": "harness/suite-contract/contract-v1/SUITE_CONTRACT.md",
+      "sha256": "57692e8ed98422f3341384f8c57d5baeb27a682da929400bdd0990be1c2a67e6",
+      "no_manifesto_do_consumidor": true
+    },
+    "report.schema.json": {
+      "origem": "harness/schemas/report.schema.json",
+      "sha256": "769e500dfd3d21ae1715fd5c4452ef9d29373b8957fc54c1ee648da235d0cd27",
+      "no_manifesto_do_consumidor": true
+    },
+    "provenance.schema.json": {
+      "origem": "harness/schemas/provenance.schema.json",
+      "sha256": "b0ce4e29be1434a9db12cf00cc2a3b6a05cb96d4b677d5eb49b54843f8a32abd",
+      "no_manifesto_do_consumidor": false,
+      "motivo": "não é fixado pelo manifesto porque não é citado por ele — mas o report.schema.json o referencia por $ref, e sem ele a validação não roda. Vem junto por necessidade mecânica, e o digest está aqui pela mesma razão que os outros."
+    },
+    "suite_conformance.py": {
+      "origem": "ci/suite_conformance.py",
+      "sha256": "af3230c03079c8e92578501d65da91e5b9500995d6ceb48dcd90c9f582067f94",
+      "no_manifesto_do_consumidor": false,
+      "motivo": "o KIT, no modo --as-suite. O próprio arquivo declara ser copiável para dentro da suíte: ele não lê registro, ADR nem harness_lib, só o laudo. É o que permite a régua responder 'eu emito envelope conforme?' no CI dela, em vez de descobrir que quebrou a promessa quando quebrou o CI de outra pessoa."
+    }
+  }
+}

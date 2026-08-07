@@ -163,13 +163,13 @@ Cada uma é imposta por um teste, não por combinação. A coluna da direita é 
 | 4 | Prefixo `test` proibido em biblioteca | `tests/test_convencoes.py:30-41,50-75` | helper em `webqa/`, `scripts/` ou `fixture_target/` chamado `testar_*`, `testes_*` ou `teste_*`. O pytest coleta por `test*`, não `test_*` |
 | 5 | Nenhum check consome `require_active_probes` hoje | `tests/test_fase_c_travada.py:314-326` | o primeiro check que o consumir **altera esse teste**, num PR que diga isso — e o arquivo é protegido por CODEOWNERS |
 | 6 | `report/` nunca é versionado | `.gitignore:1-4,19`; R8 | guardar linha de base visual de alvo real em `report/` **ou** em qualquer lugar versionado (§3.4) |
-| 7 | `sanitize_text` é a borda de escrita **de texto** | `webqa/sanitize.py:156`; `webqa/report.py:285-287` varre a string já serializada | supor que uma captura de tela está sanitizada. Ela não está — não existe mascarador de pixel. É o R19 |
+| 7 | `sanitize_text` é a borda de escrita **de texto** | `webqa/sanitize.py:156`; `webqa/report.py:323-325` varre a string já serializada | supor que uma captura de tela está sanitizada. Ela não está — não existe mascarador de pixel. É o R19 |
 | 8 | `browser_page` é de sessão e compartilhada | `conftest.py:214-219`; preço registrado em `ARQUITETURA.md:55` | mudar viewport, tema ou movimento nela. Toda variação abre contexto próprio, no molde de `network_log` (`conftest.py:352-363`) |
 | 9 | Ausência nunca vira zero | `PROXIMOS-PASSOS.md §2.1`; `webqa/metricas.py:26-45` recusa `None` | tratar elemento não renderizado como `0 px`, ou linha de base ausente como aprovação |
-| 10 | `error` ≠ `failed` | `PROXIMOS-PASSOS.md §2.2`; `webqa/report.py:182-187` | contar contexto que não abriu como achado. É o teste **não tendo acontecido** |
+| 10 | `error` ≠ `failed` | `PROXIMOS-PASSOS.md §2.2`; `webqa/report.py:212-217` | contar contexto que não abriu como achado. É o teste **não tendo acontecido** |
 | 11 | Cor nunca é o único portador de significado | `PROXIMOS-PASSOS.md §2.5`; `report_html.py:380-383` (severidade é **inline e tipográfica**, porque a folha não tem classe para ela) | inventar semáforo para diff visual. E note a simetria: isto é, ao mesmo tempo, **critério que a camada testa no alvo** (WCAG 1.4.1) |
 | 12 | Folha de estilo congelada byte a byte | `PROXIMOS-PASSOS.md §2.4`; `tests/test_report_html.py:257-259`; `tests/test_estabilidade_html.py:181-187` reprova classe sem regra na folha | criar classe CSS. Compor com as existentes (`.fora-escopo`, `.chip-neutro`, `.chip-dim`) ou usar estilo inline, como a severidade faz |
-| 13 | Métrica nova vai ao JSON; seção nova no HTML é design | `webqa/report.py:247-257` — "acrescentar seção ali é iteração de DESIGN, não de instrumentação" | renderizar tríptico de diff no `summary.html` sem OS de design, `make audita-design` e entrada em `tests/test_derivadores_ligados.py:31-35` |
+| 13 | Métrica nova vai ao JSON; seção nova no HTML é design | `webqa/report.py:277-287` — "acrescentar seção ali é iteração de DESIGN, não de instrumentação" | renderizar tríptico de diff no `summary.html` sem OS de design, `make audita-design` e entrada em `tests/test_derivadores_ligados.py:31-35` |
 | 14 | `Finding` só aceita severidade `alta/media/baixa` e fase `A/B/C` | `webqa/dominio.py:76-79` | construir `Finding` na dimensão `gui`. Os checks daqui seguem o padrão de `ux`/`frontend`: assert simples + `metricas.registrar` |
 | 15 | Verificação **e** validação no mesmo PR | `PROXIMOS-PASSOS.md §5.2` | entregar check sem unidade em `tests/` sobre dado fabricado |
 | 16 | "A garantia existe, a ligação não" | `PROXIMOS-PASSOS.md §2.10`; `tests/test_derivadores_ligados.py` | propor chave de configuração sem teste que prove que **algum check a lê**. Threshold que ninguém lê é exatamente essa classe de defeito |
@@ -498,7 +498,7 @@ supor o contrário é o R19. Por isso a hierarquia da casa ("não coletar > masc
 > fabricado chega ao disco.
 
 **O que NÃO entra agora:** renderizar as evidências no `summary.html`. Isso é
-iteração de **design**, não de instrumentação (`webqa/report.py:247-257`), e
+iteração de **design**, não de instrumentação (`webqa/report.py:277-287`), e
 exigiria OS própria, `make audita-design` verde e entrada em
 `tests/test_derivadores_ligados.py::DERIVADORES_SUMMARY:31-35`. O JSON é livre;
 o HTML tem contrato.

@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://danzeroum/project/harness/schemas/provenance.schema.json",
+  "title": "Bloco de procedência do laudo",
+  "description": "Carimba qual régua produziu um laudo. Obrigatório em todo artefato produzido pela suíte.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "standard",
+    "consumer_project",
+    "execution"
+  ],
+  "comment": "ESTE BLOCO NÃO FECHA O OBJETO, e a ausência é deliberada (CP-041). Ele tinha `additionalProperties: false`, e como é composto por $ref dentro do allOf de report.schema.json, aquela cláusula recusava as propriedades que o PRÓPRIO report acrescenta — `result` e `findings`. O efeito medido: report.schema.json não validava documento nenhum, nem o mais correto possível. Ninguém percebeu porque nada era validado contra ele: o laudo é produzido pela suíte externa, que não está instalada, e harness/reports/ é gitignored. Uma trava que nunca foi exercida e que teria recusado tudo é o caso extremo do que esta casa chama de decorativa. A correção certa é a que a versão 2020-12 prevê: mixin não fecha objeto — quem fecha é o envelope CONCRETO, com `unevaluatedProperties: false`, que enxerga as anotações dos subschemas irmãos. Ver report.schema.json.",
+  "allOf": [
+    {
+      "comment": "Bump formalizado: schema_version 1.0 NÃO admite o bloco artifact.",
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "1.0"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "artifact"
+          ]
+        }
+      }
+    },
+    {
+      "comment": "E a presença de artifact EXIGE schema_version 1.1 — o campo novo obriga o bump.",
+      "if": {
+        "required": [
+          "artifact"
+        ]
+      },
+      "then": {
+        "properties": {
+          "schema_version": {
+            "const": "1.1"
+          }
+        }
+      }
+    },
+    {
+      "comment": "Laudo que se declara 1.2 EXIGE atestacao. Nao-retroatividade deliberada: um laudo 1.1 continua valido sem o bloco, e nenhuma evidencia existente vira invalida por uma versao nova de schema.",
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "1.2"
+          }
+        },
+        "required": [
+          "schema_version"
+        ]
+      },
+      "then": {
+        "required": [
+          "attestation"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Versão do formato do laudo, para evolução. 1.0 = base; 1.1 = adiciona bloco artifact.",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "artifact": {
+      "type": "object",
+      "description": "Identidade do ARTEFATO (distinta de execution.run_id, que identifica a rodada). Só válido em schema_version 1.1.",
+      "required": [
+        "kind",
+        "id",
+        "created_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "standard": {
+      "type": "object",
+      "description": "A régua: o padrão versionado que produziu o laudo.",
+      "required": [
+        "name",
+        "version",
+        "commit",
+        "sensitive_paths_hash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "description": "Versão exata do padrão. 'UNINSTALLED' quando a suíte não está disponível."
+        },
+        "commit": {
+          "type": "string"
+        },
+        "sensitive_paths_hash": {
+          "type": "string",
+          "description": "SHA-256 da lista curada da suíte. Hashes divergentes na mesma versão = lista editada.",
+          "pattern": "^sha256:[0-9a-f]+$|^UNINSTALLED$"
+        }
+      }
+    },
+    "consumer_project": {
+      "type": "object",
+      "required": [
+        "repository",
+        "commit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "run_id",
+        "mode",
+        "network_used",
+        "active_gates",
+        "runner_kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "inventory",
+            "passive",
+            "load",
+            "active_discovery"
+          ]
+        },
+        "network_used": {
+          "type": "boolean"
+        },
+        "active_gates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "runner_kind": {
+          "type": "string",
+          "enum": [
+            "agent",
+            "human",
+            "ci"
+          ]
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "required": [
+        "kind",
+        "predicate_digest",
+        "issued_at"
+      ],
+      "additionalProperties": false,
+      "description": "Atestacao do laudo (CP-026, polimento). Reposicionada por CUSTO, nao por ser marginal: o R-09 rejeitou a justificativa de que 'os commits ja sao assinados' — eles nao sao.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "sigstore",
+            "github_attestation"
+          ]
+        },
+        "predicate_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bundle_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

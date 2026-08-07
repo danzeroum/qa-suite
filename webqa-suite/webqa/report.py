@@ -113,6 +113,36 @@ def _comando(session) -> str:
     return sanitize_text(f"pytest {args}".strip())
 
 
+def _catalog_hash() -> str:
+    """Digest da lista curada aplicada — a régua carimbada (E4, cláusula 4).
+
+    Reaproveita `webqa.sondagem.hash_dos_caminhos`: uma segunda implementação
+    derivaria, e o primeiro dia em que as duas discordassem seria o dia em que dois
+    laudos "0 achados" pareceriam da mesma régua sem serem.
+
+    Lista ausente vira `"UNAVAILABLE"`, nunca vazio nem zero: o consumidor precisa
+    distinguir "não usei catálogo" de "usei este catálogo", e uma string vazia
+    passaria por qualquer comparação de igualdade com outra string vazia.
+    """
+    try:
+        from webqa.sondagem import hash_dos_caminhos
+
+        return hash_dos_caminhos(Path(__file__).resolve().parent.parent
+                                 / "data" / "caminhos-sensiveis.yaml")
+    except (OSError, ImportError):
+        return "UNAVAILABLE"
+
+
+def _commit_do_padrao() -> str:
+    """Commit da RÉGUA, não do projeto consumidor. Mesma leitura de webqa/sondagem."""
+    try:
+        from webqa.sondagem import _commit_do_padrao as commit
+
+        return commit() or "UNAVAILABLE"
+    except ImportError:
+        return "UNAVAILABLE"
+
+
 def report_dir() -> Path:
     """Diretório de artefatos, criado sob demanda (usado também pelos checks)."""
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -282,6 +312,14 @@ def pytest_sessionfinish(session, exitstatus):
     # ele reimplemente a conta seria devolver a inferência que a origem acabou de
     # assumir.
     summary["inconclusivo"] = veredito.inconclusivo
+
+    # FINGERPRINT (E4): os cinco campos que dizem com o que este laudo é
+    # comparável. Sem eles, dois laudos parecem comparáveis sem serem, e a
+    # diferença entre um "0 achados" e outro deixa de significar o que se pensa
+    # que significa — catálogo encurtado em segredo produz exatamente isso.
+    from webqa.laudo import fingerprint
+
+    summary["fingerprint"] = fingerprint(_catalog_hash(), _commit_do_padrao())
     # A varredura por VALOR acontece sobre a string SERIALIZADA, não sobre o
     # dicionário — e é isso que a torna estrutural. Campo novo que alguém
     # acrescente ao `summary` amanhã já nasce coberto; chave conta tanto quanto
@@ -291,6 +329,26 @@ def pytest_sessionfinish(session, exitstatus):
     # e do `html.escape` do template.
     (out_dir / "summary.json").write_text(
         mascarar_valores_registrados(json.dumps(summary, indent=2, ensure_ascii=False)),
+        encoding="utf-8",
+    )
+
+    # O ENVELOPE DO CONTRATO (E4), em arquivo IRMÃO e não dentro do summary.
+    #
+    # O envelope fecha o objeto com `unevaluatedProperties: false`: fazer o summary
+    # validar contra ele exigiria apagar `results`, `by_dimension` e `metricas` —
+    # quebrar todo consumidor em transição para satisfazer um schema. Os dois
+    # formatos respondem a perguntas diferentes, e é por isso que são dois arquivos:
+    # o summary é a MEDIÇÃO, o laudo é o VEREDITO com procedência.
+    #
+    # Mesma borda de escrita do summary: a varredura por valor acontece sobre a
+    # string SERIALIZADA, então o envelope nasce coberto sem precisar saber disso.
+    from webqa.laudo import montar as montar_laudo
+
+    (out_dir / "laudo.json").write_text(
+        mascarar_valores_registrados(
+            json.dumps(montar_laudo(summary, catalog_hash=summary["fingerprint"]["catalog_hash"],
+                                    commit=summary["fingerprint"]["commit"]),
+                       indent=2, ensure_ascii=False)),
         encoding="utf-8",
     )
 
