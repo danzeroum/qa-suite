@@ -2,19 +2,20 @@
 #
 #   jobs:
 #     qa:
-#       uses: danzeroum/qa-suite/.github/workflows/auditar.yml@main
+#       uses: danzeroum/qa-suite/.github/workflows/auditar.yml@v1.0.0
 #       with:
 #         target_url: https://homolog.meu-projeto.danzeroum.com
 #       secrets:
 #         basic_auth_user: ${{ secrets.WEBQA_USER }}   # se o alvo pedir login
 #         basic_auth_pass: ${{ secrets.WEBQA_PASS }}
 #
-# `@main` porque NENHUMA tag foi cortada: o release.yml dispara em `push: tags:
-# v*` e o repositorio esta sem tags, entao `@v1` nao resolve e o workflow do
-# consumidor falha na primeira execucao. Exemplo que nao roda e pior que exemplo
-# nenhum — quem copia culpa o proprio CI. Volta a `@v1` quando a tag existir
-# (ultima linha da E2-publicar). O README traz a mesma ressalva; se um dia os
-# dois divergirem, a fonte e a existencia da tag, nao o texto.
+# `@v1.0.0` e nao `@main`: a regua e a versao. A tag e IMOVEL de um jeito
+# verificavel — o manifesto da release mora na arvore do commit taggeado
+# (webqa-suite/releases/), entao mover a tag muda o manifesto que se encontra no
+# destino, e o digest guardado pelo consumidor deixa de conferir. `@main`
+# continua valido para desenvolver contra a ponta, ao preco de a regua andar
+# sozinha entre duas execucoes. O README traz a mesma ressalva; se um dia os
+# dois divergirem, a fonte e o manifesto em releases/, nao o texto.
 #
 # O projeto DECLARA a suíte, não a copia (docs/…/ARQUITETURA §3/§4): a régua é uma
 # só, versionada em `ref`. O consumidor contribui alvo + autorização, nunca código

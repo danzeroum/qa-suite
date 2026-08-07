@@ -54,6 +54,10 @@ verify:
 	python scripts/afere_simbolos.py
 	@# Placar do mapa criterio->teste (OS-53), mesma licao do placar invisivel.
 	python scripts/exporta_conformidade.py --placar
+	@# Placar das releases ancoradas (E2): toda tag publicada ainda ancora o
+	@# manifesto que dizia ancorar. Fora do pytest pelo mesmo motivo dos outros —
+	@# o numero de releases aguardando tag precisa aparecer na tela.
+	python scripts/publicar_release.py --aferir
 # Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
 # Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
 cockpit: ; python scripts/cockpit.py --html

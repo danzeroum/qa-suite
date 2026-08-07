@@ -6,6 +6,7 @@ nada: leem os metadados e conferem que o alvo do console script existe de fato.
 """
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -122,17 +123,17 @@ def test_o_subdiretorio_do_caminho_e_onde_o_pyproject_realmente_esta(caminho):
 def test_a_referencia_do_caminho_e_uma_tag_de_versao(caminho):
     """`@v<versao>` e não `@main`: a régua é a versão.
 
-    A tag citada é a da versão CORRENTE do pacote — enquanto a versão de `main` é a
-    publicada, as duas coincidem. Quando a E2 cortar a tag e bumpar `__version__`,
-    esta asserção passa a ser contra o manifesto de release (a versão publicada),
-    não contra `__version__` (a versão em desenvolvimento): é exatamente aí que o
-    teste de disciplina de versão nasce, e ele nasce reprovando um bump esquecido.
+    Só a FORMA da referência é conferida aqui. QUAL versão ela nomeia é pergunta da
+    release, e a resposta mudou na E2: até a tag existir, a única versão possível
+    era a de `__version__`; publicada a v1.0.0 e bumpada a ponta, comparar com
+    `__version__` mandaria instalar uma tag que ninguém cortou. A cobrança mora em
+    tests/test_release.py::test_o_readme_instala_a_versao_publicada, contra o
+    manifesto — a versão publicada, não a que está sendo escrita.
     """
-    from webqa import __version__
-    assert caminho.ref == f"v{__version__}", (
-        f"o README instala de {caminho.ref!r} e o pacote está em {__version__!r}. Uma "
-        f"instrução que baixa outra versão da que o repositório diz ter produz laudo sob "
-        f"régua que ninguém escolheu.")
+    assert re.fullmatch(r"v\d+\.\d+\.\d+", caminho.ref), (
+        f"o README instala de {caminho.ref!r}. `@main` e `@<sha>` funcionam, mas não são "
+        f"régua: dois laudos tirados em dias diferentes mediriam padrões diferentes sem "
+        f"que nada dissesse isso.")
 
 
 def test_trocar_a_referencia_preserva_tudo_o_mais(caminho):

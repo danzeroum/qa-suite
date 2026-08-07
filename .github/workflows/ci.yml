@@ -37,7 +37,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # `fetch-depth: 0`: o placar das releases confere a cadeia de cada tag
+      # publicada contra o PAI dela. Com clone raso não há tag nem pai, e o placar
+      # diria "0 conferidas" sem que nada estivesse errado — verde por não olhar,
+      # que é a classe de defeito que os placares deste job existem para fechar.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -99,6 +105,19 @@ jobs:
       # coleta nao produz reprova, e check de gui que o mapa nao conhece tambem.
       - name: Placar do mapa de conformidade
         run: python scripts/exporta_conformidade.py --placar
+
+      # Placar das releases ancoradas (frente E, E2). Mesma licao dos placares
+      # acima, aplicada a outra guarda: a cadeia de uma release (manifesto na
+      # arvore taggeada, descrevendo o pai, com o commit de release nao mudando
+      # mais nada) e conferida no `release.yml` quando a tag NASCE — e o gesto
+      # perigoso, mover uma tag ja publicada, acontece depois. Aqui ela e
+      # reconferida com o codigo da ponta a cada push.
+      #
+      # Manifesto sem tag e AVISO com placar, nao vermelho: o manifesto entra na
+      # arvore pelo PR e a tag nasce do merge dele, entao reprovar aqui impediria
+      # de mergear exatamente o PR que publica a release.
+      - name: Placar das releases ancoradas
+        run: python scripts/publicar_release.py --aferir
 
       # ---------- Smoke de GUI ----------
       #

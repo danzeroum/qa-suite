@@ -120,7 +120,7 @@ No `.github/workflows/qa.yml` do **seu** projeto:
 ```yaml
 jobs:
   qa:
-    uses: danzeroum/qa-suite/.github/workflows/auditar.yml@main
+    uses: danzeroum/qa-suite/.github/workflows/auditar.yml@v1.0.0
     with:
       target_url: https://homolog.meu-projeto.danzeroum.com
     secrets:
@@ -128,13 +128,13 @@ jobs:
       basic_auth_pass: ${{ secrets.WEBQA_PASS }}
 ```
 
-> **`@main`, e não `@v1`:** a régua é a versão, e **nenhuma tag foi cortada
-> ainda** — `release.yml` dispara em `push: tags: v*`, e o repositório está sem
-> tags. Enquanto isso for verdade, `@v1` não resolve e o workflow do consumidor
-> falha na primeira execução. `@main` funciona hoje, ao preço de a régua andar
-> sozinha: quem precisa de laudo comparável no tempo deve fixar um commit
-> (`@<sha>`) até existir a tag. Trocar para `@v1` é a última linha da E2‑publicar,
-> não um detalhe de redação.
+> **`@v1.0.0`, e não `@main`:** a régua é a versão. A tag existe (`releases/`
+> guarda o manifesto dela) e é **imóvel** — o manifesto mora na árvore do commit
+> taggeado, então mover a tag muda o manifesto que se encontra no destino e a
+> divergência aparece. `@main` continua funcionando e é o que se usa para
+> desenvolver contra a ponta, ao preço de a régua andar sozinha: dois laudos
+> tirados em dias diferentes mediriam padrões diferentes sem que nada dissesse
+> isso. Para laudo comparável no tempo, fixe a tag.
 
 O caminho **passivo** (o padrão, `dimensoes: "not load"`) roda **sem gate de rede**
 — é o que agentes rodam livremente, em qualquer projeto. A **Fase C** (sondagem
