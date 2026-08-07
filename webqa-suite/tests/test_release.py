@@ -309,6 +309,37 @@ def test_tag_numa_arvore_com_outra_versao_reprova(repo_fabricado):
     assert any("__version__" in p for p in problemas), problemas
 
 
+def test_o_tree_digest_nao_depende_da_config_local_de_fim_de_linha(repo_fabricado):
+    """O falso vermelho que ESTA release levou, virado teste.
+
+    `git archive` aplica a mesma conversão do checkout. Com `core.autocrlf=true` —
+    o padrão da instalação do Git para Windows — ele emite CRLF, e o digest da
+    MESMA árvore muda. Foi assim que a v1.0.0, correta e já publicada, foi recusada
+    por `--verificar` num clone Windows.
+
+    Uma guarda que reprova a release certa por causa do sistema de quem a confere é
+    pior que guarda nenhuma: ela ensina a ignorar o vermelho, e o próximo vermelho
+    será o verdadeiro. Aqui o digest é medido com a config LIGADA e com ela
+    desligada, e os dois têm de ser o mesmo número.
+    """
+    from scripts import publicar_release as pr
+
+    raiz, git = repo_fabricado
+    (raiz / "webqa-suite" / "com_linhas.py").write_text("a = 1\nb = 2\nc = 3\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-q", "-m", "arquivo com fins de linha")
+    sha = git("rev-parse", "HEAD")
+
+    git("config", "core.autocrlf", "false")
+    sem_conversao = pr.tree_digest(sha)
+    git("config", "core.autocrlf", "true")
+    com_conversao = pr.tree_digest(sha)
+
+    assert sem_conversao == com_conversao, (
+        "o digest da árvore mudou com `core.autocrlf` — a âncora passou a depender da "
+        "configuração de quem confere, e a release certa reprova em metade das máquinas.")
+
+
 def test_cadeia_integra_nao_reprova(repo_fabricado):
     """O outro lado, e ele é obrigatório: guarda que só sabe reprovar reprova tudo."""
     from scripts import publicar_release as pr
