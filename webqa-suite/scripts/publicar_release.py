@@ -94,15 +94,35 @@ def versao_da_arvore(commit: str) -> str:
     return m.group(1)
 
 
+# A conversão de fim de linha é DESLIGADA no comando, e isto não é estilo — é a
+# correção de um falso vermelho MEDIDO. `git archive` aplica a mesma conversão do
+# checkout, então com `core.autocrlf=true` (o padrão da instalação do Git para
+# Windows) ele emite CRLF e o digest muda:
+#
+#     core.autocrlf=false  -> sha256:f8ef23c5…   (o que o manifesto declara)
+#     core.autocrlf=true   -> sha256:6fbf10d8…   (mesma árvore, outro número)
+#
+# O efeito observado: a v1.0.0 — correta, verificada em Linux e publicada — foi
+# recusada por `--verificar` num clone Windows. Uma guarda que reprova a release
+# certa por causa do sistema de quem a confere é pior que guarda nenhuma: ela
+# ensina a ignorar o vermelho, e o próximo vermelho será o verdadeiro.
+#
+# Os `-c` valem só para esta invocação: nada no repositório de quem roda é
+# alterado. O repo não tem `.gitattributes`, então a conversão vinha inteiramente
+# da config local — que é justamente o que um digest de âncora não pode ler.
+_SEM_CONVERSAO = ("-c", "core.autocrlf=false", "-c", "core.eol=lf")
+
+
 def tree_digest(commit: str) -> str:
     """Digest do conteúdo versionado do commit. Permite dizer *esta árvore é
     aquela árvore* sem confiar na tag.
 
     `git archive` é determinístico para um commit dado: o mtime dos membros vem do
-    próprio commit, não do relógio de quem arquiva.
+    próprio commit, não do relógio de quem arquiva. O que NÃO é determinístico por
+    padrão é o fim de linha — ver `_SEM_CONVERSAO` acima.
     """
     r = subprocess.run(  # nosec B603 B607
-        ["git", "archive", "--format=tar", commit], cwd=str(RAIZ_REPO),
+        ["git", *_SEM_CONVERSAO, "archive", "--format=tar", commit], cwd=str(RAIZ_REPO),
         capture_output=True, check=False)
     if r.returncode != 0:
         raise Recusa(f"git archive de {commit} falhou: {r.stderr.decode(errors='replace')}")
@@ -314,8 +334,12 @@ def _problemas_da_cadeia(tag: str, rel: str, manifesto: dict) -> list[str]:
                 f"é {pai[:12]}…. O manifesto descreve o commit VALIDADO; se ele não é o pai, a "
                 f"validação citada não é sobre este conteúdo."]
     problemas = []
-    if manifesto["tree_digest"] != tree_digest(pai):
-        problemas.append("tree_digest não confere com a árvore do commit validado")
+    medido = tree_digest(pai)
+    if manifesto["tree_digest"] != medido:
+        problemas.append(
+            f"tree_digest não confere com a árvore do commit validado: o manifesto declara "
+            f"{manifesto['tree_digest'][:19]}… e esta árvore rende {medido[:19]}…. O conteúdo "
+            f"versionado de {pai[:12]}… não é o que a release ancorou.")
     mudados = [linha for linha in
                _git("diff", "--name-only", f"{pai}..{tag}^{{commit}}").splitlines() if linha]
     if mudados != [rel]:
