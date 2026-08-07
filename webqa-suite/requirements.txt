@@ -23,3 +23,6 @@ pytest-cov>=5.0
 bandit[toml]>=1.7
 # construção do wheel/sdist do padrão (frente E, E2): `make build` e o release.
 build>=1.0
+# validacao do envelope de laudo contra o schema PINADO da contract-v1
+# (contrato/contract-v1/). So verificacao: nao entra no wheel do padrao.
+jsonschema>=4.0

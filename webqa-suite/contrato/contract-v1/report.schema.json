@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://danzeroum/project/harness/schemas/report.schema.json",
+  "title": "Envelope do laudo",
+  "description": "Envolve a procedência, o resultado e os achados. A procedência é obrigatória em qualquer comparação. Desde o CP-041 este é também o envelope da CLÁUSULA 3 do Contrato de Régua: o veredito de três estados entra aqui, aditivamente, em vez de num schema irmão que duplicaria `result` e `findings`.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "provenance.schema.json" },
+    {
+      "comment": "CLÁUSULA 3, o bump: schema_version 1.3 EXIGE verdict. Não-retroatividade deliberada, no mesmo idioma de provenance (1.1 adiciona artifact, 1.2 adiciona attestation) — um laudo 1.0 continua válido sem o campo, e nenhuma evidência existente vira inválida por uma versão nova de schema. É o que permite a qa-suite seguir emitindo 1.0 enquanto o gap `envelope` está aberto, sem que o contrato precise mentir sobre isso.",
+      "if": {
+        "properties": { "schema_version": { "const": "1.3" } },
+        "required": ["schema_version"]
+      },
+      "then": { "required": ["verdict"] }
+    },
+    {
+      "comment": "E a direção inversa: o campo novo obriga o bump. Sem ela, um laudo 1.0 poderia carregar verdict sem se declarar 1.3, e a versão deixaria de dizer o que o laudo contém.",
+      "if": { "required": ["verdict"] },
+      "then": {
+        "properties": { "schema_version": { "const": "1.3" } }
+      }
+    },
+    {
+      "comment": "Suite não instalada é INCONCLUSIVO, jamais conforme. É a cláusula que pega o defeito concreto do consumo atual: hoje o passo emite ::warning:: e sai 0, e 'não consegui medir' sai com a mesma cor de 'medi e está bom'. A cor mais barata vence por hábito.",
+      "if": {
+        "properties": { "result": { "const": "suite_not_installed" } },
+        "required": ["result", "verdict"]
+      },
+      "then": {
+        "properties": { "verdict": { "const": "inconclusivo" } }
+      }
+    },
+    {
+      "comment": "Erro também é inconclusivo — o 'fiscal não conseguiu fiscalizar' desta casa, que é exit 2 e nunca exit 0.",
+      "if": {
+        "properties": { "result": { "const": "error" } },
+        "required": ["result", "verdict"]
+      },
+      "then": {
+        "properties": { "verdict": { "const": "inconclusivo" } }
+      }
+    },
+    {
+      "comment": "E a trava que faltaria: 'ok' é o único result que pode ser conforme. Sem ela um laudo com achados poderia declarar-se conforme e o schema aceitaria — a trava valeria contra o descuido e nunca contra o gesto deliberado, que é a diferença entre uma regra e uma trava.",
+      "if": {
+        "properties": { "verdict": { "const": "conforme" } },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": { "result": { "const": "ok" } }
+      }
+    }
+  ],
+  "required": ["schema_version", "standard", "consumer_project", "execution", "result", "findings"],
+  "unevaluatedProperties": false,
+  "properties": {
+    "result": {
+      "type": "string",
+      "enum": ["ok", "findings", "suite_not_installed", "error"],
+      "description": "ok = sem achados; findings = achados presentes; suite_not_installed = stub tolerante; error = falha."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["conforme", "nao_conforme", "inconclusivo"],
+      "description": "Os TRÊS estados da cláusula 3. conforme = mediu e passou; nao_conforme = mediu e reprovou; inconclusivo = NÃO MEDIU. O terceiro existe porque a ausência dele é o modo de falha mais caro deste sistema: um verde que significa 'não olhei' encerra a investigação com a convicção de quem olhou."
+    },
+    "verdict_reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Por que este veredito. O fiscal o exige quando verdict != conforme — um inconclusivo sem razão declarada não diz o que faltou medir, que é exatamente o que alguém precisa saber para consertar."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Achados já sanitizados pela suíte. Vazio quando result != findings.",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "dimension"],
+        "properties": {
+          "id": { "type": "string" },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "dimension": { "type": "string" },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Contagens agregadas por severidade/dimensão. Opcional.",
+      "additionalProperties": true
+    }
+  }
+}

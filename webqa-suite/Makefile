@@ -58,6 +58,11 @@ verify:
 	@# manifesto que dizia ancorar. Fora do pytest pelo mesmo motivo dos outros —
 	@# o numero de releases aguardando tag precisa aparecer na tela.
 	python scripts/publicar_release.py --aferir
+	@# Kit de conformidade do CONTRATO (E4), sobre o laudo que o pytest acima
+	@# acabou de emitir. O kit e do consumidor e vive aqui por pin
+	@# (contrato/contract-v1/); roda-lo do lado da regua e o que faz disto um
+	@# contrato, e nao uma checagem que so uma das partes consegue fazer.
+	python contrato/contract-v1/suite_conformance.py --as-suite report/laudo.json
 # Cockpit de testes: leitura AST do repo -> report/cockpit.html + .json (D1k).
 # Arquivo unico, offline, sem tocar a rede. So LE o codigo (nao executa nada).
 cockpit: ; python scripts/cockpit.py --html

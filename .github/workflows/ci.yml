@@ -155,6 +155,16 @@ jobs:
       - name: O smoke exercitou os checks de GUI
         run: python scripts/afere_smoke_gui.py report/smoke-gui/summary.json
 
+      # KIT DE CONFORMIDADE DO CONTRATO (frente E, E4), sobre o laudo que o smoke
+      # ACABOU DE EMITIR — nunca sobre um exemplo escrito à mão.
+      #
+      # O kit é do consumidor e vive aqui por PIN (contrato/contract-v1/, digest em
+      # PROCEDENCIA.json). Rodá-lo do lado da régua é o que faz disto um contrato e
+      # não uma checagem que só uma das partes consegue fazer: sem ele, a suíte
+      # descobriria que quebrou a promessa quando quebrasse o CI de outra pessoa.
+      - name: Conformidade do laudo com a contract-v1 (lado da régua)
+        run: python contrato/contract-v1/suite_conformance.py --as-suite report/smoke-gui/laudo.json
+
       # Liga o "motor" do cockpit (D5k): medicoes.json a partir da cobertura recém
       # medida + ruff C901; depois o cockpit veste tudo. Ambiente limpo (sem gate
       # de rede) — a espinha do cockpit fica serena, como deve. Não bloqueia o PR.
