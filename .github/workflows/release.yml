@@ -27,11 +27,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # `fetch-depth: 0`: a verificação da cadeia compara a árvore taggeada com a
+      # do PAI. Com clone raso o pai não existe localmente, e a guarda passaria
+      # por não conseguir olhar — que é o modo de falha que ela existe para negar.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # A ÂNCORA, conferida antes de construir qualquer coisa (frente E, E2).
+      #
+      # Tag é ponteiro móvel: sem manifesto na árvore, "continua sendo o que eu
+      # instalei" é indemonstrável do lado do consumidor. A guarda cobra as quatro
+      # coisas que fazem a âncora valer — manifesto presente, descrevendo o pai,
+      # com o commit de release não mudando mais nada, e a árvore declarando o
+      # `__version__` que a tag promete. A última é a que impede o wheel de sair
+      # com um número diferente do da tag, já que a versão é dinâmica.
+      #
+      # ANTES do build de propósito: artefato de uma tag que não ancora nada seria
+      # baixável, e baixável é indistinguível de publicado.
+      - name: A tag ancora um manifesto coerente
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python scripts/publicar_release.py --verificar "$TAG"
 
       - name: Instalar o construtor
         run: pip install build

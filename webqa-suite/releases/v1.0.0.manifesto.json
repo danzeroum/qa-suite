@@ -1,0 +1,16 @@
+{
+  "catalogo": {
+    "caminhos_sensiveis_hash": "sha256:fadb9fd75759537ea924df49f7b18938bd69c5b7e6dad562a1190d2b755400f3",
+    "checks_hash": "sha256:a24fdd86c7a9060f4dbd518eefabde418a49dd72da107b9c796fc53d085bd38b"
+  },
+  "commit_sha": "4f44a8a3e03462a33db1a6dd107af4aecebb7317",
+  "mordida": {
+    "estado": "pendente",
+    "motivo": "a autoprova de mordida por release e a entrega 5 desta frente; ate ela existir, esta release declara que as travas NAO foram provadas mordendo. Declarar 'aprovada' aqui seria o selo falso que o proprio contrato chama de pior que fiscal nenhum."
+  },
+  "repositorio": "danzeroum/qa-suite",
+  "schema_version": "1.0",
+  "tag": "v1.0.0",
+  "tree_digest": "sha256:f8ef23c5d3ae8d92e52032b335d7b199de1c41ba5b5f12c02e6cf370a2bb0e52",
+  "versao": "1.0.0"
+}
