@@ -1,4 +1,4 @@
-.PHONY: referencia-visual all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes build
+.PHONY: instalacao referencia-visual all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes build
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -65,6 +65,18 @@ medicoes: ; python scripts/medicoes.py
 # biblioteca webqa/ viaja; a versao vem de webqa.__version__. Publicar (onde) e
 # decisao do dono — este alvo so PRODUZ o artefato versionado.
 build: ; python -m build
+# Reproduz OFFLINE o job `instalacao-declarada` do CI: instala o padrao num venv
+# limpo pelo caminho DECLARADO no README (com este clone no lugar da origem
+# remota) e confere que a versao resolvida e o console script existem. E a unica
+# forma de provar que a instrucao de instalacao funciona — regex sobre o README
+# prova a forma, nunca a materia. Ver scripts/caminho_de_instalacao.py.
+instalacao:
+	@rm -rf .venv-instalacao
+	python -m venv .venv-instalacao
+	.venv-instalacao/bin/pip install -q "$$(python scripts/caminho_de_instalacao.py --local .. --ref "$$(git rev-parse HEAD)")"
+	.venv-instalacao/bin/python -c "import importlib.metadata as m, webqa; print('instalado:', m.version('webqa-suite'))"
+	.venv-instalacao/bin/webqa-sondar --help > /dev/null
+	@echo "OK: o caminho declarado resolve e o console script responde."
 # Mutação escopada na superfície de segurança. NAO roda no PR (lento: ~1 min por
 # modulo); roda no noturno agendado e a mao. O ambiente TEM de estar limpo — este
 # harness inverte a logica dos gates de proposito. Ver

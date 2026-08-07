@@ -36,3 +36,8 @@ dist/
 .coverage.*
 coverage.xml
 htmlcov/
+
+# Venv efemero do alvo `make instalacao` (prova offline do caminho de instalacao
+# declarado). Recriado do zero a cada execucao — versiona-lo seria versionar um
+# ambiente, e o ponto do alvo e que ele nasce limpo.
+webqa-suite/.venv-instalacao/
