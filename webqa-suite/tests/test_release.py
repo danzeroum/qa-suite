@@ -98,9 +98,17 @@ def test_mordida_pendente_sem_motivo_reprova():
     assert any("motivo" in p for p in problemas)
 
 
-def test_mordida_aprovada_dispensa_motivo():
-    """O outro lado: exigir motivo do estado bom transformaria a guarda em ritual."""
-    assert problemas_de_forma(manifesto_valido(mordida={"estado": "aprovada"})) == []
+def test_mordida_aprovada_dispensa_motivo_mas_exige_numeros():
+    """O outro lado: exigir MOTIVO do estado bom transformaria a guarda em ritual.
+
+    A exigência mudou na E5, e mudou porque a autoprova passou a existir: `aprovada`
+    sem contagem seria um selo — quem lê o manifesto veria a palavra e não teria
+    como perguntar *aprovada em quê*. O motivo segue dispensado; os números, não.
+    """
+    aprovada = {"estado": "aprovada", "devem_falhar": "28/28", "smoke_gui": "4/4",
+                "declarado_sem_mordida": 15}
+    assert problemas_de_forma(manifesto_valido(mordida=aprovada)) == []
+    assert "motivo" not in aprovada
 
 
 @pytest.mark.parametrize("chave", ["caminhos_sensiveis_hash", "checks_hash"])

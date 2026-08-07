@@ -225,7 +225,67 @@ def _problemas_de_mordida(mordida: dict) -> list[str]:
     if estado == "pendente" and not (mordida.get("motivo") or "").strip():
         return ["mordida.estado é 'pendente' sem motivo escrito. Pendência sem motivo é uma "
                 "decisão que ninguém consegue revisar depois."]
+    if estado == "aprovada":
+        return _problemas_de_mordida_aprovada(mordida)
     return []
+
+
+def _problemas_de_mordida_aprovada(mordida: dict) -> list[str]:
+    """`aprovada` exige os NÚMEROS, não a palavra.
+
+    Um estado sem contagem seria um selo: quem lê o manifesto veria "aprovada" e
+    não teria como perguntar *aprovada em quê*. Os três campos são o escopo inteiro
+    da autoprova — as mordidas do contrato 1:1, as direções da guarda do smoke, e
+    quantas entradas ficaram DECLARADAS sem mordida, com motivo.
+    """
+    problemas = []
+    for chave in ("devem_falhar", "smoke_gui", "declarado_sem_mordida"):
+        if chave not in mordida:
+            problemas.append(
+                f"mordida.{chave} ausente com estado 'aprovada'. Aprovada em quê? Estado sem "
+                f"contagem é selo, e selo é o que o contrato chama de pior que fiscal nenhum.")
+    if problemas:
+        return problemas
+    for chave in ("devem_falhar", "smoke_gui"):
+        valor = str(mordida[chave])
+        if not re.fullmatch(r"(\d+)/(\1)", valor):
+            problemas.append(
+                f"mordida.{chave} é {valor!r}: 'aprovada' exige que TODAS as mordidas do escopo "
+                f"tenham reprovado. Parte do escopo mordendo é `pendente`, nunca `aprovada`.")
+    return problemas
+
+
+def mordida_da_autoprova(caminho: Path) -> dict:
+    """Traduz o relatório de `scripts/autoprova.py` no bloco `mordida` do manifesto.
+
+    A tradução é aqui, e não no autoprova, porque quem decide o que entra num
+    manifesto de release é o publicador: o autoprova MEDE, este módulo PUBLICA, e
+    manter os dois papéis separados é o que impede um relatório de se auto-aprovar.
+    """
+    try:
+        relatorio = json.loads(caminho.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as erro:
+        raise Recusa(f"relatório de autoprova ilegível em {caminho}: {erro}") from erro
+    if relatorio.get("indeterminado"):
+        raise Recusa(
+            f"a autoprova não conseguiu provar: {relatorio['indeterminado']}. 'Não consegui "
+            f"provar' e 'provei que não morde' pedem reações diferentes, e nenhuma das duas "
+            f"produz release aprovada.")
+    if not relatorio.get("aprovada"):
+        faltantes = (relatorio.get("escopo") or {}).get("devem_falhar", {}).get("nao_morderam", [])
+        raise Recusa(
+            f"a autoprova reprovou: {len(faltantes)} mordida(s) do contrato 1:1 não reprovaram "
+            f"{faltantes[:5]}. Uma régua verde cujas travas não mordem é indistinguível de uma "
+            f"régua verde — e a release é exatamente quando alguém passa a confiar nela sem "
+            f"poder olhar.")
+    devem = relatorio["escopo"]["devem_falhar"]
+    smoke = relatorio["escopo"]["smoke_gui"]
+    return {
+        "estado": "aprovada",
+        "devem_falhar": f"{devem['morderam']}/{devem['total']}",
+        "smoke_gui": f"{sum(smoke.values())}/{len(smoke)}",
+        "declarado_sem_mordida": len(relatorio["declarado_sem_mordida"]),
+    }
 
 
 def problemas_de_forma(manifesto: dict) -> list[str]:
@@ -328,6 +388,37 @@ def _preflight(versao: str, commit: str) -> tuple[str, str, str]:
     return tag, sha, rel
 
 
+def conferir_mordida(tag: str, autoprova: Path) -> list[str]:
+    """O manifesto da tag não pode dizer mais do que a autoprova mediu.
+
+    Uma release que se declarasse `aprovada` com autoprova vermelha seria o selo
+    falso que o contrato chama de pior que fiscal nenhum. O sentido único é
+    deliberado: a autoprova pode ter medido MAIS do que o manifesto declara (uma
+    release `pendente` cujas travas hoje mordem é honesta — ela só não prometeu),
+    mas nunca o contrário.
+    """
+    versao = tag.lstrip("v")
+    rel = f"{PREFIXO}/releases/v{versao}.manifesto.json"
+    try:
+        manifesto = json.loads(_git("show", f"{tag}:{rel}"))
+    except (Recusa, json.JSONDecodeError) as erro:
+        return [f"não consegui ler o manifesto de {tag}: {erro}"]
+    declarada = manifesto.get("mordida") or {}
+    if declarada.get("estado") != "aprovada":
+        return []
+    try:
+        medida = mordida_da_autoprova(autoprova)
+    except Recusa as erro:
+        return [f"o manifesto declara mordida `aprovada` e {erro}"]
+    divergentes = [c for c in ("devem_falhar", "smoke_gui", "declarado_sem_mordida")
+                   if declarada.get(c) != medida.get(c)]
+    if divergentes:
+        return [f"o manifesto declara {[declarada.get(c) for c in divergentes]} e a autoprova "
+                f"mediu {[medida.get(c) for c in divergentes]} em {divergentes}. O manifesto é "
+                f"o que o consumidor guarda; ele não pode dizer mais do que se mediu."]
+    return []
+
+
 def publicar(versao: str, commit: str, mordida: dict, executar: bool) -> int:
     """Emite, commita, tagueia LOCALMENTE e verifica — nesta ordem, sem push."""
     tag, sha, rel = _preflight(versao, commit)
@@ -410,6 +501,17 @@ def aferir() -> int:
     return 1 if quebradas else 0
 
 
+def _relatar(tag: str, problemas: list[str], verde: str) -> int:
+    """Imprime e devolve o código. Os problemas vão para stderr como `::error::`
+    porque é assim que o log do CI os destaca; o verde vai para stdout."""
+    for p in problemas:
+        print(f"::error::{tag}: {p}", file=sys.stderr)
+    if problemas:
+        return 1
+    print(f"{tag}: {verde}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--aferir", action="store_true",
@@ -420,26 +522,27 @@ def main(argv: list[str] | None = None) -> int:
                         help="cria commit de release e tag LOCAIS (nunca faz push)")
     parser.add_argument("--motivo-da-mordida", default="",
                         help="por que a autoprova de mordida está pendente nesta release")
-    parser.add_argument("--mordida-aprovada", action="store_true",
-                        help="a autoprova de mordida desta release passou")
+    parser.add_argument("--autoprova", type=Path,
+                        help="relatório de scripts/autoprova.py; aprova a mordida desta release")
     parser.add_argument("--verificar", metavar="TAG",
                         help="confere a cadeia de uma tag já existente")
+    parser.add_argument("--conferir-mordida", nargs=2, metavar=("TAG", "AUTOPROVA"),
+                        help="o manifesto da TAG não diz mais do que a AUTOPROVA mediu")
     args = parser.parse_args(argv)
 
     try:
         if args.aferir:
             return aferir()
+        if args.conferir_mordida:
+            tag, autoprova = args.conferir_mordida
+            return _relatar(tag, conferir_mordida(tag, Path(autoprova)),
+                            "o manifesto não diz mais do que a autoprova mediu.")
         if args.verificar:
-            problemas = verificar(args.verificar)
-            if problemas:
-                for p in problemas:
-                    print(f"::error::{args.verificar}: {p}", file=sys.stderr)
-                return 1
-            print(f"{args.verificar}: manifesto na árvore, cadeia íntegra, versão coerente.")
-            return 0
+            return _relatar(args.verificar, verificar(args.verificar),
+                            "manifesto na árvore, cadeia íntegra, versão coerente.")
         if not args.versao:
             parser.error("informe --versao ou --verificar")
-        mordida = ({"estado": "aprovada"} if args.mordida_aprovada
+        mordida = (mordida_da_autoprova(args.autoprova) if args.autoprova
                    else {"estado": "pendente", "motivo": args.motivo_da_mordida})
         return publicar(args.versao, args.commit, mordida, args.executar)
     except Recusa as erro:
