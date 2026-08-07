@@ -104,6 +104,26 @@ jobs:
           WEBQA_BASIC_AUTH_PASS: ${{ secrets.basic_auth_pass }}
         run: pytest -m "$WEBQA_DIMENSOES"
 
+      # O VEREDITO DO PROCESSO (frente E, E3), DEPOIS do run e em passo proprio.
+      #
+      # O exit do pytest nao tem como expressar o terceiro estado, e as duas formas
+      # do defeito ja foram medidas: com o alvo fora do ar ele sai 1 — indistinguivel
+      # de uma violacao real —, e com tudo pulado sai 0 — indistinguivel de alvo
+      # limpo. Um consumidor que lesse so o pytest concluiria "medi e esta bom" sobre
+      # uma auditoria que nao mediu nada.
+      #
+      # `if: always()`: o passo acima acabou de reprovar em qualquer cenario
+      # interessante, e sem isto o veredito nunca correria justamente quando ele
+      # importa. Os codigos sao 10/20/30 e nao colidem com os 0-5 do pytest de
+      # proposito — quem le o log precisa saber de quem e o numero.
+      #
+      # O passo NAO altera o exit do pytest, do `make verify`, dos `afere_*`, do
+      # ledger nem o `|| true` do entrypoint: ele LE o laudo que o run acabou de
+      # deixar. Veredito de guarda se le do EXIT CODE, nunca da primeira linha.
+      - name: Veredito do processo (0 nada observado · 10 violacao · 20 indeterminado)
+        if: always()
+        run: python -m webqa.veredito --laudo report/summary.json
+
       # Fase C — SÓ quando pedido, e com escopo (posse provada). O escopo vem por
       # secret e é escrito só aqui; sai gitignored e é apagado ao fim.
       - name: Preparar escopo da Fase C

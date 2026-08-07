@@ -164,7 +164,7 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 ```xml
 <lang>Python 3.11 + pytest + Playwright 1.56.0 — pytest.ini, webqa/report.py, webqa/report_html.py, webqa/viewports.py, conftest.py, data/gui-perfis.yaml</lang>
 <task>Criar a dimensão `gui` de ponta a ponta — marcador, laudo, nota epistêmica — mais a fixture de contexto isolado e a matriz de viewports. Nenhum check ainda.</task>
-<context>Dimensão só aparece no laudo se estiver em report.py::DIMENSIONS (27-30); fora dela agrupa como `other`. --strict-markers (pytest.ini:4) transforma marcador não registrado em erro de coleta, e as descrições ali são ASCII sem acento. browser_page é de sessão e compartilhada com checks/frontend/test_rendering.py (conftest.py:200-205): mexer em viewport ou tema nela contamina as Web Vitals das outras dimensões (R20). O molde de contexto virgem é o network_log (conftest.py:338-349). A doutrina de matriz por env, fail-closed, é webqa/navegador.py:24-48. load_settings faz float() em TODA chave de thresholds (config.py:45-47), então booleano não cabe lá.</context>
+<context>Dimensão só aparece no laudo se estiver em report.py::DIMENSIONS (27-30); fora dela agrupa como `other`. --strict-markers (pytest.ini:4) transforma marcador não registrado em erro de coleta, e as descrições ali são ASCII sem acento. browser_page é de sessão e compartilhada com checks/frontend/test_rendering.py (conftest.py:214-219): mexer em viewport ou tema nela contamina as Web Vitals das outras dimensões (R20). O molde de contexto virgem é o network_log (conftest.py:352-363). A doutrina de matriz por env, fail-closed, é webqa/navegador.py:24-48. load_settings faz float() em TODA chave de thresholds (config.py:45-47), então booleano não cabe lá.</context>
 <rules>
 - Pense passo a passo antes de responder.
 - Quatro pontos de integração no MESMO PR: pytest.ini (markers), report.py::DIMENSIONS, report.py::DIMENSION_NOTES, report_html.py::OBSERVACOES. Faltando um, a dimensão existe no pytest e não no laudo.
@@ -199,10 +199,10 @@ qualquer check, e faz **todas** as mudanças de fixture de uma vez.
 ```xml
 <lang>Python 3.11 + Playwright — webqa/geometria.py, checks/gui/test_reflow.py, checks/gui/test_alvos.py</lang>
 <task>Implementar GUI-RESP-01 (reflow 320px), GUI-TIPO-01 (zoom 200%) e GUI-ALVO-01 (alvo de toque >= 24px com as exceções da norma), com o algoritmo puro em webqa/geometria.py.</task>
-<context>Specs completas em docs/GUI-CATALOGO.md §3.1, §3.2 e §3.6. As exceções da 2.5.8 (inline, equivalente, espaçamento) são o miolo do algoritmo e a fonte de falso positivo se ignoradas. C901 max-complexity = 8 vale em webqa/ e é dispensado em checks/** (pyproject.toml:47-57) — o algoritmo vive na biblioteca, decomposto, e fica testável sem navegador sobre caixas fabricadas. Medir o elemento CLICÁVEL, não o ícone interno: a área de toque costuma vir do padding do ancestral.</context>
+<context>Specs completas em docs/GUI-CATALOGO.md §3.1, §3.2 e §3.6. As exceções da 2.5.8 (inline, equivalente, espaçamento) são o miolo do algoritmo e a fonte de falso positivo se ignoradas. C901 max-complexity = 8 vale em webqa/ e é dispensado em checks/** (pyproject.toml:55-65) — o algoritmo vive na biblioteca, decomposto, e fica testável sem navegador sobre caixas fabricadas. Medir o elemento CLICÁVEL, não o ícone interno: a área de toque costuma vir do padding do ancestral.</context>
 <rules>
 - Pense passo a passo antes de responder.
-- Iteração de viewport DENTRO do corpo do teste — um nodeid por check (conftest.py:105-113 explica por quê: o contrato de esperado.json é por nodeid exato).
+- Iteração de viewport DENTRO do corpo do teste — um nodeid por check (conftest.py:119-127 explica por quê: o contrato de esperado.json é por nodeid exato).
 - Esperar document.fonts.ready antes de medir largura; rolar a página inteira antes de medir alvos (conteúdo lazy não medido é não avaliado, nunca aprovado).
 - Alvo entre 24 e 44px é xfail (alerta), não failed: 44 é meta de plataforma, não norma.
 - Toda medida por metricas.registrar; None é descartado, ausência não vira zero.

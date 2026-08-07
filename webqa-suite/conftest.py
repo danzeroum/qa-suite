@@ -25,8 +25,8 @@ from webqa.etiqueta import PoliteFetcher
 from webqa.http_utils import Timing, make_client, timed_get
 from webqa.navegacao import percorrer
 from webqa.navegador import engines_configurados
-from webqa.trackers import LoggedRequest, NetworkLog
 from webqa.rede_simulada import carregar_perfis_de_rede
+from webqa.trackers import LoggedRequest, NetworkLog
 from webqa.viewports import carregar_perfis, opcoes_de_contexto
 
 
@@ -54,9 +54,23 @@ def alvo_alcancavel(settings, credencial):
 
     A resposta é devolvida para a `home_response` reaproveitar: preflight que
     gasta um GET a mais contradiz o respeito ao sistema sob teste.
+
+    O desfecho é REGISTRADO no laudo (E3). "O alvo foi alcançado?" é estado de
+    SESSÃO, e a contagem de desfechos não o reconstrói: contra uma porta fechada,
+    os checks que fazem a requisição no corpo (pytest-bdd) terminam em `failed` e
+    os que dependem desta fixture em `error` — quem lesse só a contagem veria
+    "violações" sobre um alvo que ninguém alcançou. O registro vive em
+    webqa/report.py, e não aqui, porque este arquivo não viaja no wheel.
     """
-    with make_client(settings) as cliente_de_sondagem:
-        resposta = cliente_de_sondagem.get(settings.target_url)
+    from webqa.report import registrar_preflight
+
+    try:
+        with make_client(settings) as cliente_de_sondagem:
+            resposta = cliente_de_sondagem.get(settings.target_url)
+    except Exception as erro:   # noqa: BLE001 - qualquer falha de transporte é "não alcançado"
+        registrar_preflight(False, f"{type(erro).__name__}: {erro}")
+        raise
+    registrar_preflight(True, f"HTTP {resposta.status_code}")
     verificar_desafio_de_autenticacao(resposta.status_code, credencial, settings.target_url)
     return resposta
 

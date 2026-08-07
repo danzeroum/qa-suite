@@ -163,18 +163,18 @@ Cada uma é imposta por um teste, não por combinação. A coluna da direita é 
 | 4 | Prefixo `test` proibido em biblioteca | `tests/test_convencoes.py:30-41,50-75` | helper em `webqa/`, `scripts/` ou `fixture_target/` chamado `testar_*`, `testes_*` ou `teste_*`. O pytest coleta por `test*`, não `test_*` |
 | 5 | Nenhum check consome `require_active_probes` hoje | `tests/test_fase_c_travada.py:314-326` | o primeiro check que o consumir **altera esse teste**, num PR que diga isso — e o arquivo é protegido por CODEOWNERS |
 | 6 | `report/` nunca é versionado | `.gitignore:1-4,19`; R8 | guardar linha de base visual de alvo real em `report/` **ou** em qualquer lugar versionado (§3.4) |
-| 7 | `sanitize_text` é a borda de escrita **de texto** | `webqa/sanitize.py:156`; `webqa/report.py:236-238` varre a string já serializada | supor que uma captura de tela está sanitizada. Ela não está — não existe mascarador de pixel. É o R19 |
-| 8 | `browser_page` é de sessão e compartilhada | `conftest.py:200-205`; preço registrado em `ARQUITETURA.md:55` | mudar viewport, tema ou movimento nela. Toda variação abre contexto próprio, no molde de `network_log` (`conftest.py:338-349`) |
+| 7 | `sanitize_text` é a borda de escrita **de texto** | `webqa/sanitize.py:156`; `webqa/report.py:285-287` varre a string já serializada | supor que uma captura de tela está sanitizada. Ela não está — não existe mascarador de pixel. É o R19 |
+| 8 | `browser_page` é de sessão e compartilhada | `conftest.py:214-219`; preço registrado em `ARQUITETURA.md:55` | mudar viewport, tema ou movimento nela. Toda variação abre contexto próprio, no molde de `network_log` (`conftest.py:352-363`) |
 | 9 | Ausência nunca vira zero | `PROXIMOS-PASSOS.md §2.1`; `webqa/metricas.py:26-45` recusa `None` | tratar elemento não renderizado como `0 px`, ou linha de base ausente como aprovação |
-| 10 | `error` ≠ `failed` | `PROXIMOS-PASSOS.md §2.2`; `webqa/report.py:157-162` | contar contexto que não abriu como achado. É o teste **não tendo acontecido** |
+| 10 | `error` ≠ `failed` | `PROXIMOS-PASSOS.md §2.2`; `webqa/report.py:182-187` | contar contexto que não abriu como achado. É o teste **não tendo acontecido** |
 | 11 | Cor nunca é o único portador de significado | `PROXIMOS-PASSOS.md §2.5`; `report_html.py:380-383` (severidade é **inline e tipográfica**, porque a folha não tem classe para ela) | inventar semáforo para diff visual. E note a simetria: isto é, ao mesmo tempo, **critério que a camada testa no alvo** (WCAG 1.4.1) |
 | 12 | Folha de estilo congelada byte a byte | `PROXIMOS-PASSOS.md §2.4`; `tests/test_report_html.py:257-259`; `tests/test_estabilidade_html.py:181-187` reprova classe sem regra na folha | criar classe CSS. Compor com as existentes (`.fora-escopo`, `.chip-neutro`, `.chip-dim`) ou usar estilo inline, como a severidade faz |
-| 13 | Métrica nova vai ao JSON; seção nova no HTML é design | `webqa/report.py:222-232` — "acrescentar seção ali é iteração de DESIGN, não de instrumentação" | renderizar tríptico de diff no `summary.html` sem OS de design, `make audita-design` e entrada em `tests/test_derivadores_ligados.py:31-35` |
+| 13 | Métrica nova vai ao JSON; seção nova no HTML é design | `webqa/report.py:247-257` — "acrescentar seção ali é iteração de DESIGN, não de instrumentação" | renderizar tríptico de diff no `summary.html` sem OS de design, `make audita-design` e entrada em `tests/test_derivadores_ligados.py:31-35` |
 | 14 | `Finding` só aceita severidade `alta/media/baixa` e fase `A/B/C` | `webqa/dominio.py:76-79` | construir `Finding` na dimensão `gui`. Os checks daqui seguem o padrão de `ux`/`frontend`: assert simples + `metricas.registrar` |
 | 15 | Verificação **e** validação no mesmo PR | `PROXIMOS-PASSOS.md §5.2` | entregar check sem unidade em `tests/` sobre dado fabricado |
 | 16 | "A garantia existe, a ligação não" | `PROXIMOS-PASSOS.md §2.10`; `tests/test_derivadores_ligados.py` | propor chave de configuração sem teste que prove que **algum check a lê**. Threshold que ninguém lê é exatamente essa classe de defeito |
 | 17 | Loopback prova a lógica, nunca a fronteira | `PROXIMOS-PASSOS.md §2.11` | dar por provado, contra o alvo fixture (`127.0.0.1`, isento de etiqueta), qualquer comportamento que dependa de rede pública |
-| 18 | C901 máx. 8 e linha 110 na biblioteca | `pyproject.toml:42-52`; `checks/**` tem isenção em `:57` | esconder o algoritmo de geometria dentro do check para escapar do gate. Ele vive em `webqa/`, decomposto — que é também onde ele fica testável sem navegador |
+| 18 | C901 máx. 8 e linha 110 na biblioteca | `pyproject.toml:50-60`; `checks/**` tem isenção em `:65` | esconder o algoritmo de geometria dentro do check para escapar do gate. Ele vive em `webqa/`, decomposto — que é também onde ele fica testável sem navegador |
 | 19 | axe‑core está pinado com hash | `webqa/axe.py:21-24` (movido para lá na OS‑45; era privado no check) | subir a versão do axe dentro de uma OS desta camada. O SHA‑384 é controle de segurança, não número de versão. Mapear critério→regra só depois de confirmar que a regra existe na 4.9.1 |
 | 20 | `mutacao.yml` exige ambiente sem gate | `.github/workflows/mutacao.yml` | depender de variável de gate ligada para o teste passar |
 
@@ -198,7 +198,7 @@ que hoje está em 0/10 (`PROXIMOS-PASSOS.md §4.4`).
 
 **b) Parametrizar muda o nodeid, e o nodeid é o contrato do alvo fixture.**
 
-`conftest.py:107-115` explica que a fixture `browser` **não** é parametrizada
+`conftest.py:121-129` explica que a fixture `browser` **não** é parametrizada
 quando há uma engine só, de propósito: assim o nodeid fica `::test_x` e não
 `::test_x[chromium]`, "preservando o contrato 1:1 do alvo fixture
 (`esperado.json`, §2.8) sem tocá‑lo".
@@ -285,8 +285,8 @@ webqa-suite/
 A lei é `ARQUITETURA.md:44` e `conftest.py:3-5`: **`checks/gui/` só conhece
 fixtures; todo detalhe vive em `webqa/`.** Aqui isso tem uma consequência prática
 que vale além da estética — o gate de complexidade `C901 max-complexity = 8`
-(`pyproject.toml:47-52`) vale para `webqa/` e é **dispensado** em `checks/**`
-(`:57`). Um algoritmo de geometria escrito dentro do check escaparia do gate; o
+(`pyproject.toml:55-60`) vale para `webqa/` e é **dispensado** em `checks/**`
+(`:65`). Um algoritmo de geometria escrito dentro do check escaparia do gate; o
 mesmo algoritmo em `webqa/geometria.py` é obrigado a se decompor — e, decomposto,
 fica testável sem navegador, sobre caixas fabricadas.
 
@@ -498,7 +498,7 @@ supor o contrário é o R19. Por isso a hierarquia da casa ("não coletar > masc
 > fabricado chega ao disco.
 
 **O que NÃO entra agora:** renderizar as evidências no `summary.html`. Isso é
-iteração de **design**, não de instrumentação (`webqa/report.py:222-232`), e
+iteração de **design**, não de instrumentação (`webqa/report.py:247-257`), e
 exigiria OS própria, `make audita-design` verde e entrada em
 `tests/test_derivadores_ligados.py::DERIVADORES_SUMMARY:31-35`. O JSON é livre;
 o HTML tem contrato.
@@ -514,7 +514,7 @@ descreve o exportador próprio, que lê o `summary.json`.
 
 **Contexto novo por variação.** A lição do `network_log` — "cookie ou
 consentimento herdado de um teste anterior faria o alvo parecer conforme, o pior
-falso negativo possível" (`conftest.py:200-205`) — vale idêntica para
+falso negativo possível" (`conftest.py:214-219`) — vale idêntica para
 `prefers-color-scheme` e viewport herdados. Toda variação abre
 `browser.new_context(...)` e o fecha no `finally`. **Nenhum check de `gui` toca
 `browser_page`**, que é de sessão e alimenta as Web Vitals de
@@ -536,7 +536,7 @@ o ledger existe para medir.
 
 **Chromium‑only com skip honesto.** Emulação CDP (rede, CPU, memória) não existe
 em Firefox e WebKit. Ali o teste **pula com instrução**, nunca passa — a mesma
-regra da fixture `browser` para engine sem binário (`conftest.py:180-182`).
+regra da fixture `browser` para engine sem binário (`conftest.py:194-196`).
 
 ### Diferenças por engine — o que já custou caro
 

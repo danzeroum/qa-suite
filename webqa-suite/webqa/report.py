@@ -55,6 +55,31 @@ REPORT_DIR = Path(
 _RESULTS: list[dict] = []
 _START = time.time()
 
+# Desfecho do PREFLIGHT de sessão (conftest.py::alvo_alcancavel). Fica aqui, e não
+# no conftest, porque o conftest NÃO viaja no wheel: o laudo é lido por quem
+# instalou só a biblioteca, e um sinal que só existisse no repositório seria
+# invisível justamente para o consumidor.
+#
+# Existe porque "o alvo foi alcançado?" é estado de SESSÃO, e não a soma dos
+# desfechos. Medido contra uma porta fechada: 58 checks viram `error` (a fixture
+# estourou no setup) e 4 viram `failed` (o pytest-bdd faz a requisição DENTRO do
+# corpo, então o ConnectError cai na fase `call`). Ler aquela contagem de fora
+# produziria "4 violações" — quatro achados sobre um alvo que ninguém alcançou. A
+# distinção error/failed do laudo é por FASE, não por natureza, e é por isso que
+# ela não basta.
+_PREFLIGHT: dict | None = None
+
+
+def registrar_preflight(alcancado: bool, motivo: str = "") -> None:
+    """Registra se o alvo respondeu ao primeiro GET da sessão.
+
+    Chamado pelo preflight (conftest). Idempotente por sessão: o primeiro registro
+    vence, porque é o que descreve o estado em que a sessão começou.
+    """
+    global _PREFLIGHT
+    if _PREFLIGHT is None:
+        _PREFLIGHT = {"alcancado": bool(alcancado), "motivo": sanitize_text(motivo)[:400]}
+
 
 def _alvo_observado() -> str:
     """URL do alvo com a query oculta — relatório não reproduz parâmetro do alvo."""
@@ -233,6 +258,30 @@ def pytest_sessionfinish(session, exitstatus):
         "metricas": coletadas(),
         "results": _RESULTS,
     }
+    if _PREFLIGHT is not None:
+        summary["preflight"] = _PREFLIGHT
+    # O VEREDITO, carimbado no laudo pela MESMA função que decide o código de saída
+    # de `webqa-veredicto` (webqa/veredito.py). Um só lugar decide: se o laudo e o
+    # exit fossem calculados em dois lugares, a primeira divergência entre eles
+    # seria justamente a que ninguém veria — e o par exit/laudo é a única coisa que
+    # um consumidor consegue auditar sem ler o log.
+    #
+    # ADITIVO: `results`, `by_dimension`, `metricas` e todo o resto seguem
+    # exatamente como estavam. Um summary antigo continua renderizando, e um
+    # consumidor em transição continua lendo o que já lia.
+    from webqa.veredito import avaliar
+
+    veredito = avaliar(summary)
+    summary["veredito"] = {
+        "estado": veredito.estado,
+        "motivo": veredito.motivo,
+        "codigo_de_saida": veredito.codigo,
+    }
+    # Booleano à parte, e não derivado na leitura: `inconclusivo` é o campo que o
+    # consumidor usa para NÃO tratar "não medi" como "medi e passou", e exigir que
+    # ele reimplemente a conta seria devolver a inferência que a origem acabou de
+    # assumir.
+    summary["inconclusivo"] = veredito.inconclusivo
     # A varredura por VALOR acontece sobre a string SERIALIZADA, não sobre o
     # dicionário — e é isso que a torna estrutural. Campo novo que alguém
     # acrescente ao `summary` amanhã já nasce coberto; chave conta tanto quanto

@@ -33,10 +33,23 @@ def test_entrypoint_do_motor_declarado(proj):
     assert scripts["webqa-sondar"] == "webqa.sondagem:main"
 
 
-def test_alvo_do_entrypoint_existe_e_e_chamavel():
+def test_entrypoint_do_veredito_declarado(proj):
+    """E3: o veredito do processo é um console script IRMÃO, não um modo do pytest.
+
+    Separado de propósito: um comando que também executasse os checks teria dois
+    motivos para falhar, e quem lê o código de saída não saberia qual deles ocorreu.
+    """
+    scripts = proj["project"]["scripts"]
+    assert scripts["webqa-veredicto"] == "webqa.veredito:main"
+
+
+@pytest.mark.parametrize("modulo,funcao", [("webqa.sondagem", "main"),
+                                           ("webqa.veredito", "main")])
+def test_alvo_do_entrypoint_existe_e_e_chamavel(modulo, funcao):
     """O que o console script promete tem de existir — senão instala quebrado."""
-    from webqa.sondagem import main
-    assert callable(main)
+    import importlib
+
+    assert callable(getattr(importlib.import_module(modulo), funcao))
 
 
 def test_dependencias_de_runtime_declaradas(proj):
