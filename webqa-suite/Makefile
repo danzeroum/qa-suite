@@ -1,4 +1,4 @@
-.PHONY: instalacao referencia-visual all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes build
+.PHONY: autoprova instalacao referencia-visual all backend frontend ux functional acceptance lgpd seguranca lgpd-passivo load verify lint sast estabilidade fixture vps-smoke audita-design campanha campanha-vps sumario painel telemetria mutar cockpit medicoes build
 
 all: ; pytest
 backend: ; pytest -m backend
@@ -91,6 +91,16 @@ instalacao:
 # harness inverte a logica dos gates de proposito. Ver
 # docs/handoff/HANDOFF-Q1-instrumentacao.md §Q5.
 mutar: ; python scripts/mutar.py . webqa/escopo.py tests/test_escopo.py tests/test_fase_c_travada.py
+# Autoprova de mordida POR RELEASE (E5): as travas desta regua ainda reprovam o
+# que prometem reprovar? Escopo = os `devem_falhar` do contrato 1:1 (violacoes
+# plantadas no alvo fabricado) + as direcoes da guarda do smoke. EXIGE Chromium:
+# sem ele as violacoes de gui nao sao observaveis e o script sai 2
+# (INDETERMINADO) — "nao consegui provar" nunca vira release aprovada.
+#
+# NAO chama scripts/mutar.py: a mutacao escopada responde outra pergunta ("minhas
+# assercoes sao fortes?") e segue no noturno, onde o custo cabe. O veredito
+# escrito sobre as duas esta na docstring de scripts/autoprova.py.
+autoprova: ; python scripts/autoprova.py
 lint: ; ruff check webqa checks tests scripts fixture_target
 # Mesmos comandos do CI (.github/workflows/ci.yml): rigor total na biblioteca;
 # nos checks, as exceções já documentadas nos per-file-ignores do ruff.

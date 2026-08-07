@@ -54,6 +54,38 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: python scripts/publicar_release.py --verificar "$TAG"
 
+      # AUTOPROVA DE MORDIDA (frente E, E5) — a release recusa a tag se alguma
+      # trava do escopo nao reprovar o que ela promete reprovar.
+      #
+      # Uma regua verde cujas travas nao mordem e indistinguivel de uma regua
+      # verde, e a release e exatamente o momento em que alguem do outro lado
+      # passa a confiar nela sem poder olhar. O escopo e o que e DETERMINISTICO:
+      # os `devem_falhar` do contrato 1:1 (violacoes plantadas no alvo fabricado) e
+      # as direcoes da guarda do smoke. `fora_do_contrato` entra no manifesto como
+      # declarado-sem-mordida COM MOTIVO — exigir mordida determinística de quem
+      # depende de rede, de engine instalada ou de tempo violaria a navalha do
+      # contrato, e reprovaria por ambiente em vez de por regressao.
+      #
+      # Chromium e obrigatorio: sem ele as violacoes plantadas de `gui` nao sao
+      # observaveis, o autoprova sai 2 (INDETERMINADO) e a release e recusada. E o
+      # comportamento certo — "nao consegui provar" nao pode virar release.
+      - name: Instalar dependencias e Chromium (a autoprova exige navegador)
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: As travas desta release ainda mordem
+        run: python scripts/autoprova.py --saida report/autoprova.json
+
+      # O manifesto nao pode dizer mais do que a autoprova mediu. Uma release que
+      # se declarasse `aprovada` com autoprova vermelha seria o selo falso que o
+      # contrato chama de pior que fiscal nenhum — e a checagem e barata: os dois
+      # numeros acabaram de ser produzidos, lado a lado.
+      - name: O manifesto e a autoprova concordam
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python scripts/publicar_release.py --conferir-mordida "$TAG" report/autoprova.json
+
       - name: Instalar o construtor
         run: pip install build
 
