@@ -144,11 +144,33 @@ travam por host — o gate é necessário, não suficiente.
 
 ### Via pacote instalável (CLI)
 
+O caminho de instalação é **declarado**, não deduzido — é este, e só este:
+
 ```bash
-pip install webqa-suite            # índice a definir; `make build` gera o wheel
+pip install "webqa-suite @ git+https://github.com/danzeroum/qa-suite@v1.0.0#subdirectory=webqa-suite"
 webqa-sondar --alvo https://homolog.meu-projeto.danzeroum.com \
              --caminhos data/caminhos-sensiveis.yaml
 ```
+
+> **Por que Git com `#subdirectory=`, e não um índice.** O pacote **não vive na raiz
+> do repositório** — a raiz carrega o `docker/` e os workflows; o pacote é
+> `webqa-suite/`. Sem o fragmento `#subdirectory=webqa-suite` o `pip` procura
+> `pyproject.toml` na raiz, não acha, e a falha é de "projeto inválido" — mensagem
+> que manda quem instala procurar defeito no lugar errado. A **decisão de não
+> publicar em índice** é do dono e está registrada no `release.yml`: uma tag produz
+> wheel + sdist como **artefato**, e nenhum passo publica em PyPI ou índice privado.
+> Enquanto isso valer, a referência direta (PEP 508) é o único caminho que resolve,
+> e `pip install webqa-suite` puro **não resolve** — dizer o contrário no README
+> seria um exemplo que não roda, que é pior que exemplo nenhum.
+>
+> A **tag** do caminho é a régua: `@v1.0.0` fixa uma versão comparável no tempo.
+> `@main` também resolve, e é o que se usa para desenvolver contra a ponta — ao
+> preço de a régua andar sozinha entre dois laudos.
+>
+> O caminho não é só documentação: `tests/test_empacotamento.py` o lê **daqui** e
+> confere a forma (repositório, subdiretório, tag), e o job `instalacao-declarada`
+> do CI o **executa** em ambiente limpo a cada push. README que descreve instalação
+> sem ninguém instalar é a classe de defeito que esta seção existe para não ter.
 
 Todo laudo carrega a **procedência** (versão do padrão + hash da lista curada);
 dois laudos só se comparam sob a mesma régua:

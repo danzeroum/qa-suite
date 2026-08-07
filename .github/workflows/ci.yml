@@ -152,6 +152,91 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # ---------- O caminho de instalação declarado (frente E, E1) ----------
+  #
+  # `tests/test_empacotamento.py` trava a FORMA do caminho (origem, subdiretório,
+  # tag) lendo o README. Forma não é matéria: um caminho sintaticamente perfeito
+  # pode não resolver — foi exatamente o que acontecia até aqui, com o README
+  # dizendo `pip install webqa-suite` para um pacote que não está em índice nenhum
+  # e cujo pyproject.toml não vive na raiz do repositório.
+  #
+  # Este job INSTALA. Ambiente limpo (nenhum `pip install -r requirements.txt`
+  # antes), origem REAL (a mesma URL do README), e a única coisa trocada é a
+  # referência: a tag declarada vira o commit sob teste, que é o conteúdo que este
+  # push está propondo. A string vem do próprio README via
+  # scripts/caminho_de_instalacao.py — se o job a montasse sozinho, provaria a si
+  # mesmo, e o README poderia perder o `#subdirectory=` sem nada ficar vermelho.
+  #
+  # Não depende do quality-gate: são perguntas independentes ("a suíte se verifica"
+  # × "o padrão se instala"), e encadeá-las só esconderia a segunda atrás da
+  # primeira. Reprodução offline: `make instalacao`.
+  instalacao-declarada:
+    name: O caminho de instalação do README resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # O commit precisa estar EM danzeroum/qa-suite para a origem declarada
+    # alcançá-lo. Num PR de fork ele está no fork, e o job falharia dizendo que a
+    # instalação quebrou quando o que falta é o commit ter chegado aqui — falso
+    # vermelho é tão caro quanto falso verde, porque ensina a ignorar o job.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Ambiente do consumidor, não o da suíte: quem instala o padrão não tem o
+      # requirements.txt de desenvolvimento. As dependências de runtime têm de vir
+      # do próprio pyproject, e é isso que este passo prova sem dizer.
+      - name: Instalar o padrão pelo caminho DECLARADO no README
+        env:
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          SPEC="$(python scripts/caminho_de_instalacao.py --ref "$SHA")"
+          echo "caminho declarado (com o commit sob teste): $SPEC"
+          python -m venv /tmp/venv-instalacao
+          /tmp/venv-instalacao/bin/pip install "$SPEC"
+
+      - name: A versão resolvida é a que o padrão declara
+        run: |
+          python - <<'PY'
+          import subprocess, sys, pathlib
+          sys.path.insert(0, ".")
+          from webqa import __version__ as esperado
+          medida = subprocess.run(
+              ["/tmp/venv-instalacao/bin/python", "-c",
+               "import importlib.metadata as m; print(m.version('webqa-suite'))"],
+              capture_output=True, text=True, check=True).stdout.strip()
+          assert medida == esperado, f"instalado {medida!r}, declarado {esperado!r}"
+          print(f"OK: pip resolveu webqa-suite=={medida}")
+          PY
+
+      # O console script é o que torna o pacote UTILIZÁVEL — sem ele o `pip
+      # install` teria sucesso e a adoção falharia no primeiro comando.
+      - name: O console script responde
+        run: /tmp/venv-instalacao/bin/webqa-sondar --help
+
+      # A fronteira do wheel, medida no ambiente INSTALADO (o release.yml a mede no
+      # artefato). checks/, tests/, scripts/ e fixture_target/ não são o padrão
+      # instalável: se vazassem, um consumidor herdaria os testes DA SUÍTE como se
+      # fossem dele.
+      - name: Só a biblioteca chegou ao ambiente instalado
+        # `-P`: sem o diretório corrente no sys.path. O passo roda em webqa-suite/,
+        # que TEM checks/ e tests/ no disco — sem a flag, a guarda acusaria vazamento
+        # olhando para o repositório em vez de para o ambiente instalado.
+        run: |
+          /tmp/venv-instalacao/bin/python -P - <<'PY'
+          import importlib.util
+          assert importlib.util.find_spec("webqa") is not None, "webqa não foi instalado"
+          for proibido in ("checks", "tests", "scripts", "fixture_target", "conftest"):
+              assert importlib.util.find_spec(proibido) is None, \
+                  f"{proibido} vazou para o ambiente instalado"
+          print("OK: só webqa/ viaja")
+          PY
+
   validate-target:
     name: Validação contra alvo real
     needs: quality-gate            # nenhuma validação sem verificação verde
