@@ -220,7 +220,7 @@ chaves planas (`webqa/config.py:32-33`). Toda medida por `metricas.registrar`,
 que descarta `None` — ausência não é zero. Nenhum teste parametrizado: a iteração
 acontece **dentro do corpo**, um nodeid por check (`GUI.md §2.3b`). Fixture nova
 `contexto_gui(**opcoes)`, que abre `browser.new_context(...)` próprio e fecha no
-`finally`, no molde de `network_log` (`conftest.py:338-349`) — **nenhum destes toca
+`finally`, no molde de `network_log` (`conftest.py:352-363`) — **nenhum destes toca
 `browser_page`**. Cada check ganha unidade em `tests/` sobre dado fabricado e
 contraparte que reprova de propósito em `fixture_target/paginas_gui/`.
 
@@ -943,7 +943,7 @@ e o diff visual emite veredito sobre uma imagem que não existe.
 
 Duas consequências para a estimativa da OS: o *unfiltering* do PNG tem cinco
 tipos por linha (None, Sub, Up, Average, Paeth) e não cabe numa função sob
-`C901 max-complexity = 8` (`pyproject.toml:47-52`) — são umas quatro ou cinco
+`C901 max-complexity = 8` (`pyproject.toml:55-60`) — são umas quatro ou cinco
 funções, e é bom que sejam, porque cada filtro fica testável isoladamente contra
 vetor conhecido. E o gate de complexidade vale em `webqa/`, que é onde o módulo
 mora — escondê‑lo no check para escapar dele seria contornar a guarda, não

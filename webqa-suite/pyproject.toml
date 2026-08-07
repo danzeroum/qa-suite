@@ -29,6 +29,14 @@ browser = ["playwright==1.56.0"]
 # decisão do comando unificado `webqa <sub>` (que exigiria movê-los para webqa/).
 [project.scripts]
 webqa-sondar = "webqa.sondagem:main"
+# Veredito do PROCESSO (frente E, E3): lê report/summary.json e traduz os três
+# estados em código de saída — 0 nenhuma violação observada · 10 violação · 20
+# indeterminado (BLOQUEIA) · 30 config inválida. Existe porque a semântica dos três
+# estados já vivia no nível dos checks e parava ali: com o alvo fora do ar o
+# preflight derruba tudo em skip e o pytest sai 0, então "não consegui medir" saía
+# com a cor de "medi e está bom". Irmão do webqa-sondar, e deliberadamente separado
+# do pytest: um veredito que também executasse teria dois motivos para falhar.
+webqa-veredicto = "webqa.veredito:main"
 
 [tool.setuptools]
 # Só a BIBLIOTECA viaja no wheel do padrão. checks/ (dimensões), tests/
